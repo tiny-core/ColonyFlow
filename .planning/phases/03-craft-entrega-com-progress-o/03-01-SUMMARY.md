@@ -29,3 +29,4 @@ completed: 2026-04-05
 ## Observações
 
 - A verificação completa requer testes in-world (ME Bridge real + destino real + padrões de autocrafting) para validar ME-04/DEL-03 em cenário real.
+- Correção aplicada em `modules/engine.lua` para remover erro de sintaxe que impedia carregar o módulo durante `tests/run.lua`.
