@@ -87,13 +87,35 @@ local function getDestinationSnapshot(state, targetName, targetInv, forceRefresh
 end
 
 local function getMeAmount(me, itemName)
-  local res = me and me.getItem and me:getItem({ name = itemName }) or nil
-  if type(res) ~= "table" then return 0 end
-  return tonumber(res.amount or 0) or 0
+  if not me then return 0 end
+  if type(me.getItem) == "function" then
+    local res = me:getItem({ name = itemName })
+    if type(res) == "table" then
+      local n = tonumber(res.amount or 0) or 0
+      if n > 0 then return n end
+    end
+  end
+  if type(me.listItems) ~= "function" then return 0 end
+  local list = me:listItems({ name = itemName })
+  if type(list) ~= "table" then return 0 end
+  local total = 0
+  for _, v in pairs(list) do
+    if type(v) == "table" and v.name == itemName then
+      total = total + (tonumber(v.amount or v.count or 0) or 0)
+    end
+  end
+  return total
 end
 
 local function isMeCraftable(me, itemName, count)
-  if not me or type(me.isCraftable) ~= "function" then return nil, nil end
+  if not me then return nil, nil end
+  if type(me.getItem) == "function" then
+    local res = me:getItem({ name = itemName })
+    if type(res) == "table" and res.isCraftable ~= nil then
+      return res.isCraftable == true, nil
+    end
+  end
+  if type(me.isCraftable) ~= "function" then return nil, nil end
   return me:isCraftable({ name = itemName, count = count })
 end
 
@@ -380,6 +402,10 @@ function Engine:tick()
               { request = r.id, item = candidate.name, err = tostring(craftableErr) })
           else
             local started, startErr = self.me:craftItem({ name = candidate.name, count = craftQty })
+            if started == nil and startErr == nil then
+              started = true
+              startErr = "retorno_nil"
+            end
             if started == true then
               state.cache:set("craft_lock", lockKey, true, lockTtlSeconds)
               state.stats.crafted = state.stats.crafted + 1
