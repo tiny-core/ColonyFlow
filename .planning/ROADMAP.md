@@ -86,7 +86,7 @@ Inclui:
   5. Em falha (ME offline/destino ausente), o sistema alerta e mantém a requisição na fila com backoff.
 
 Plans:
-- [ ] 03-01: Integrar ME Bridge para craft/entrega com prevenção de duplicidade e gating
+- [x] 03-01: Integrar ME Bridge para craft/entrega com prevenção de duplicidade e gating
 
 ### Phase 4: UI + Configuração Operacional
 
