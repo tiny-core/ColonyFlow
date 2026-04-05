@@ -73,4 +73,18 @@ function Config:getBool(section, key, default)
   return default
 end
 
+function Config:getList(section, key, default, sep)
+  local v = self:get(section, key, nil)
+  if v == nil then return default or {} end
+  local out = {}
+  local s = tostring(v)
+  local delimiter = sep or ","
+  for part in s:gmatch("[^" .. delimiter .. "]+") do
+    local t = Util.trim(part)
+    if t ~= "" then table.insert(out, t) end
+  end
+  if #out == 0 then return default or {} end
+  return out
+end
+
 return Config

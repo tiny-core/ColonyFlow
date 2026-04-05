@@ -33,6 +33,29 @@ function Equivalence:getTierOverride(name)
   return self.db.tier_overrides[name]
 end
 
+function Equivalence:isVanilla(name)
+  if not name then return false end
+  return tostring(name):sub(1, 10) == "minecraft:"
+end
+
+function Equivalence:isAllowed(name)
+  if not name then return false end
+  if self:isVanilla(name) then return true end
+  return self.db.items[name] ~= nil
+end
+
+function Equivalence:getClass(name)
+  local meta = self.db.items[name]
+  return meta and meta.class or nil
+end
+
+function Equivalence:getClassTiers(className)
+  local c = className and self.db.classes[className] or nil
+  local tiers = c and c.tiers or nil
+  if type(tiers) ~= "table" then return nil end
+  return tiers
+end
+
 function Equivalence:getEquivalents(name)
   local meta = self.db.items[name]
   local out = { name }

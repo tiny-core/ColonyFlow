@@ -36,4 +36,21 @@ function M.countAny(inv, names)
   return total, nil
 end
 
+function M.snapshot(inv)
+  local list, err = safeList(inv)
+  if not list then return nil, err end
+  local counts = {}
+  for _, stack in pairs(list) do
+    if stack and stack.name then
+      counts[stack.name] = (counts[stack.name] or 0) + (stack.count or 0)
+    end
+  end
+  return counts, nil
+end
+
+function M.countFromSnapshot(snapshot, itemName)
+  if type(snapshot) ~= "table" then return 0 end
+  return snapshot[itemName] or 0
+end
+
 return M

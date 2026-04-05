@@ -7,14 +7,27 @@ function Mine.new(state)
   return setmetatable({ state = state }, Mine)
 end
 
+local function fnv1a32(str)
+  local hash = 2166136261
+  for i = 1, #str do
+    hash = bit32.bxor(hash, str:byte(i))
+    hash = (hash * 16777619) % 4294967296
+  end
+  return hash
+end
+
+local function hashHex32(n)
+  return string.format("%08x", n % 4294967296)
+end
+
 local function normalizeRequest(r)
-  local items = {}
+  local accepted = {}
   if type(r.items) == "table" then
     for _, it in ipairs(r.items) do
-      table.insert(items, {
+      table.insert(accepted, {
         name = it.name,
         displayName = it.displayName,
-        count = it.count,
+        count = tonumber(it.count),
         maxStackSize = it.maxStackSize,
         tags = it.tags,
         nbt = it.nbt,
@@ -22,15 +35,38 @@ local function normalizeRequest(r)
     end
   end
 
+  local requiredCount = tonumber(r.count) or tonumber(r.minCount)
+  if not requiredCount and accepted[1] and accepted[1].count then requiredCount = accepted[1].count end
+  requiredCount = requiredCount or 0
+
+  for _, it in ipairs(accepted) do
+    if not it.count then it.count = requiredCount end
+  end
+
+  local id = r.id and tostring(r.id) or nil
+  if not id or id == "" then
+    local keys = {}
+    for _, it in ipairs(accepted) do
+      if it and it.name then
+        table.insert(keys, tostring(it.name) .. ":" .. tostring(it.count or 0))
+      end
+    end
+    table.sort(keys)
+    local raw = tostring(r.target or "") .. "|" .. tostring(requiredCount) .. "|" .. table.concat(keys, "|")
+    id = "gen:" .. hashHex32(fnv1a32(raw))
+  end
+
   return {
-    id = r.id,
+    id = id,
+    raw_id = r.id,
     name = r.name,
     desc = r.desc,
     state = r.state,
-    count = r.count,
-    minCount = r.minCount,
     target = r.target,
-    items = items,
+    requiredCount = requiredCount,
+    accepted = accepted,
+    items = accepted,
+    count = requiredCount,
   }
 end
 

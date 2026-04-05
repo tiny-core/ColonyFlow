@@ -1,5 +1,4 @@
 local MineColonies = require("modules.minecolonies")
-local ME = require("modules.me")
 local Inventory = require("modules.inventory")
 local Equivalence = require("modules.equivalence")
 local Tier = require("modules.tier")
@@ -11,23 +10,10 @@ function Engine.new(state)
   return setmetatable({
     state = state,
     mine = MineColonies.new(state),
-    me = ME.new(state),
     eq = Equivalence.new(state),
     tier = nil,
     work = {},
   }, Engine)
-end
-
-local function isPendingRequest(r)
-  if not r or not r.state then return false end
-  local s = tostring(r.state):lower()
-  if s == "done" or s == "completed" or s == "fulfilled" or s == "success" then return false end
-  return true
-end
-
-local function getItemAmount(itemInfo)
-  if not itemInfo then return 0 end
-  return itemInfo.amount or itemInfo.count or itemInfo.stored or 0
 end
 
 local function guessClass(name)
@@ -38,96 +24,128 @@ local function guessClass(name)
   return nil
 end
 
-local function maxTierForLevel(level)
-  if not level then return nil end
-  if level <= 1 then return "iron" end
-  if level == 2 then return "diamond" end
-  return "netherite"
+local function listIndex(list, value)
+  if type(list) ~= "table" then return nil end
+  for i, v in ipairs(list) do
+    if v == value then return i end
+  end
+  return nil
 end
 
-local function pickCandidate(state, me, eq, tier, request, opts)
-  if #request.items == 0 then return nil, "sem_itens" end
+local function tierRank(eq, className, tierName)
+  if not tierName then return nil end
+  local tiers = eq:getClassTiers(className)
+  local idx = listIndex(tiers, tierName)
+  if idx then return idx end
+  local tool = { wood = 1, stone = 2, iron = 3, diamond = 4, netherite = 5 }
+  local armor = { leather = 1, iron = 2, diamond = 3, netherite = 4 }
+  if className == "ARMOR_CHEST" then return armor[tierName] end
+  return tool[tierName]
+end
 
-  local mode = state.cfg:get("substitution", "mode", "safe")
-  local candidates = {}
-
-  for _, it in ipairs(request.items) do
-    table.insert(candidates, { item = it, source = "request" })
+local function isPendingState(cfg, stateValue)
+  local s = stateValue and tostring(stateValue):lower() or ""
+  if s == "" then return false end
+  local deny = cfg:getList("minecolonies", "completed_states_deny", { "done", "completed", "fulfilled", "success" })
+  for _, v in ipairs(deny) do
+    if s == tostring(v):lower() then return false end
   end
+  local allow = cfg:getList("minecolonies", "pending_states_allow", {})
+  if #allow == 0 then return true end
+  for _, v in ipairs(allow) do
+    if s == tostring(v):lower() then return true end
+  end
+  return false
+end
 
-  if mode ~= "safe" then
-    local base = request.items[1]
-    local eqs = eq:getEquivalents(base.name)
-    for _, n in ipairs(eqs) do
-      table.insert(candidates, { item = { name = n, count = base.count }, source = "equivalence" })
+local function resolveTarget(cfg)
+  local targets = cfg:getList("delivery", "default_target_container", {})
+  for _, name in ipairs(targets) do
+    if name ~= "" and peripheral.isPresent(name) then
+      return name, peripheral.wrap(name)
+    end
+  end
+  local raw = cfg:get("delivery", "default_target_container", "")
+  if raw ~= "" and peripheral.isPresent(raw) then
+    return raw, peripheral.wrap(raw)
+  end
+  return nil, nil
+end
+
+local function getDestinationSnapshot(state, targetName, targetInv, forceRefresh)
+  local ttl = state.cfg:getNumber("delivery", "destination_cache_ttl_seconds", 2)
+  if not forceRefresh then
+    local cached = state.cache:get("dest", targetName)
+    if cached then return cached, nil end
+  end
+  local snap, err = Inventory.snapshot(targetInv)
+  if not snap then return nil, err end
+  state.cache:set("dest", targetName, snap, ttl)
+  return snap, nil
+end
+
+local function pickCandidate(state, eq, tier, request)
+  local accepted = request.accepted or request.items or {}
+  if #accepted == 0 then return nil, "sem_itens" end
+
+  local allowUnmapped = state.cfg:getBool("substitution", "allow_unmapped_mods", false)
+  local vanillaFirst = state.cfg:getBool("substitution", "vanilla_first", true)
+  local tierPref = state.cfg:get("substitution", "tier_preference", "lowest"):lower()
+
+  local eligible = {}
+  local blocked = {}
+  for _, it in ipairs(accepted) do
+    if it and it.name then
+      local allowed = allowUnmapped or eq:isAllowed(it.name)
+      if allowed then
+        table.insert(eligible, it)
+      else
+        table.insert(blocked, it)
+      end
     end
   end
 
-  local maxTool = opts and opts.maxTool or state.cfg:get("tiers", "max_tool_tier", "netherite")
-  local maxArmor = opts and opts.maxArmor or state.cfg:get("tiers", "max_armor_tier", "netherite")
+  if #eligible == 0 then
+    if #blocked > 0 then return nil, "nao_suportado" end
+    return nil, "sem_candidato"
+  end
 
-  local best = nil
-  local bestScore = -math.huge
-  local bestWhy = nil
+  local best, bestWhy, bestScore = nil, nil, -math.huge
+  for idx, it in ipairs(eligible) do
+    local className = eq:getClass(it.name) or guessClass(it.name)
+    local t, tierWhy = tier:infer({ name = it.name, tags = it.tags })
+    local score = 0
 
-  for _, c in ipairs(candidates) do
-    local it = c.item
-    if it and it.name then
-      local info = state.cache:get("me", it.name)
-      if not info then
-        local itemInfo = me:getItem({ name = it.name })
-        local craftable = me:isCraftable({ name = it.name })
-        info = {
-          amount = getItemAmount(itemInfo),
-          craftable = craftable == true or (itemInfo and itemInfo.isCraftable == true),
-          tags = itemInfo and itemInfo.tags or it.tags,
-        }
-        state.cache:set("me", it.name, info, 5)
-      end
+    local isVanilla = eq:isVanilla(it.name)
+    if vanillaFirst then
+      if isVanilla then score = score + 100 end
+    else
+      if not isVanilla then score = score + 100 end
+    end
 
-      local meta = eq:getItemMeta(it.name)
-      local className = (meta and meta.class) or guessClass(it.name)
-      local t, tierWhy = tier:infer({ name = it.name, tags = info.tags })
-      local allowed = true
-      if className == "ARMOR_CHEST" and t then
-        allowed = tier:isTierAllowed(className, t, maxArmor)
-      elseif className and t then
-        allowed = tier:isTierAllowed(className, t, maxTool)
-      end
-
-      local score = 0
-      if not allowed then
-        score = score - 10000
+    local rank = tierRank(eq, className, t)
+    if rank then
+      if tierPref == "highest" then
+        score = score + rank
       else
-        if info.amount and info.amount > 0 then score = score + 1000 end
-        if info.craftable then score = score + 100 end
+        score = score + (100 - rank)
       end
+    end
 
-      if t then
-        local tn = tierWhy == "override" and 50 or 0
-        score = score + tn
-        if t == "netherite" then score = score + 50 end
-        if t == "diamond" then score = score + 40 end
-        if t == "iron" then score = score + 30 end
-        if t == "stone" then score = score + 20 end
-        if t == "wood" or t == "leather" then score = score + 10 end
-      end
+    score = score - (idx / 1000)
 
-      if c.source == "request" then score = score + 5 end
-
-      if score > bestScore then
-        bestScore = score
-        best = it
-        bestWhy = {
-          source = c.source,
-          amount = info.amount,
-          craftable = info.craftable,
-          class = className,
-          tier = t,
-          tier_reason = tierWhy,
-          allowed = allowed,
-        }
-      end
+    if score > bestScore then
+      bestScore = score
+      best = it
+      bestWhy = {
+        policy = { vanilla_first = vanillaFirst, tier_preference = tierPref, allow_unmapped_mods = allowUnmapped },
+        class = className,
+        tier = t,
+        tier_reason = tierWhy,
+        vanilla = isVanilla,
+        allowed = true,
+        equivalents = eq:getEquivalents(it.name),
+      }
     end
   end
 
@@ -158,161 +176,78 @@ function Engine:tick()
   end
   state.colonyStats = colonyStats
 
-  local buildings = state.cache:get("mc", "buildings")
-  if not buildings then
-    buildings = self.mine:listBuildings()
-    state.cache:set("mc", "buildings", buildings, 10)
-  end
+  local targetName, targetInv = resolveTarget(state.cfg)
 
-  if not state.devices.meBridge then
-    state.logger:warn("meBridge indisponível; aguardando...")
-    return
-  end
-
-  local okOnline, onlineErr = self.me:isOnline()
-  if not okOnline then
-    state.logger:warn("ME indisponível; aguardando...", { reason = onlineErr })
-    return
-  end
-
-  local target = state.cfg:get("delivery", "default_target_container", "")
-  local targetInv = (target ~= "" and peripheral.isPresent(target)) and peripheral.wrap(target) or nil
   if not targetInv then
-    state.logger:warn("Destino padrão indisponível; aguardando...", { target = target })
+    state.logger:warn("Destino padrão indisponível; aguardando...", { target = state.cfg:get("delivery", "default_target_container", "") })
+    for _, r in ipairs(requests) do
+      if r and r.id and isPendingState(state.cfg, r.state) then
+        local work = self.work[r.id] or {}
+        work.status = "waiting_retry"
+        work.request_state = r.state
+        work.target = r.target
+        work.err = "destino_indisponivel"
+        work.next_retry = os.epoch("utc") + 5000
+        self.work[r.id] = work
+      end
+    end
     return
   end
 
-  local enforce = state.cfg:getBool("progression", "enforce_building_gating", true)
+  local snap, snapErr = getDestinationSnapshot(state, targetName, targetInv, false)
 
   for _, r in ipairs(requests) do
-    if isPendingRequest(r) then
+    if r and r.id and isPendingState(state.cfg, r.state) then
       local job = self.work[r.id]
       if job and job.next_retry and job.next_retry > os.epoch("utc") then
         goto continue
       end
 
-      local buildingLevel = nil
-      if enforce and type(r.target) == "string" then
-        local targetLower = r.target:lower()
-        for _, b in ipairs(buildings) do
-          if b and b.name and targetLower:find(tostring(b.name):lower(), 1, true) then
-            buildingLevel = tonumber(b.level) or buildingLevel
-            break
-          end
-        end
-      end
+      local candidate, why = pickCandidate(state, self.eq, self.tier, r)
+      local work = self.work[r.id] or {}
+      work.request_state = r.state
+      work.target = r.target
+      work.requested = (r.accepted and r.accepted[1] and r.accepted[1].name) or (r.items and r.items[1] and r.items[1].name) or nil
+      work.accepted = r.accepted or r.items
 
-      local candidate, why = pickCandidate(state, self.me, self.eq, self.tier, r, {
-        maxTool = (enforce and buildingLevel) and maxTierForLevel(buildingLevel) or nil,
-        maxArmor = (enforce and buildingLevel) and maxTierForLevel(buildingLevel) or nil,
-      })
       if not candidate then
-        self.work[r.id] = { status = "error", next_retry = os.epoch("utc") + 5000 }
+        work.status = (why == "nao_suportado") and "unsupported" or "error"
+        work.err = why
+        work.next_retry = os.epoch("utc") + 15000
+        self.work[r.id] = work
         state.logger:warn("Request sem candidato", { request = r.id, reason = why })
         goto continue
       end
 
-      if type(why) == "table" and why.source == "equivalence" then
+      work.chosen = candidate.name
+      work.choice = why
+      work.needed = tonumber(candidate.count or r.requiredCount or r.count or 0) or 0
+
+      if not snap then
+        work.status = "waiting_retry"
+        work.err = snapErr
+        work.next_retry = os.epoch("utc") + 5000
+        self.work[r.id] = work
+        state.logger:warn("Falha ao ler destino", { request = r.id, err = snapErr })
+        goto continue
+      end
+
+      local present = Inventory.countFromSnapshot(snap, candidate.name)
+      local missing = math.max(0, work.needed - present)
+      work.present = present
+      work.missing = missing
+      work.status = missing > 0 and "pending" or "done"
+      self.work[r.id] = work
+
+      if type(why) == "table" and type(why.equivalents) == "table" and #why.equivalents > 1 then
         state.stats.substitutions = state.stats.substitutions + 1
-        state.logger:info("Substituição sugerida por equivalência", {
+        state.logger:info("Equivalências conhecidas para o item escolhido", {
           request = r.id,
           target = r.target,
           item = candidate.name,
           tier = why.tier,
           class = why.class,
-          allowed = why.allowed,
         })
-      end
-
-      local needed = tonumber(candidate.count or r.count or 0) or 0
-      local work = self.work[r.id] or {}
-      work.status = work.status or "pending"
-      work.request_state = r.state
-      work.target = r.target
-      work.requested = (r.items[1] and r.items[1].name) or nil
-      work.chosen = candidate.name
-      work.choice = why
-      work.needed = needed
-      local present, invErr = Inventory.countItem(targetInv, candidate.name)
-      if present == nil then
-        work.status = "waiting_retry"
-        work.next_retry = os.epoch("utc") + 5000
-        work.err = invErr
-        self.work[r.id] = work
-        state.logger:warn("Falha ao ler destino", { request = r.id, err = invErr })
-        goto continue
-      end
-
-      local missing = math.max(0, needed - present)
-      if missing <= 0 then
-        work.status = "done"
-        work.present = present
-        work.missing = 0
-        self.work[r.id] = work
-        goto continue
-      end
-      work.present = present
-      work.missing = missing
-      work.status = "pending"
-      self.work[r.id] = work
-
-      local itemInfo = self.me:getItem({ name = candidate.name })
-      local available = getItemAmount(itemInfo)
-      local deliverNow = math.min(missing, available)
-      if deliverNow > 0 then
-        local exported, expErr = self.me:exportItem({ name = candidate.name, count = deliverNow }, target)
-        if exported == nil then
-          work.status = "waiting_retry"
-          work.next_retry = os.epoch("utc") + 5000
-          work.err = expErr
-          self.work[r.id] = work
-          state.stats.errors = state.stats.errors + 1
-          state.logger:error("Falha ao exportar item", { request = r.id, item = candidate.name, err = expErr })
-          goto continue
-        end
-        state.stats.delivered = state.stats.delivered + deliverNow
-        missing = missing - deliverNow
-        work.delivered = (work.delivered or 0) + deliverNow
-        work.missing = missing
-        work.status = missing > 0 and "partial_delivered" or "done"
-        self.work[r.id] = work
-      end
-
-      if missing > 0 then
-        local crafting, craftStateErr = self.me:isCrafting({ name = candidate.name })
-        if crafting == true then
-          work.status = "crafting"
-          work.next_retry = os.epoch("utc") + 5000
-          self.work[r.id] = work
-          goto continue
-        end
-
-        local craftable = self.me:isCraftable({ name = candidate.name })
-        if craftable ~= true then
-          work.status = "waiting_retry"
-          work.next_retry = os.epoch("utc") + 15000
-          work.err = craftStateErr
-          self.work[r.id] = work
-          state.logger:warn("Item não craftável no ME", { request = r.id, item = candidate.name, missing = missing, err = craftStateErr })
-          goto continue
-        end
-
-        local craftJob, craftErr = self.me:craftItem({ name = candidate.name, count = missing })
-        if craftJob == nil then
-          work.status = "waiting_retry"
-          work.next_retry = os.epoch("utc") + 15000
-          work.err = craftErr
-          self.work[r.id] = work
-          state.stats.errors = state.stats.errors + 1
-          state.logger:error("Falha ao solicitar craft", { request = r.id, item = candidate.name, err = craftErr })
-          goto continue
-        end
-
-        state.stats.crafted = state.stats.crafted + missing
-        work.status = "crafting"
-        work.next_retry = os.epoch("utc") + 5000
-        work.craft_requested = missing
-        self.work[r.id] = work
       end
     end
     ::continue::

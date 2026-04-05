@@ -62,7 +62,7 @@ Inclui:
   5. Pedidos com destino inválido entram em estado de retry com log e sem craft cego.
 
 Plans:
-- [ ] 02-01: Implementar normalização, tiers e equivalências com reconciliação de destino
+- [x] 02-01: Implementar normalização, tiers e equivalências com reconciliação de destino
 
 ### Phase 3: Craft + Entrega com Progressão
 
@@ -139,7 +139,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Fundação Operacional | 1/1 | Complete    | 2026-04-05 |
-| 2. Núcleo de Requisições + Filtros | 0/1 | Not started | - |
+| 2. Núcleo de Requisições + Filtros | 1/1 | In review | - |
 | 3. Craft + Entrega com Progressão | 0/1 | Not started | - |
 | 4. UI + Configuração Operacional | 0/1 | Not started | - |
 | 5. Testes + Endurecimento | 0/1 | Not started | - |
