@@ -17,12 +17,18 @@ local function resolve(cfg, logger, key, typeName)
   local dev = tryWrapByName(name)
   if dev then return dev, name end
 
-  dev = tryFindByType(typeName)
-  if dev then
-    return dev, peripheral.getName(dev)
+  if type(typeName) == "table" then
+    for _, t in ipairs(typeName) do
+      dev = tryFindByType(t)
+      if dev then return dev, peripheral.getName(dev) end
+    end
+  else
+    dev = tryFindByType(typeName)
+    if dev then return dev, peripheral.getName(dev) end
   end
 
-  logger:warn("Periférico não encontrado: " .. key .. " (" .. typeName .. ")")
+  local typeLabel = type(typeName) == "table" and table.concat(typeName, "|") or tostring(typeName)
+  logger:warn("Periférico não encontrado: " .. key .. " (" .. typeLabel .. ")")
   return nil, nil
 end
 
@@ -32,7 +38,7 @@ function M.discover(cfg, logger)
   local colonyIntegrator, colonyName = resolve(cfg, logger, "colony_integrator", "colonyIntegrator")
   if not colonyIntegrator then table.insert(issues, "colonyIntegrator ausente") end
 
-  local meBridge, meName = resolve(cfg, logger, "me_bridge", "meBridge")
+  local meBridge, meName = resolve(cfg, logger, "me_bridge", { "meBridge", "me_bridge" })
   if not meBridge then table.insert(issues, "meBridge ausente") end
 
   local modem, modemName = resolve(cfg, logger, "modem", "modem")
