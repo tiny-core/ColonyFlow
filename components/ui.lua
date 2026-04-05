@@ -76,23 +76,29 @@ end
 
 local function renderStatus(state, mon)
   withTerm(mon, function()
-    local w, _ = term.getSize()
+    local w, h = term.getSize()
     term.setCursorPos(1, 1)
     term.write("Status")
     term.setCursorPos(1, 2)
     term.write(string.rep("-", math.max(0, w)))
-    term.setCursorPos(1, 3)
-    term.write("Processados: " .. tostring(state.stats.processed))
-    term.setCursorPos(1, 4)
-    term.write("Erros: " .. tostring(state.stats.errors))
-    term.setCursorPos(1, 5)
-    term.write("Reqs: " .. tostring(#state.requests))
-    term.setCursorPos(1, 6)
-    term.write("Entregues: " .. tostring(state.stats.delivered))
-    term.setCursorPos(1, 7)
-    term.write("Craft: " .. tostring(state.stats.crafted))
-    term.setCursorPos(1, 8)
-    term.write("Subst: " .. tostring(state.stats.substitutions))
+
+    local y = 3
+    local cs = state.colonyStats or {}
+    term.setCursorPos(1, y) term.write(shorten("Colônia: " .. tostring(cs.name or "—"), w)); y = y + 1
+    term.setCursorPos(1, y) term.write(shorten("Cidadãos: " .. tostring(cs.citizens or "—") .. "/" .. tostring(cs.maxCitizens or "—"), w)); y = y + 1
+    term.setCursorPos(1, y) term.write(shorten("Felicidade: " .. tostring(cs.happiness or "—"), w)); y = y + 1
+    term.setCursorPos(1, y) term.write(shorten("Ataque: " .. tostring(cs.underAttack or false), w)); y = y + 1
+    term.setCursorPos(1, y) term.write(shorten("Obras: " .. tostring(cs.constructionSites or "—"), w)); y = y + 2
+
+    term.setCursorPos(1, y) term.write(shorten("Reqs: " .. tostring(#state.requests), w)); y = y + 1
+    term.setCursorPos(1, y) term.write(shorten("Processados: " .. tostring(state.stats.processed), w)); y = y + 1
+    term.setCursorPos(1, y) term.write(shorten("Entregues: " .. tostring(state.stats.delivered), w)); y = y + 1
+    term.setCursorPos(1, y) term.write(shorten("Craft req.: " .. tostring(state.stats.crafted), w)); y = y + 1
+    term.setCursorPos(1, y) term.write(shorten("Subst: " .. tostring(state.stats.substitutions), w)); y = y + 1
+    term.setCursorPos(1, y) term.write(shorten("Erros: " .. tostring(state.stats.errors), w)); y = y + 1
+
+    term.setCursorPos(1, h)
+    term.write(shorten("v1 | " .. os.date("!%H:%M:%SZ"), w))
   end)
 end
 

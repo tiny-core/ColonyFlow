@@ -151,6 +151,13 @@ function Engine:tick()
   local requests = self.mine:listRequests()
   state.requests = requests
 
+  local colonyStats = state.cache:get("mc", "stats")
+  if not colonyStats then
+    colonyStats = self.mine:getColonyStats()
+    state.cache:set("mc", "stats", colonyStats, 2)
+  end
+  state.colonyStats = colonyStats
+
   local buildings = state.cache:get("mc", "buildings")
   if not buildings then
     buildings = self.mine:listBuildings()

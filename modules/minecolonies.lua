@@ -75,6 +75,31 @@ function Mine:listBuildings()
   return out
 end
 
+function Mine:getColonyStats()
+  local integrator = self.state.devices.colonyIntegrator
+  local stats = {}
+
+  local okName, name = Util.safeCall(integrator.getColonyName)
+  if okName then stats.name = name end
+
+  local okCit, citizens = Util.safeCall(integrator.amountOfCitizens)
+  if okCit then stats.citizens = citizens end
+
+  local okMax, maxCit = Util.safeCall(integrator.maxOfCitizens)
+  if okMax then stats.maxCitizens = maxCit end
+
+  local okHappy, happiness = Util.safeCall(integrator.getHappiness)
+  if okHappy then stats.happiness = happiness end
+
+  local okAtk, underAttack = Util.safeCall(integrator.isUnderAttack)
+  if okAtk then stats.underAttack = underAttack end
+
+  local okSites, sites = Util.safeCall(integrator.amountOfConstructionSites)
+  if okSites then stats.constructionSites = sites end
+
+  return stats
+end
+
 return {
   new = Mine.new,
 }
