@@ -92,6 +92,11 @@ local function getMeAmount(me, itemName)
   return tonumber(res.amount or 0) or 0
 end
 
+local function isMeCraftable(me, itemName, count)
+  if not me or type(me.isCraftable) ~= "function" then return nil, nil end
+  return me:isCraftable({ name = itemName, count = count })
+end
+
 local function strLower(s)
   return s and tostring(s):lower() or ""
 end
@@ -171,9 +176,15 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
       end
     end
     local amount = getMeAmount(me, it.name)
+    local craftable, craftableErr = nil, nil
+    if amount <= 0 then
+      craftable, craftableErr = isMeCraftable(me, it.name, tonumber(it.count or request.requiredCount or request.count or 1) or 1)
+    end
     local score = 0
 
     if amount > 0 then score = score + 10000 end
+    if craftable == true then score = score + 5000 end
+    if craftable == false then score = score - 5000 end
 
     local isVanilla = eq:isVanilla(it.name)
     if vanillaFirst then
@@ -208,6 +219,8 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
         vanilla = isVanilla,
         allowed = true,
         me_amount = amount,
+        me_craftable = craftable,
+        me_craftable_err = craftableErr,
         equivalents = eq:getEquivalents(it.name),
       }
     end
@@ -359,7 +372,7 @@ function Engine:tick()
           work.craft.last_seen = os.epoch("utc")
         else
           local craftable, craftableErr = self.me:isCraftable({ name = candidate.name, count = craftQty })
-          if craftable ~= true then
+          if craftable == false then
             work.status = "waiting_retry"
             work.err = "nao_craftavel:" .. tostring(craftableErr or "")
             work.next_retry = os.epoch("utc") + 15000

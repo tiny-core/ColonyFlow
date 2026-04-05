@@ -523,6 +523,87 @@ local tests = {
     peripheral = oldPeripheral
   end
   },
+  { "engine_prefere_disponivel_ou_craftavel", function()
+      local Engine = require("modules.engine")
+      local Cache = require("lib.cache")
+
+      local inv = { list = function() return {} end }
+      local oldPeripheral = peripheral
+      peripheral = {
+        isPresent = function(name) return name == "test_inv" end,
+        wrap = function() return inv end,
+      }
+
+      local craftedName = nil
+      local meBridge = {
+        isConnected = function() return true end,
+        isOnline = function() return true end,
+        getItem = function(filter)
+          if filter.name == "minecraft:iron_sword" then
+            return { name = filter.name, amount = 1, isCraftable = false }
+          end
+          return { name = filter.name, amount = 0, isCraftable = false }
+        end,
+        isItemCraftable = function(filter)
+          if filter.name == "minecraft:netherite_sword" then return false end
+          if filter.name == "minecraft:iron_sword" then return true end
+          return false
+        end,
+        isItemCrafting = function(filter) return false end,
+        craftItem = function(filter) craftedName = filter.name; return true, "ok" end,
+      }
+
+      local cfg = makeCfg({
+        minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
+        delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "2" },
+        substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "highest" },
+      })
+
+      local state = {
+        cfg = cfg,
+        cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+        logger = { warn = function() end, info = function() end, error = function() end },
+        devices = {
+          meBridge = meBridge,
+          colonyIntegrator = {
+            getRequests = function()
+              return {
+                {
+                  id = 14,
+                  state = "requested",
+                  target = "builder",
+                  count = 1,
+                  items = {
+                    { name = "minecraft:netherite_sword", count = 1 },
+                    { name = "minecraft:iron_sword", count = 1 },
+                  },
+                },
+              }
+            end,
+            getBuildings = function()
+              return { { name = "builder", type = "builder", level = 5, built = true } }
+            end,
+            getColonyName = function() return "t" end,
+            amountOfCitizens = function() return 0 end,
+            maxOfCitizens = function() return 0 end,
+            getHappiness = function() return 0 end,
+            isUnderAttack = function() return false end,
+            amountOfConstructionSites = function() return 0 end,
+          },
+        },
+        requests = {},
+        stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+      }
+
+      local engine = Engine.new(state)
+      state.work = engine.work
+      engine:tick()
+      assertEq(state.work["14"].chosen, "minecraft:iron_sword")
+      assertEq(craftedName, nil, "não deveria craftar quando já existe em estoque")
+
+      peripheral = oldPeripheral
+    end
+  },
   { "me_bridge_api_fallbacks", function()
     local ME = require("modules.me")
     local bridge = {
