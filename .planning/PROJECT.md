@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Sistema de automação em Lua para um Advanced Computer do CC: Tweaked que conecta MineColonies, Applied Energistics 2 e Advanced Peripherals. O objetivo é observar requisições pendentes da colônia, validar disponibilidade e necessidade real de itens, acionar autocrafting apenas do faltante e entregar automaticamente ao destino correto. A operação deve ser visível em dois Advanced Monitors com interface ASCII em tempo real e ser robusta o suficiente para rodar continuamente.
+Sistema de automação em Lua para um Advanced Computer do CC: Tweaked que conecta MineColonies, Applied Energistics 2 e Advanced Peripherals. O objetivo é observar requisições pendentes da colônia, validar disponibilidade e necessidade real de itens, acionar autocrafting apenas do faltante e entregar automaticamente ao destino correto. Além disso, inclui um sistema de filtragem inteligente para modpacks que mapeia itens equivalentes entre mods e aplica regras de tier (iron/diamond/netherite) para sugerir ou priorizar substituições compatíveis com o nível das buildings/workers. A operação deve ser visível em dois Advanced Monitors com interface ASCII em tempo real e ser robusta o suficiente para rodar continuamente.
 
 ## Core Value
 
@@ -22,6 +22,13 @@ Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColo
 - [ ] Calcular apenas o faltante real antes de solicitar autocrafting
 - [ ] Solicitar crafting automaticamente no AE2 e acompanhar o andamento da operação
 - [ ] Entregar automaticamente os itens ao destino quando o inventário estiver conectado e identificável
+- [ ] Implementar sistema de filtragem inteligente com equivalências entre mods (substituições configuráveis)
+- [ ] Classificar automaticamente itens em tiers (iron/diamond/netherite) com heurísticas por tags/metadados e regras configuráveis
+- [ ] Respeitar restrições de tier por nível de building/worker ao selecionar ferramentas/equipamentos substitutos
+- [ ] Fornecer interface de configuração para adicionar mapeamentos manualmente e via arquivo JSON
+- [ ] Implementar cache otimizado para consultas repetidas (ME, tiers, mapeamentos e destinos)
+- [ ] Incluir testes unitários para mapeamentos e regras de progressão (incluindo ATM10 v6.4 e mods populares)
+- [ ] Garantir compatibilidade de operação em singleplayer e multiplayer
 - [ ] Exibir requisições e status operacional em dois Advanced Monitors com layout ASCII responsivo
 - [ ] Registrar logs estruturados em português com rotação e níveis de severidade
 - [ ] Operar em loop autônomo com fila, retentativas e recuperação segura de falhas
@@ -31,6 +38,7 @@ Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColo
 - Interface fora do jogo ou painel web — a v1 deve operar inteiramente dentro do ecossistema CC: Tweaked
 - Matching avançado por NBT completo — a primeira versão usará correspondência por nome técnico e dano
 - Dependência de intervenção manual no fluxo principal — a v1 prioriza operação autônoma
+- Substituir/alterar requisições “na origem” do MineColonies — a v1 atua atendendo pedidos e escolhendo o que craftar/entregar, sem modificar o estado interno do mod
 
 ## Context
 
@@ -60,6 +68,8 @@ Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColo
 | Correspondência por nome técnico e dano | Entrega boa precisão com menor complexidade que matching por NBT completo na primeira versão | — Pending |
 | Segundo monitor com painel misto | O operador precisa ver colônia, operação e estoque crítico sem trocar de tela | — Pending |
 | Política de falha com alerta e fila | Requisições problemáticas devem permanecer visíveis e elegíveis para nova tentativa | — Pending |
+| Substituições devem ser auditáveis | Trocas entre mods podem causar confusão; logs e UI devem mostrar sempre o que foi substituído e por quê | — Pending |
+| Tier gating por building/worker é obrigatório | Evita “pular progressão” e mantém coerência com o nível atual da colônia | — Pending |
 
 ## Evolution
 
