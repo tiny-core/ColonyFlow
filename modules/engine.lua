@@ -336,6 +336,12 @@ function Engine:tick()
   end
 
   local snap, snapErr = getDestinationSnapshot(state, targetName, targetInv, false)
+  local available = {}
+  if type(snap) == "table" then
+    for k, v in pairs(snap) do
+      available[k] = tonumber(v or 0) or 0
+    end
+  end
   local buildings = state.cache:get("mc", "buildings")
   if not buildings then
     buildings = self.mine:listBuildings()
@@ -385,9 +391,12 @@ function Engine:tick()
         goto continue
       end
 
-      local present = Inventory.countFromSnapshot(snap, candidate.name)
-      local missing = math.max(0, work.needed - present)
-      work.present = present
+      local presentTotal = Inventory.countFromSnapshot(snap, candidate.name)
+      local alloc = math.min(tonumber(available[candidate.name] or 0) or 0, work.needed)
+      available[candidate.name] = (tonumber(available[candidate.name] or 0) or 0) - alloc
+      local missing = math.max(0, work.needed - alloc)
+      work.present_total = presentTotal
+      work.present = alloc
       work.missing = missing
 
       if missing <= 0 then
