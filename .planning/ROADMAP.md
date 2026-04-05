@@ -6,7 +6,7 @@ Objetivo: entregar um sistema autônomo em Lua (CC: Tweaked) que lê requisiçõ
 
 ## Phases
 
-- [ ] **Phase 1: Fundação Operacional** - Bootstrap confiável com config, logs, cache e periféricos validados
+- [x] **Phase 1: Fundação Operacional** - Bootstrap confiável com config, logs, cache e periféricos validados (completed 2026-04-05)
 - [ ] **Phase 2: Núcleo de Requisições + Filtros** - Normalizar requests, resolver equivalências/tiers e calcular faltante real por destino
 - [ ] **Phase 3: Craft + Entrega com Progressão** - Integrar ME para craft e entrega, evitando duplicidade e respeitando tier gating por building
 - [ ] **Phase 4: UI + Configuração Operacional** - UI dual-monitor, paginação, status misto e editor de mapeamentos com logs de substituição
@@ -37,7 +37,7 @@ Inclui:
   5. Loop principal roda continuamente e sobrevive a erros de `pcall` sem encerrar.
 
 Plans:
-- [ ] 01-01: Formalizar e verificar a fundação operacional (retroativo)
+- [x] 01-01: Formalizar e verificar a fundação operacional (retroativo)
 
 ### Phase 2: Núcleo de Requisições + Filtros
 
@@ -138,7 +138,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Fundação Operacional | 0/1 | Not started | - |
+| 1. Fundação Operacional | 1/1 | Complete    | 2026-04-05 |
 | 2. Núcleo de Requisições + Filtros | 0/1 | Not started | - |
 | 3. Craft + Entrega com Progressão | 0/1 | Not started | - |
 | 4. UI + Configuração Operacional | 0/1 | Not started | - |
