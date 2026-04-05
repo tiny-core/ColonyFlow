@@ -3,12 +3,16 @@ status: partial
 phase: 03-craft-entrega-com-progress-o
 source: [03-VERIFICATION.md]
 started: "2026-04-05T18:00:00.000Z"
-updated: "2026-04-05T18:00:00.000Z"
+updated: "2026-04-05T20:40:00.000Z"
 ---
 
 ## Current Test
 
-awaiting human testing
+number: 1
+name: Rodar harness de testes
+expected: |
+  Executar `tests/run.lua` no CC e ver `Tests: N/N OK` sem falhas.
+awaiting: user response
 
 ## Tests
 
@@ -42,4 +46,3 @@ skipped: 0
 blocked: 0
 
 ## Gaps
-
