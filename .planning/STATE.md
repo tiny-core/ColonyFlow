@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v6.4
 milestone_name: milestone
 status: planning
-stopped_at: Phase 1 formalizada e marcada como complete
-last_updated: "2026-04-05T16:44:08.761Z"
+stopped_at: Phase 2 context gathered
+last_updated: "2026-04-05T17:44:55.996Z"
 last_activity: 2026-04-05 — Phase 1 concluída (01-01)
 progress:
   total_phases: 5
@@ -61,6 +61,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-05
-Stopped at: Phase 1 formalizada e marcada como complete
-Resume file: None
+Last session: 2026-04-05T17:44:55.992Z
+Stopped at: Phase 2 context gathered
+Resume file: .planning/phases/02-n-cleo-de-requisi-es-filtros/02-CONTEXT.md
