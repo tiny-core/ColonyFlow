@@ -426,6 +426,20 @@ function Engine:tick()
       end
 
       if exportQty > 0 then
+        local exportMode = tostring(state.cfg:get("delivery", "export_mode", "peripheral") or "peripheral"):lower()
+        local exportTarget = targetName
+        if exportMode == "direction" then
+          exportTarget = tostring(state.cfg:get("delivery", "export_direction", "") or ""):lower()
+          if exportTarget == "" then
+            work.status = "waiting_retry"
+            work.err = "export_direction_vazio"
+            work.next_retry = os.epoch("utc") + 5000
+            state.logger:warn("Entrega não ocorreu; export_direction vazio", { request = r.id, item = candidate.name })
+            self.work[r.id] = work
+            goto continue
+          end
+        end
+
         local beforeSnap, beforeErr = getDestinationSnapshot(state, targetName, targetInv, true)
         if not beforeSnap then
           work.status = "waiting_retry"
@@ -433,7 +447,7 @@ function Engine:tick()
           work.next_retry = os.epoch("utc") + 5000
           state.logger:warn("Falha ao ler destino antes da entrega", { request = r.id, err = beforeErr })
         else
-          local exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, targetName)
+          local exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, exportTarget)
           exported = tonumber(exported or 0) or 0
           if exported <= 0 then
             work.status = "waiting_retry"
