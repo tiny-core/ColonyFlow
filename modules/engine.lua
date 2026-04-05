@@ -218,18 +218,36 @@ function Engine:tick()
       end
 
       local needed = tonumber(candidate.count or r.count or 0) or 0
+      local work = self.work[r.id] or {}
+      work.status = work.status or "pending"
+      work.request_state = r.state
+      work.target = r.target
+      work.requested = (r.items[1] and r.items[1].name) or nil
+      work.chosen = candidate.name
+      work.choice = why
+      work.needed = needed
       local present, invErr = Inventory.countItem(targetInv, candidate.name)
       if present == nil then
-        self.work[r.id] = { status = "waiting_retry", next_retry = os.epoch("utc") + 5000 }
+        work.status = "waiting_retry"
+        work.next_retry = os.epoch("utc") + 5000
+        work.err = invErr
+        self.work[r.id] = work
         state.logger:warn("Falha ao ler destino", { request = r.id, err = invErr })
         goto continue
       end
 
       local missing = math.max(0, needed - present)
       if missing <= 0 then
-        self.work[r.id] = { status = "done" }
+        work.status = "done"
+        work.present = present
+        work.missing = 0
+        self.work[r.id] = work
         goto continue
       end
+      work.present = present
+      work.missing = missing
+      work.status = "pending"
+      self.work[r.id] = work
 
       local itemInfo = self.me:getItem({ name = candidate.name })
       local available = getItemAmount(itemInfo)
@@ -237,39 +255,57 @@ function Engine:tick()
       if deliverNow > 0 then
         local exported, expErr = self.me:exportItem({ name = candidate.name, count = deliverNow }, target)
         if exported == nil then
-          self.work[r.id] = { status = "waiting_retry", next_retry = os.epoch("utc") + 5000 }
+          work.status = "waiting_retry"
+          work.next_retry = os.epoch("utc") + 5000
+          work.err = expErr
+          self.work[r.id] = work
           state.stats.errors = state.stats.errors + 1
           state.logger:error("Falha ao exportar item", { request = r.id, item = candidate.name, err = expErr })
           goto continue
         end
         state.stats.delivered = state.stats.delivered + deliverNow
         missing = missing - deliverNow
+        work.delivered = (work.delivered or 0) + deliverNow
+        work.missing = missing
+        work.status = missing > 0 and "partial_delivered" or "done"
+        self.work[r.id] = work
       end
 
       if missing > 0 then
         local crafting, craftStateErr = self.me:isCrafting({ name = candidate.name })
         if crafting == true then
-          self.work[r.id] = { status = "crafting", next_retry = os.epoch("utc") + 5000 }
+          work.status = "crafting"
+          work.next_retry = os.epoch("utc") + 5000
+          self.work[r.id] = work
           goto continue
         end
 
         local craftable = self.me:isCraftable({ name = candidate.name })
         if craftable ~= true then
-          self.work[r.id] = { status = "waiting_retry", next_retry = os.epoch("utc") + 15000 }
+          work.status = "waiting_retry"
+          work.next_retry = os.epoch("utc") + 15000
+          work.err = craftStateErr
+          self.work[r.id] = work
           state.logger:warn("Item não craftável no ME", { request = r.id, item = candidate.name, missing = missing, err = craftStateErr })
           goto continue
         end
 
         local craftJob, craftErr = self.me:craftItem({ name = candidate.name, count = missing })
         if craftJob == nil then
-          self.work[r.id] = { status = "waiting_retry", next_retry = os.epoch("utc") + 15000 }
+          work.status = "waiting_retry"
+          work.next_retry = os.epoch("utc") + 15000
+          work.err = craftErr
+          self.work[r.id] = work
           state.stats.errors = state.stats.errors + 1
           state.logger:error("Falha ao solicitar craft", { request = r.id, item = candidate.name, err = craftErr })
           goto continue
         end
 
         state.stats.crafted = state.stats.crafted + missing
-        self.work[r.id] = { status = "crafting", next_retry = os.epoch("utc") + 5000 }
+        work.status = "crafting"
+        work.next_retry = os.epoch("utc") + 5000
+        work.craft_requested = missing
+        self.work[r.id] = work
       end
     end
     ::continue::

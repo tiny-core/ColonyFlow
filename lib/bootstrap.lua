@@ -42,6 +42,7 @@ function M.run()
   }
 
   local engine = Engine.new(state)
+  state.work = engine.work
   local ui = UI.new(state)
 
   Scheduler.run(state, engine, ui)
