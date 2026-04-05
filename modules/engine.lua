@@ -163,10 +163,12 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
     local className = eq:getClass(it.name) or guessClass(it.name)
     local t, tierWhy = tier:infer({ name = it.name, tags = it.tags })
     local maxTier, maxTierResolved, maxTierSource = getMaxTier(eq, className, building, buildingResolved)
-    local allowedByTier = t and maxTier and tier:isTierAllowed(className, t, maxTier) or false
-    if not allowedByTier then
-      table.insert(blockedByTier, { name = it.name, class = className, tier = t, max = maxTier })
-      goto continue_item
+    if t then
+      local allowedByTier = maxTier and tier:isTierAllowed(className, t, maxTier) or false
+      if not allowedByTier then
+        table.insert(blockedByTier, { name = it.name, class = className, tier = t, max = maxTier })
+        goto continue_item
+      end
     end
     local amount = getMeAmount(me, it.name)
     local score = 0
@@ -215,8 +217,12 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
   if not best then
     if #blockedByTier > 0 then
       return nil,
-          { reason = "blocked_by_tier", building = building and
-          { name = building.name, type = building.type, level = building.level } or nil, blocked = blockedByTier }
+          {
+            reason = "blocked_by_tier",
+            building = building and
+                { name = building.name, type = building.type, level = building.level } or nil,
+            blocked = blockedByTier
+          }
     end
     return nil, "sem_candidato"
   end
@@ -279,19 +285,6 @@ function Engine:tick()
         goto continue
       end
 
-      local meOnline, meErr = self.me:isOnline()
-      if not meOnline then
-        local work = self.work[r.id] or {}
-        work.status = "waiting_retry"
-        work.request_state = r.state
-        work.target = r.target
-        work.err = "me_offline:" .. tostring(meErr or "")
-        work.next_retry = os.epoch("utc") + 5000
-        self.work[r.id] = work
-        state.logger:warn("ME indisponível; aguardando...", { request = r.id, err = tostring(meErr) })
-        goto continue
-      end
-
       local building, buildingResolved = resolveBuildingForTarget(buildings, r.target)
       local candidate, why = pickCandidate(state, self.eq, self.tier, self.me, r, building, buildingResolved)
       local work = self.work[r.id] or {}
@@ -336,6 +329,16 @@ function Engine:tick()
       if missing <= 0 then
         work.status = "done"
         self.work[r.id] = work
+        goto continue
+      end
+
+      local meOnline, meErr = self.me:isOnline()
+      if not meOnline then
+        work.status = "waiting_retry"
+        work.err = "me_offline:" .. tostring(meErr or "")
+        work.next_retry = os.epoch("utc") + 5000
+        self.work[r.id] = work
+        state.logger:warn("ME indisponível; aguardando...", { request = r.id, err = tostring(meErr) })
         goto continue
       end
 
