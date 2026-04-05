@@ -8,17 +8,17 @@ updated: "2026-04-05T20:40:00.000Z"
 
 ## Current Test
 
-number: 1
-name: Rodar harness de testes
+number: 2
+name: Entrega sem craft quando já há estoque no ME
 expected: |
-  Executar `tests/run.lua` no CC e ver `Tests: N/N OK` sem falhas.
+  Para uma request cujo item já existe no ME, o sistema exporta para o destino padrão e não chama craft.
 awaiting: user response
 
 ## Tests
 
 ### 1. Rodar harness de testes
 expected: `tests/run.lua` imprime `Tests: N/N OK`
-result: pending
+result: pass
 
 ### 2. Entrega sem craft quando já há estoque no ME
 expected: Para uma request cujo item já existe no ME, o sistema exporta para o destino padrão e não chama craft.
@@ -39,9 +39,9 @@ result: pending
 ## Summary
 
 total: 5
-passed: 0
+passed: 1
 issues: 0
-pending: 5
+pending: 4
 skipped: 0
 blocked: 0
 
