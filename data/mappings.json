@@ -36,6 +36,9 @@
     }
   },
   "tier_overrides": {},
+  "gating": {
+    "by_building_type": {}
+  },
   "notes": {
     "warning": "Este arquivo é editável e será mesclado com regras internas. Use a CLI (startup map) para atualizar com segurança."
   }

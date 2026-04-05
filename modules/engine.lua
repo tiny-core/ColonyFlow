@@ -92,7 +92,46 @@ local function getMeAmount(me, itemName)
   return tonumber(res.amount or 0) or 0
 end
 
-local function pickCandidate(state, eq, tier, me, request)
+local function strLower(s)
+  return s and tostring(s):lower() or ""
+end
+
+local function resolveBuildingForTarget(buildings, target)
+  local t = strLower(target)
+  if t == "" then return nil, false end
+  for _, b in ipairs(buildings or {}) do
+    if b and (strLower(b.name) == t or strLower(b.type) == t) then
+      return b, true
+    end
+  end
+  for _, b in ipairs(buildings or {}) do
+    if b and (strLower(b.name):find(t, 1, true) or strLower(b.type):find(t, 1, true)) then
+      return b, true
+    end
+  end
+  return nil, false
+end
+
+local function defaultMaxTierForLevel(className, level)
+  local lvl = tonumber(level or 0) or 0
+  if lvl >= 5 then return "netherite" end
+  if lvl >= 3 then return "diamond" end
+  return "iron"
+end
+
+local function getMaxTier(eq, className, building, resolved)
+  if building and (building.type or building.name) then
+    local bt = building.type or building.name
+    local override = eq:getGatingMaxTier(bt, className) or eq:getGatingMaxTier(building.name, className)
+    if override then return override, true, "override" end
+  end
+  if resolved and building then
+    return defaultMaxTierForLevel(className, building.level), true, "default"
+  end
+  return "iron", false, "unresolved"
+end
+
+local function pickCandidate(state, eq, tier, me, request, building, buildingResolved)
   local accepted = request.accepted or request.items or {}
   if #accepted == 0 then return nil, "sem_itens" end
 
@@ -118,10 +157,17 @@ local function pickCandidate(state, eq, tier, me, request)
     return nil, "sem_candidato"
   end
 
+  local blockedByTier = {}
   local best, bestWhy, bestScore = nil, nil, -math.huge
   for idx, it in ipairs(eligible) do
     local className = eq:getClass(it.name) or guessClass(it.name)
     local t, tierWhy = tier:infer({ name = it.name, tags = it.tags })
+    local maxTier, maxTierResolved, maxTierSource = getMaxTier(eq, className, building, buildingResolved)
+    local allowedByTier = t and maxTier and tier:isTierAllowed(className, t, maxTier) or false
+    if not allowedByTier then
+      table.insert(blockedByTier, { name = it.name, class = className, tier = t, max = maxTier })
+      goto continue_item
+    end
     local amount = getMeAmount(me, it.name)
     local score = 0
 
@@ -153,15 +199,25 @@ local function pickCandidate(state, eq, tier, me, request)
         class = className,
         tier = t,
         tier_reason = tierWhy,
+        max_tier = maxTier,
+        max_tier_resolved = maxTierResolved,
+        max_tier_source = maxTierSource,
+        building = building and { name = building.name, type = building.type, level = building.level } or nil,
         vanilla = isVanilla,
         allowed = true,
         me_amount = amount,
         equivalents = eq:getEquivalents(it.name),
       }
     end
+    ::continue_item::
   end
 
-  if not best then return nil, "sem_candidato" end
+  if not best then
+    if #blockedByTier > 0 then
+      return nil, { reason = "blocked_by_tier", building = building and { name = building.name, type = building.type, level = building.level } or nil, blocked = blockedByTier }
+    end
+    return nil, "sem_candidato"
+  end
   return best, bestWhy
 end
 
@@ -208,6 +264,11 @@ function Engine:tick()
   end
 
   local snap, snapErr = getDestinationSnapshot(state, targetName, targetInv, false)
+  local buildings = state.cache:get("mc", "buildings")
+  if not buildings then
+    buildings = self.mine:listBuildings()
+    state.cache:set("mc", "buildings", buildings, 5)
+  end
 
   for _, r in ipairs(requests) do
     if r and r.id and isPendingState(state.cfg, r.state) then
@@ -229,18 +290,24 @@ function Engine:tick()
         goto continue
       end
 
-      local candidate, why = pickCandidate(state, self.eq, self.tier, self.me, r)
+      local building, buildingResolved = resolveBuildingForTarget(buildings, r.target)
+      local candidate, why = pickCandidate(state, self.eq, self.tier, self.me, r, building, buildingResolved)
       local work = self.work[r.id] or {}
       work.request_state = r.state
       work.target = r.target
       work.requested = (r.accepted and r.accepted[1] and r.accepted[1].name) or
       (r.items and r.items[1] and r.items[1].name) or nil
-      work.accepted = r.accepted or r.items
 
       if not candidate then
-        work.status = (why == "nao_suportado") and "unsupported" or "error"
-        work.err = why
-        work.next_retry = os.epoch("utc") + 15000
+        if type(why) == "table" and why.reason == "blocked_by_tier" then
+          work.status = "blocked_by_tier"
+          work.err = "blocked_by_tier"
+          work.next_retry = os.epoch("utc") + 15000
+        else
+          work.status = (why == "nao_suportado") and "unsupported" or "error"
+          work.err = why
+          work.next_retry = os.epoch("utc") + 15000
+        end
         self.work[r.id] = work
         state.logger:warn("Request sem candidato", { request = r.id, reason = why })
         goto continue

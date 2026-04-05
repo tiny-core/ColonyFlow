@@ -11,6 +11,8 @@ local function loadDb()
   db.items = db.items or {}
   db.classes = db.classes or {}
   db.tier_overrides = db.tier_overrides or {}
+  db.gating = db.gating or {}
+  db.gating.by_building_type = db.gating.by_building_type or {}
   return db
 end
 
@@ -65,6 +67,15 @@ function Equivalence:getEquivalents(name)
     end
   end
   return out
+end
+
+function Equivalence:getGatingMaxTier(buildingType, className)
+  if not buildingType or not className then return nil end
+  local byType = self.db.gating and self.db.gating.by_building_type or nil
+  if type(byType) ~= "table" then return nil end
+  local t = byType[buildingType]
+  if type(t) ~= "table" then return nil end
+  return t[className]
 end
 
 return {
