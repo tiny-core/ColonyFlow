@@ -74,6 +74,34 @@ local function resolveTarget(cfg)
   return nil, nil
 end
 
+local function resolveInvByName(name)
+  if not name or name == "" then return nil end
+  if not peripheral.isPresent(name) then return nil end
+  return peripheral.wrap(name)
+end
+
+local function pushFromBuffer(bufferInv, targetName, itemName, qty)
+  if not bufferInv then return 0, "buffer_indisponivel" end
+  if type(bufferInv.list) ~= "function" then return 0, "buffer_sem_list" end
+  if type(bufferInv.pushItems) ~= "function" then return 0, "buffer_sem_pushItems" end
+  local list = bufferInv.list()
+  if type(list) ~= "table" then return 0, "buffer_list_invalida" end
+  local movedTotal = 0
+  local remaining = tonumber(qty or 0) or 0
+  for slot, stack in pairs(list) do
+    if remaining <= 0 then break end
+    if type(stack) == "table" and stack.name == itemName then
+      local moved = bufferInv.pushItems(targetName, slot, remaining)
+      moved = tonumber(moved or 0) or 0
+      if moved > 0 then
+        movedTotal = movedTotal + moved
+        remaining = remaining - moved
+      end
+    end
+  end
+  return movedTotal, nil
+end
+
 local function getDestinationSnapshot(state, targetName, targetInv, forceRefresh)
   local ttl = state.cfg:getNumber("delivery", "destination_cache_ttl_seconds", 2)
   if not forceRefresh then
@@ -427,6 +455,20 @@ function Engine:tick()
       end
 
       if exportQty > 0 then
+        local exportMode = tostring(state.cfg:get("delivery", "export_mode", "auto") or "auto"):lower()
+        local exportDirection = tostring(state.cfg:get("delivery", "export_direction", "up") or "up"):lower()
+        local bufferName = tostring(state.cfg:get("delivery", "export_buffer_container", "") or "")
+
+        if exportMode == "auto" then
+          if self.me:supportsExportToPeripheral() then
+            exportMode = "peripheral"
+          elseif bufferName ~= "" then
+            exportMode = "buffer"
+          else
+            exportMode = "direction"
+          end
+        end
+
         local beforeSnap, beforeErr = getDestinationSnapshot(state, targetName, targetInv, true)
         if not beforeSnap then
           work.status = "waiting_retry"
@@ -434,7 +476,32 @@ function Engine:tick()
           work.next_retry = os.epoch("utc") + 5000
           state.logger:warn("Falha ao ler destino antes da entrega", { request = r.id, err = beforeErr })
         else
-          local exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, targetName)
+          local exported, exportErr = nil, nil
+          local pushed, pushErr = nil, nil
+
+          if exportMode == "peripheral" then
+            exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, targetName)
+          elseif exportMode == "direction" then
+            exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, exportDirection)
+          elseif exportMode == "buffer" then
+            local bufferInv = resolveInvByName(bufferName)
+            if not bufferInv then
+              exported, exportErr = 0, "export_buffer_indisponivel:" .. bufferName
+            else
+              exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, exportDirection)
+              exported = tonumber(exported or 0) or 0
+              if exported > 0 then
+                pushed, pushErr = pushFromBuffer(bufferInv, targetName, candidate.name, exported)
+                pushed = tonumber(pushed or 0) or 0
+                if pushed <= 0 then
+                  exported, exportErr = 0, "push_buffer_falhou:" .. tostring(pushErr or "")
+                end
+              end
+            end
+          else
+            exported, exportErr = 0, "export_mode_invalido:" .. tostring(exportMode)
+          end
+
           exported = tonumber(exported or 0) or 0
           if exported <= 0 then
             work.status = "waiting_retry"

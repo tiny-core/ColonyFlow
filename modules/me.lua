@@ -79,6 +79,11 @@ function ME:craftItem(filter)
   return call(b, "craftItem", filter)
 end
 
+function ME:supportsExportToPeripheral()
+  local b = self.state.devices.meBridge
+  return b and type(b.exportItemToPeripheral) == "function"
+end
+
 function ME:exportItem(filter, target)
   local b = self.state.devices.meBridge
   if b and type(b.exportItemToPeripheral) == "function" then
