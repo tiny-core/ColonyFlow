@@ -1,6 +1,7 @@
 local MineColonies = require("modules.minecolonies")
 local Inventory = require("modules.inventory")
 local Equivalence = require("modules.equivalence")
+local ME = require("modules.me")
 local Tier = require("modules.tier")
 
 local Engine = {}
@@ -11,6 +12,7 @@ function Engine.new(state)
     state = state,
     mine = MineColonies.new(state),
     eq = Equivalence.new(state),
+    me = ME.new(state),
     tier = nil,
     work = {},
   }, Engine)
@@ -84,7 +86,13 @@ local function getDestinationSnapshot(state, targetName, targetInv, forceRefresh
   return snap, nil
 end
 
-local function pickCandidate(state, eq, tier, request)
+local function getMeAmount(me, itemName)
+  local res = me and me.getItem and me:getItem({ name = itemName }) or nil
+  if type(res) ~= "table" then return 0 end
+  return tonumber(res.amount or 0) or 0
+end
+
+local function pickCandidate(state, eq, tier, me, request)
   local accepted = request.accepted or request.items or {}
   if #accepted == 0 then return nil, "sem_itens" end
 
@@ -114,7 +122,10 @@ local function pickCandidate(state, eq, tier, request)
   for idx, it in ipairs(eligible) do
     local className = eq:getClass(it.name) or guessClass(it.name)
     local t, tierWhy = tier:infer({ name = it.name, tags = it.tags })
+    local amount = getMeAmount(me, it.name)
     local score = 0
+
+    if amount > 0 then score = score + 10000 end
 
     local isVanilla = eq:isVanilla(it.name)
     if vanillaFirst then
@@ -144,6 +155,7 @@ local function pickCandidate(state, eq, tier, request)
         tier_reason = tierWhy,
         vanilla = isVanilla,
         allowed = true,
+        me_amount = amount,
         equivalents = eq:getEquivalents(it.name),
       }
     end
@@ -179,7 +191,8 @@ function Engine:tick()
   local targetName, targetInv = resolveTarget(state.cfg)
 
   if not targetInv then
-    state.logger:warn("Destino padrão indisponível; aguardando...", { target = state.cfg:get("delivery", "default_target_container", "") })
+    state.logger:warn("Destino padrão indisponível; aguardando...",
+      { target = state.cfg:get("delivery", "default_target_container", "") })
     for _, r in ipairs(requests) do
       if r and r.id and isPendingState(state.cfg, r.state) then
         local work = self.work[r.id] or {}
@@ -203,11 +216,25 @@ function Engine:tick()
         goto continue
       end
 
-      local candidate, why = pickCandidate(state, self.eq, self.tier, r)
+      local meOnline, meErr = self.me:isOnline()
+      if not meOnline then
+        local work = self.work[r.id] or {}
+        work.status = "waiting_retry"
+        work.request_state = r.state
+        work.target = r.target
+        work.err = "me_offline:" .. tostring(meErr or "")
+        work.next_retry = os.epoch("utc") + 5000
+        self.work[r.id] = work
+        state.logger:warn("ME indisponível; aguardando...", { request = r.id, err = tostring(meErr) })
+        goto continue
+      end
+
+      local candidate, why = pickCandidate(state, self.eq, self.tier, self.me, r)
       local work = self.work[r.id] or {}
       work.request_state = r.state
       work.target = r.target
-      work.requested = (r.accepted and r.accepted[1] and r.accepted[1].name) or (r.items and r.items[1] and r.items[1].name) or nil
+      work.requested = (r.accepted and r.accepted[1] and r.accepted[1].name) or
+      (r.items and r.items[1] and r.items[1].name) or nil
       work.accepted = r.accepted or r.items
 
       if not candidate then
@@ -236,8 +263,54 @@ function Engine:tick()
       local missing = math.max(0, work.needed - present)
       work.present = present
       work.missing = missing
-      work.status = missing > 0 and "pending" or "done"
-      self.work[r.id] = work
+
+      if missing <= 0 then
+        work.status = "done"
+        self.work[r.id] = work
+        goto continue
+      end
+
+      local lockTtlSeconds = 15
+      local lockKey = tostring(candidate.name) .. "|" .. tostring(missing) .. "|" .. tostring(targetName)
+      local locked = state.cache:get("craft_lock", lockKey)
+      local crafting, craftErr = self.me:isCrafting({ name = candidate.name, count = missing })
+      if crafting == true or locked then
+        work.status = "crafting"
+        work.craft = work.craft or {}
+        work.craft.key = lockKey
+        work.craft.last_seen = os.epoch("utc")
+        self.work[r.id] = work
+        goto continue
+      end
+
+      local craftable, craftableErr = self.me:isCraftable({ name = candidate.name, count = missing })
+      if craftable ~= true then
+        work.status = "waiting_retry"
+        work.err = "nao_craftavel:" .. tostring(craftableErr or "")
+        work.next_retry = os.epoch("utc") + 15000
+        self.work[r.id] = work
+        state.logger:warn("Item não craftável agora; aguardando...",
+          { request = r.id, item = candidate.name, err = tostring(craftableErr) })
+        goto continue
+      end
+
+      local started, startErr = self.me:craftItem({ name = candidate.name, count = missing })
+      if started == true then
+        state.cache:set("craft_lock", lockKey, true, lockTtlSeconds)
+        state.stats.crafted = state.stats.crafted + 1
+        work.status = "crafting"
+        work.craft = work.craft or {}
+        work.craft.key = lockKey
+        work.craft.started_at = os.epoch("utc")
+        work.craft.message = startErr
+        self.work[r.id] = work
+      else
+        work.status = "waiting_retry"
+        work.err = "craft_falhou:" .. tostring(startErr or "")
+        work.next_retry = os.epoch("utc") + 15000
+        self.work[r.id] = work
+        state.logger:warn("Falha ao iniciar craft", { request = r.id, item = candidate.name, err = tostring(startErr) })
+      end
 
       if type(why) == "table" and type(why.equivalents) == "table" and #why.equivalents > 1 then
         state.stats.substitutions = state.stats.substitutions + 1
