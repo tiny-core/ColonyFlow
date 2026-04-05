@@ -42,6 +42,13 @@ local tests = {
       assertEq(t, "diamond")
     end
   },
+  { "tier_por_tags", function()
+      local eqMod = require("modules.equivalence").new({ cache = { get = function() end, set = function() end } })
+      local tier = require("modules.tier").new({}, eqMod)
+      local t = tier:infer({ name = "mod:tool", tags = { "forge:tools/pickaxes", "forge:ingots/netherite" } })
+      assertEq(t, "netherite")
+    end
+  },
   { "tier_gating", function()
       local eqMod = require("modules.equivalence").new({ cache = { get = function() end, set = function() end } })
       local tier = require("modules.tier").new({}, eqMod)
