@@ -74,6 +74,34 @@ local function resolveTarget(cfg)
   return nil, nil
 end
 
+local function resolveInvByName(name)
+  if not name or name == "" then return nil end
+  if not peripheral.isPresent(name) then return nil end
+  return peripheral.wrap(name)
+end
+
+local function pushFromBuffer(bufferInv, targetName, itemName, qty)
+  if not bufferInv then return 0, "buffer_indisponivel" end
+  if type(bufferInv.list) ~= "function" then return 0, "buffer_sem_list" end
+  if type(bufferInv.pushItems) ~= "function" then return 0, "buffer_sem_pushItems" end
+  local list = bufferInv.list()
+  if type(list) ~= "table" then return 0, "buffer_list_invalida" end
+  local movedTotal = 0
+  local remaining = tonumber(qty or 0) or 0
+  for slot, stack in pairs(list) do
+    if remaining <= 0 then break end
+    if type(stack) == "table" and stack.name == itemName then
+      local moved = bufferInv.pushItems(targetName, slot, remaining)
+      moved = tonumber(moved or 0) or 0
+      if moved > 0 then
+        movedTotal = movedTotal + moved
+        remaining = remaining - moved
+      end
+    end
+  end
+  return movedTotal, nil
+end
+
 local function getDestinationSnapshot(state, targetName, targetInv, forceRefresh)
   local ttl = state.cfg:getNumber("delivery", "destination_cache_ttl_seconds", 2)
   if not forceRefresh then
@@ -200,7 +228,8 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
     local amount = getMeAmount(me, it.name)
     local craftable, craftableErr = nil, nil
     if amount <= 0 then
-      craftable, craftableErr = isMeCraftable(me, it.name, tonumber(it.count or request.requiredCount or request.count or 1) or 1)
+      craftable, craftableErr = isMeCraftable(me, it.name,
+        tonumber(it.count or request.requiredCount or request.count or 1) or 1)
     end
     local score = 0
 
@@ -428,6 +457,9 @@ function Engine:tick()
       if exportQty > 0 then
         local exportMode = tostring(state.cfg:get("delivery", "export_mode", "peripheral") or "peripheral"):lower()
         local exportTarget = targetName
+        local bufferInv = nil
+        local pushToTarget = false
+
         if exportMode == "direction" then
           exportTarget = tostring(state.cfg:get("delivery", "export_direction", "") or ""):lower()
           if exportTarget == "" then
@@ -438,6 +470,28 @@ function Engine:tick()
             self.work[r.id] = work
             goto continue
           end
+        elseif exportMode == "buffer" then
+          exportTarget = tostring(state.cfg:get("delivery", "export_direction", "") or ""):lower()
+          if exportTarget == "" then
+            work.status = "waiting_retry"
+            work.err = "export_direction_vazio"
+            work.next_retry = os.epoch("utc") + 5000
+            state.logger:warn("Entrega não ocorreu; export_direction vazio", { request = r.id, item = candidate.name })
+            self.work[r.id] = work
+            goto continue
+          end
+          local bufferName = tostring(state.cfg:get("delivery", "export_buffer_container", "") or "")
+          bufferInv = resolveInvByName(bufferName)
+          if not bufferInv then
+            work.status = "waiting_retry"
+            work.err = "export_buffer_indisponivel:" .. bufferName
+            work.next_retry = os.epoch("utc") + 5000
+            state.logger:warn("Entrega não ocorreu; buffer indisponível",
+              { request = r.id, item = candidate.name, buffer = bufferName })
+            self.work[r.id] = work
+            goto continue
+          end
+          pushToTarget = true
         end
 
         local beforeSnap, beforeErr = getDestinationSnapshot(state, targetName, targetInv, true)
@@ -456,6 +510,20 @@ function Engine:tick()
             state.logger:warn("Entrega não ocorreu; aguardando...",
               { request = r.id, item = candidate.name, err = tostring(exportErr) })
           else
+            if pushToTarget then
+              local moved, moveErr = pushFromBuffer(bufferInv, targetName, candidate.name, exported)
+              moved = tonumber(moved or 0) or 0
+              if moved <= 0 then
+                work.status = "waiting_retry"
+                work.err = "push_buffer_falhou:" .. tostring(moveErr or "")
+                work.next_retry = os.epoch("utc") + 5000
+                state.logger:warn("Entrega não ocorreu; falha ao mover do buffer para o destino",
+                  { request = r.id, item = candidate.name, err = tostring(moveErr) })
+                self.work[r.id] = work
+                goto continue
+              end
+            end
+
             local afterSnap, afterErr = getDestinationSnapshot(state, targetName, targetInv, true)
             if not afterSnap then
               work.status = "waiting_retry"
