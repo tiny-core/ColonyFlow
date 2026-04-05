@@ -317,6 +317,136 @@ local tests = {
     peripheral = oldPeripheral
   end
   },
+  { "engine_entrega_valida_snapshot", function()
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local invCount = 0
+    local inv = {
+      list = function()
+        if invCount == 0 then return {} end
+        return { [1] = { name = "minecraft:dirt", count = invCount } }
+      end,
+    }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local craftCalls = 0
+    local meBridge = {
+      isConnected = function() return true end,
+      isOnline = function() return true end,
+      getItem = function(filter) return { name = filter.name, amount = 2, isCraftable = true } end,
+      exportItemToPeripheral = function(filter, target)
+        assertEq(target, "test_inv")
+        invCount = invCount + (filter.count or 0)
+        return tonumber(filter.count or 0), nil
+      end,
+      craftItem = function(filter)
+        craftCalls = craftCalls + 1; return true, "ok"
+      end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "2" },
+      substitution = { vanilla_first = "true", allow_unmapped_mods = "false", tier_preference = "lowest" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = meBridge,
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 11, state = "requested", target = "x", count = 2, items = { { name = "minecraft:dirt", count = 2 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+    assertEq(state.work["11"].status, "done")
+    assertEq(state.work["11"].delivered, 2)
+    assertEq(state.stats.delivered, 2)
+    assertEq(craftCalls, 0, "não deveria iniciar craft quando já há estoque no ME")
+
+    peripheral = oldPeripheral
+  end
+  },
+  { "engine_destino_cheio_waiting_retry", function()
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local meBridge = {
+      isConnected = function() return true end,
+      isOnline = function() return true end,
+      getItem = function(filter) return { name = filter.name, amount = 2, isCraftable = true } end,
+      exportItemToPeripheral = function(filter, target) return 0, "cheio" end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "2" },
+      substitution = { vanilla_first = "true", allow_unmapped_mods = "false", tier_preference = "lowest" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = meBridge,
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 12, state = "requested", target = "x", count = 2, items = { { name = "minecraft:dirt", count = 2 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+    assertEq(state.work["12"].status, "waiting_retry")
+    assertEq(type(state.work["12"].next_retry), "number")
+
+    peripheral = oldPeripheral
+  end
+  },
   { "me_bridge_api_fallbacks", function()
     local ME = require("modules.me")
     local bridge = {

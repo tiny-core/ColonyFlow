@@ -270,52 +270,104 @@ function Engine:tick()
         goto continue
       end
 
-      local lockTtlSeconds = 15
-      local lockKey = tostring(candidate.name) .. "|" .. tostring(missing) .. "|" .. tostring(targetName)
-      local locked = state.cache:get("craft_lock", lockKey)
-      local crafting, craftErr = self.me:isCrafting({ name = candidate.name, count = missing })
-      if crafting == true or locked then
-        work.status = "crafting"
-        work.craft = work.craft or {}
-        work.craft.key = lockKey
-        work.craft.last_seen = os.epoch("utc")
-        self.work[r.id] = work
-        goto continue
+      local meAmount = getMeAmount(self.me, candidate.name)
+      local missingDest = missing
+      local craftQty = math.max(0, missingDest - meAmount)
+      local exportQty = math.min(meAmount, missingDest)
+
+      if craftQty > 0 then
+        local lockTtlSeconds = 15
+        local lockKey = tostring(candidate.name) .. "|" .. tostring(craftQty) .. "|" .. tostring(targetName)
+        local locked = state.cache:get("craft_lock", lockKey)
+        local crafting, craftErr = self.me:isCrafting({ name = candidate.name, count = craftQty })
+        if crafting == true or locked then
+          work.status = "crafting"
+          work.craft = work.craft or {}
+          work.craft.key = lockKey
+          work.craft.last_seen = os.epoch("utc")
+        else
+          local craftable, craftableErr = self.me:isCraftable({ name = candidate.name, count = craftQty })
+          if craftable ~= true then
+            work.status = "waiting_retry"
+            work.err = "nao_craftavel:" .. tostring(craftableErr or "")
+            work.next_retry = os.epoch("utc") + 15000
+            state.logger:warn("Item não craftável agora; aguardando...", { request = r.id, item = candidate.name, err = tostring(craftableErr) })
+          else
+            local started, startErr = self.me:craftItem({ name = candidate.name, count = craftQty })
+            if started == true then
+              state.cache:set("craft_lock", lockKey, true, lockTtlSeconds)
+              state.stats.crafted = state.stats.crafted + 1
+              work.status = "crafting"
+              work.craft = work.craft or {}
+              work.craft.key = lockKey
+              work.craft.started_at = os.epoch("utc")
+              work.craft.message = startErr
+            else
+              work.status = "waiting_retry"
+              work.err = "craft_falhou:" .. tostring(startErr or "")
+              work.next_retry = os.epoch("utc") + 15000
+              state.logger:warn("Falha ao iniciar craft", { request = r.id, item = candidate.name, err = tostring(startErr) })
+            end
+          end
+        end
       end
 
-      local craftable, craftableErr = self.me:isCraftable({ name = candidate.name, count = missing })
-      if craftable ~= true then
-        work.status = "waiting_retry"
-        work.err = "nao_craftavel:" .. tostring(craftableErr or "")
-        work.next_retry = os.epoch("utc") + 15000
-        self.work[r.id] = work
-        state.logger:warn("Item não craftável agora; aguardando...",
-          { request = r.id, item = candidate.name, err = tostring(craftableErr) })
-        goto continue
+      if exportQty > 0 then
+        local beforeSnap, beforeErr = getDestinationSnapshot(state, targetName, targetInv, true)
+        if not beforeSnap then
+          work.status = "waiting_retry"
+          work.err = beforeErr
+          work.next_retry = os.epoch("utc") + 5000
+          state.logger:warn("Falha ao ler destino antes da entrega", { request = r.id, err = beforeErr })
+        else
+          local exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, targetName)
+          exported = tonumber(exported or 0) or 0
+          if exported <= 0 then
+            work.status = "waiting_retry"
+            work.err = "destino_cheio_ou_export_falhou:" .. tostring(exportErr or "")
+            work.next_retry = os.epoch("utc") + 5000
+            state.logger:warn("Entrega não ocorreu; aguardando...", { request = r.id, item = candidate.name, err = tostring(exportErr) })
+          else
+            local afterSnap, afterErr = getDestinationSnapshot(state, targetName, targetInv, true)
+            if not afterSnap then
+              work.status = "waiting_retry"
+              work.err = "pos_entrega_snapshot_falhou:" .. tostring(afterErr or "")
+              work.next_retry = os.epoch("utc") + 5000
+              state.logger:warn("Falha ao ler destino após entrega", { request = r.id, err = afterErr })
+            else
+              local beforeCount = Inventory.countFromSnapshot(beforeSnap, candidate.name)
+              local afterCount = Inventory.countFromSnapshot(afterSnap, candidate.name)
+              if afterCount < beforeCount then
+                work.status = "waiting_retry"
+                work.err = "pos_entrega_inconsistente"
+                work.next_retry = os.epoch("utc") + 5000
+                state.logger:warn("Validação pós-entrega inconsistente; aguardando...", { request = r.id, item = candidate.name })
+              else
+                state.stats.delivered = state.stats.delivered + exported
+                work.delivered = (work.delivered or 0) + exported
+                work.present = afterCount
+                work.missing = math.max(0, work.needed - afterCount)
+                if work.missing <= 0 then
+                  work.status = "done"
+                elseif work.status ~= "crafting" and work.status ~= "waiting_retry" then
+                  work.status = "pending"
+                end
+              end
+            end
+          end
+        end
       end
 
-      local started, startErr = self.me:craftItem({ name = candidate.name, count = missing })
-      if started == true then
-        state.cache:set("craft_lock", lockKey, true, lockTtlSeconds)
-        state.stats.crafted = state.stats.crafted + 1
-        work.status = "crafting"
-        work.craft = work.craft or {}
-        work.craft.key = lockKey
-        work.craft.started_at = os.epoch("utc")
-        work.craft.message = startErr
-        self.work[r.id] = work
-      else
-        work.status = "waiting_retry"
-        work.err = "craft_falhou:" .. tostring(startErr or "")
-        work.next_retry = os.epoch("utc") + 15000
-        self.work[r.id] = work
-        state.logger:warn("Falha ao iniciar craft", { request = r.id, item = candidate.name, err = tostring(startErr) })
+      if not work.status then
+        work.status = "pending"
+      end
+
+      self.work[r.id] = work
       end
 
       if type(why) == "table" and type(why.equivalents) == "table" and #why.equivalents > 1 then
         state.stats.substitutions = state.stats.substitutions + 1
         state.logger:info("Equivalências conhecidas para o item escolhido", {
-          request = r.id,
           target = r.target,
           item = candidate.name,
           tier = why.tier,
