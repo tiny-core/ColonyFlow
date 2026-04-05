@@ -214,7 +214,9 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
 
   if not best then
     if #blockedByTier > 0 then
-      return nil, { reason = "blocked_by_tier", building = building and { name = building.name, type = building.type, level = building.level } or nil, blocked = blockedByTier }
+      return nil,
+          { reason = "blocked_by_tier", building = building and
+          { name = building.name, type = building.type, level = building.level } or nil, blocked = blockedByTier }
     end
     return nil, "sem_candidato"
   end
@@ -296,7 +298,7 @@ function Engine:tick()
       work.request_state = r.state
       work.target = r.target
       work.requested = (r.accepted and r.accepted[1] and r.accepted[1].name) or
-      (r.items and r.items[1] and r.items[1].name) or nil
+          (r.items and r.items[1] and r.items[1].name) or nil
 
       if not candidate then
         if type(why) == "table" and why.reason == "blocked_by_tier" then
@@ -358,7 +360,8 @@ function Engine:tick()
             work.status = "waiting_retry"
             work.err = "nao_craftavel:" .. tostring(craftableErr or "")
             work.next_retry = os.epoch("utc") + 15000
-            state.logger:warn("Item não craftável agora; aguardando...", { request = r.id, item = candidate.name, err = tostring(craftableErr) })
+            state.logger:warn("Item não craftável agora; aguardando...",
+              { request = r.id, item = candidate.name, err = tostring(craftableErr) })
           else
             local started, startErr = self.me:craftItem({ name = candidate.name, count = craftQty })
             if started == true then
@@ -373,7 +376,8 @@ function Engine:tick()
               work.status = "waiting_retry"
               work.err = "craft_falhou:" .. tostring(startErr or "")
               work.next_retry = os.epoch("utc") + 15000
-              state.logger:warn("Falha ao iniciar craft", { request = r.id, item = candidate.name, err = tostring(startErr) })
+              state.logger:warn("Falha ao iniciar craft",
+                { request = r.id, item = candidate.name, err = tostring(startErr) })
             end
           end
         end
@@ -393,7 +397,8 @@ function Engine:tick()
             work.status = "waiting_retry"
             work.err = "destino_cheio_ou_export_falhou:" .. tostring(exportErr or "")
             work.next_retry = os.epoch("utc") + 5000
-            state.logger:warn("Entrega não ocorreu; aguardando...", { request = r.id, item = candidate.name, err = tostring(exportErr) })
+            state.logger:warn("Entrega não ocorreu; aguardando...",
+              { request = r.id, item = candidate.name, err = tostring(exportErr) })
           else
             local afterSnap, afterErr = getDestinationSnapshot(state, targetName, targetInv, true)
             if not afterSnap then
@@ -408,7 +413,8 @@ function Engine:tick()
                 work.status = "waiting_retry"
                 work.err = "pos_entrega_inconsistente"
                 work.next_retry = os.epoch("utc") + 5000
-                state.logger:warn("Validação pós-entrega inconsistente; aguardando...", { request = r.id, item = candidate.name })
+                state.logger:warn("Validação pós-entrega inconsistente; aguardando...",
+                  { request = r.id, item = candidate.name })
               else
                 state.stats.delivered = state.stats.delivered + exported
                 work.delivered = (work.delivered or 0) + exported
@@ -430,7 +436,6 @@ function Engine:tick()
       end
 
       self.work[r.id] = work
-      end
 
       if type(why) == "table" and type(why.equivalents) == "table" and #why.equivalents > 1 then
         state.stats.substitutions = state.stats.substitutions + 1
