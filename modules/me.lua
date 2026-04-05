@@ -12,6 +12,23 @@ local function call(bridge, method, ...)
   return res1, res2
 end
 
+local function callAny(bridge, methods, ...)
+  local lastErr = nil
+  for _, m in ipairs(methods or {}) do
+    local res, err = call(bridge, m, ...)
+    if res ~= nil then return res, err end
+    lastErr = err
+  end
+  return nil, lastErr or "Método indisponível"
+end
+
+local function isDirection(target)
+  if type(target) ~= "string" then return false end
+  local t = target:lower()
+  return t == "right" or t == "left" or t == "front" or t == "back" or t == "top" or t == "bottom"
+      or t == "north" or t == "south" or t == "east" or t == "west" or t == "up" or t == "down"
+end
+
 function ME.new(state)
   return setmetatable({ state = state }, ME)
 end
@@ -47,14 +64,14 @@ end
 
 function ME:isCrafting(filter)
   local b = self.state.devices.meBridge
-  local res, err = call(b, "isCrafting", filter)
+  local res, err = callAny(b, { "isCrafting", "isItemCrafting" }, filter)
   if res == nil and err then return nil, err end
   return res, err
 end
 
 function ME:isCraftable(filter)
   local b = self.state.devices.meBridge
-  return call(b, "isCraftable", filter)
+  return callAny(b, { "isCraftable", "isItemCraftable" }, filter)
 end
 
 function ME:craftItem(filter)
@@ -64,10 +81,15 @@ end
 
 function ME:exportItem(filter, target)
   local b = self.state.devices.meBridge
-  return call(b, "exportItem", filter, target)
+  if b and type(b.exportItemToPeripheral) == "function" then
+    return call(b, "exportItemToPeripheral", filter, target)
+  end
+  if isDirection(target) then
+    return call(b, "exportItem", filter, target)
+  end
+  return nil, "exportItemToPeripheral indisponível e target não é direção: " .. tostring(target)
 end
 
 return {
   new = ME.new,
 }
-
