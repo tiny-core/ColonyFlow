@@ -396,10 +396,46 @@ function Engine:tick()
   end
   do
     local guarded = 0
+    local sumDx, sumDz = 0, 0
+    local origin = nil
+    if type(state.colonyStats.location) == "table" and state.colonyStats.location.x and state.colonyStats.location.z then
+      origin = { x = tonumber(state.colonyStats.location.x), z = tonumber(state.colonyStats.location.z) }
+      if not origin.x or not origin.z then origin = nil end
+    end
+
+    local function addVector(pos)
+      if not origin then return end
+      if type(pos) ~= "table" then return end
+      local x = tonumber(pos.x)
+      local z = tonumber(pos.z)
+      if not x or not z then return end
+      sumDx = sumDx + (x - origin.x)
+      sumDz = sumDz + (z - origin.z)
+    end
+
+    local function directionFromVector(dx, dz)
+      if dx == 0 and dz == 0 then return nil end
+      local adx = math.abs(dx)
+      local adz = math.abs(dz)
+      if adx >= adz * 2 then
+        return (dx > 0) and "LESTE" or "OESTE"
+      end
+      if adz >= adx * 2 then
+        return (dz < 0) and "NORTE" or "SUL"
+      end
+      local ns = (dz < 0) and "NORTE" or "SUL"
+      local ew = (dx > 0) and "LESTE" or "OESTE"
+      if ns == "NORTE" and ew == "LESTE" then return "NORDESTE" end
+      if ns == "NORTE" and ew == "OESTE" then return "NOROESTE" end
+      if ns == "SUL" and ew == "LESTE" then return "SUDESTE" end
+      return "SUDOESTE"
+    end
+
     if type(buildings) == "table" then
       for _, b in ipairs(buildings) do
         if type(b) == "table" and b.guarded == true then
           guarded = guarded + 1
+          addVector(b.location)
         end
       end
     end
@@ -411,6 +447,7 @@ function Engine:tick()
           local s = c.state:lower()
           if s:find("raid") or s:find("attack") or s:find("combat") or s:find("fight") or s:find("flee") or s:find("barbar") then
             citizenAlert = citizenAlert + 1
+            addVector(c.location)
           end
         end
       end
@@ -419,6 +456,11 @@ function Engine:tick()
     state.colonyStats.underAttackHeuristic = (guarded > 0) or (citizenAlert > 0)
     state.colonyStats.underAttackGuardedBuildings = guarded
     state.colonyStats.underAttackCitizenAlerts = citizenAlert
+    if state.colonyStats.underAttackHeuristic == true then
+      state.colonyStats.underAttackDirection = directionFromVector(sumDx, sumDz)
+    else
+      state.colonyStats.underAttackDirection = nil
+    end
   end
 
   for _, r in ipairs(requests) do

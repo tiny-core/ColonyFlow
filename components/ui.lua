@@ -466,17 +466,16 @@ function UI:renderStatus(state, mon)
 
   local under = (cs.underAttack == true) or (cs.underAttackHeuristic == true)
   if under then
-    self:drawText("status", mon, 1, y, padRight("ALERTA: RAID/ATAQUE EM ANDAMENTO", w), colors.red, colors.black)
+    local dir = cs.underAttackDirection
+    local msg = "ALERTA: RAID/ATAQUE EM ANDAMENTO"
+    if type(dir) == "string" and dir ~= "" then
+      msg = msg .. " - " .. dir
+    end
+    self:drawText("status", mon, 1, y, padRight(msg, w), colors.red, colors.black)
     y = y + 1
   end
 
   self:drawText("status", mon, 1, y, shorten("Colonia: " .. tostring(cs.name or "-"), w)); y = y + 1
-  if type(cs.location) == "table" and cs.location.x and cs.location.y and cs.location.z then
-    self:drawText("status", mon, 1, y,
-      shorten(
-      "TownHall: " .. tostring(cs.location.x) .. "," .. tostring(cs.location.y) .. "," .. tostring(cs.location.z), w)); y =
-    y + 1
-  end
   self:drawText("status", mon, 1, y,
     shorten("Cidadaos: " .. tostring(cs.citizens or "-") .. "/" .. tostring(cs.maxCitizens or "-"), w)); y = y + 1
 
