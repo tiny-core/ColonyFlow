@@ -47,8 +47,8 @@
 
 ### Cache e Performance
 
-- [ ] **CACHE-01**: O sistema implementa cache (TTL) para consultas de itens no ME e para inferência de tier/equivalência, com invalidação por tempo e limites de tamanho.
-- [ ] **CACHE-02**: O sistema não revarre inventários de destino desnecessariamente; aplica política de refresh configurável e/ou sob demanda por requisição.
+- [ ] **CACHE-01**: O sistema implementa cache (TTL) para consultas de itens no ME e para inferência de tier/equivalência, com invalidação por tempo e limites de tamanho. (Infra existe; faltam caches dedicados para consultas ME e inferência tier/eq.)
+- [x] **CACHE-02**: O sistema não revarre inventários de destino desnecessariamente; aplica política de refresh configurável e/ou sob demanda por requisição. (Implementado via cache TTL do snapshot do destino e refresh pós-entrega.)
 
 ### Interface Dual-Monitor
 
@@ -109,7 +109,7 @@
 | CFG-03 | Phase 2 | Pending |
 | CFG-04 | Phase 4 | Complete |
 | CACHE-01 | Phase 1 | Pending |
-| CACHE-02 | Phase 2 | Pending |
+| CACHE-02 | Phase 2 | Complete |
 | UI-01 | Phase 4 | Complete |
 | UI-02 | Phase 4 | Complete |
 | UI-03 | Phase 4 | Complete |
