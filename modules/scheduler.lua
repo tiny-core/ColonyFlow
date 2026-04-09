@@ -41,7 +41,25 @@ function M.run(state, engine, ui)
     end
   end
 
-  parallel.waitForAny(loopEngine, loopUI)
+  local function loopEvents()
+    while true do
+      local ev = { os.pullEventRaw() }
+      local name = ev[1]
+      if name == "terminate" then
+        print("Terminated by user")
+        break
+      end
+
+      if ui.handleEvent then
+        local ok, err = pcall(ui.handleEvent, ui, table.unpack(ev))
+        if not ok then
+          state.logger:error("Erro no ui.handleEvent", { err = tostring(err) })
+        end
+      end
+    end
+  end
+
+  parallel.waitForAny(loopEngine, loopUI, loopEvents)
 end
 
 return M
