@@ -207,7 +207,7 @@ function UI:renderNoCraft(state, mon)
   local nameW = #"NOME"
   local tagW = #"TAG"
 
-  local pageSize = math.max(1, h - 6)
+  local pageSize = math.max(1, h - 5)
   local pages = math.max(1, math.ceil(#list / pageSize))
   if self.noCraftPage > pages then self.noCraftPage = pages end
   if self.noCraftPage < 1 then self.noCraftPage = 1 end
@@ -259,15 +259,15 @@ function UI:renderNoCraft(state, mon)
     self:drawText("status", mon, 1, y, padRight(line, w))
     y = y + 1
   end
-  for i = y, h - 2 do
+  for i = y, h - 1 do
     self:drawText("status", mon, 1, i, padRight("", w))
   end
 
-  local btn = "< VOLTAR | PAG " .. tostring(self.noCraftPage) .. "/" .. tostring(pages) .. " | PROX >"
-  self:drawText("status", mon, 1, h - 1, padRight(btn, w), colors.black, colors.lightGray)
-  self:drawText("status", mon, 1, h, padRight(centerText("TOQUE: ESQ=VOLTAR  MEIO=ANTERIOR  DIR=PROX", w), w),
-    colors.black,
-    colors.lightGray)
+  local left = "[VOLTAR]"
+  local right = "PAG " .. tostring(self.noCraftPage) .. "/" .. tostring(pages) .. "  TOTAL " .. tostring(#list)
+  local footer = padRight(left, w)
+  footer = footer:sub(1, math.max(0, w - #right)) .. right
+  self:drawText("status", mon, 1, h, padRight(footer, w), colors.lightGray, colors.black)
 end
 
 local function jobSymbol(jobState)
@@ -487,16 +487,15 @@ function UI:renderStatus(state, mon)
 
   self:drawText("status", mon, 1, y, shorten("Estoque Critico: [heuristica]", w)); y = y + 1
 
-  -- Clear remaining lines until bottom button (2 linhas)
-  for i = y, h - 2 do
+  -- Clear remaining lines until bottom button
+  for i = y, h - 1 do
     self:drawText("status", mon, 1, i, padRight("", w))
   end
 
   local noCraft = self:collectNoCraftItems(state)
-  local btn = "[SEM CRAFT: " .. tostring(#noCraft) .. "]  (TOQUE)"
-  local btnBg = (#noCraft > 0) and colors.red or colors.gray
-  self:drawText("status", mon, 1, h - 1, padRight(centerText(btn, w), w), colors.white, btnBg)
-  self:drawText("status", mon, 1, h, padRight("", w), colors.white, btnBg)
+  local btn = "SEM CRAFT: " .. tostring(#noCraft) .. "  (TOQUE)"
+  local btnFg = (#noCraft > 0) and colors.red or colors.gray
+  self:drawText("status", mon, 1, h, padRight(btn, w), btnFg, colors.black)
 end
 
 function UI:handleEvent(event, side, x, y)
@@ -521,14 +520,16 @@ function UI:handleEvent(event, side, x, y)
     end
     if side == statusMonName then
       local w, h = self.state.devices.monitorStatus.getSize()
-      if y >= h - 1 then
+      if y == h then
         if self.statusView == "nocraft" then
-          if x < math.floor(w / 3) then
+          if x <= (#"[VOLTAR]" + 2) then
             self.statusView = "main"
-          elseif x > math.floor((2 * w) / 3) then
-            self.noCraftPage = (self.noCraftPage or 1) + 1
           else
-            self.noCraftPage = (self.noCraftPage or 1) - 1
+            if x < w / 2 then
+              self.noCraftPage = (self.noCraftPage or 1) - 1
+            else
+              self.noCraftPage = (self.noCraftPage or 1) + 1
+            end
           end
         else
           local list = self:collectNoCraftItems(self.state)
