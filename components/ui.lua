@@ -274,12 +274,14 @@ local function jobSymbol(jobState)
   local s = tostring(jobState or "")
   s = s:lower()
   if s == "" then return "--" end
-  if s == "done" then return "OK" end
-  if s:find("wait") or s:find("await") then return "AG" end
-  if s:find("craft") then return "CR" end
-  if s:find("pend") then return "PD" end
-  if s:find("err") or s:find("fail") then return "ER" end
-  return shorten(s, 2)
+  if s == "done" then return "CONCLUIDO" end
+  if s:find("wait") or s:find("retry") or s:find("await") then return "AGUARDANDO" end
+  if s:find("craft") then return "CRAFTANDO" end
+  if s:find("pend") then return "PENDENTE" end
+  if s:find("blocked_by_tier") or s:find("blocked") then return "BLOQUEADO TIER" end
+  if s:find("unsupport") or s:find("nao_suport") then return "NAO SUPORTADO" end
+  if s:find("err") or s:find("fail") then return "ERRO" end
+  return shorten((s:gsub("_", " ")):upper(), 14)
 end
 
 function UI:renderRequests(state, mon)
@@ -346,7 +348,7 @@ function UI:renderRequests(state, mon)
   end
 
   if choMax > 24 then choMax = 24 end
-  if jobMax > 10 then jobMax = 10 end
+  if jobMax > 14 then jobMax = 14 end
 
   local reqW = w - (choMax + jobMax + faltW + seps)
   if reqW < reqMin then
@@ -479,10 +481,10 @@ function UI:renderStatus(state, mon)
   self:drawText("status", mon, 1, y, centerText("OPERACAO", w), colors.cyan); y = y + 1
   self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
 
-  self:drawText("status", mon, 1, y, shorten("Reqs: " .. tostring(#state.requests), w)); y = y + 1
+  self:drawText("status", mon, 1, y, shorten("Requisicoes: " .. tostring(#state.requests), w)); y = y + 1
   self:drawText("status", mon, 1, y, shorten("Entregues: " .. tostring(state.stats.delivered), w)); y = y + 1
-  self:drawText("status", mon, 1, y, shorten("Craft req.: " .. tostring(state.stats.crafted), w)); y = y + 1
-  self:drawText("status", mon, 1, y, shorten("Subst: " .. tostring(state.stats.substitutions), w)); y = y + 1
+  self:drawText("status", mon, 1, y, shorten("Crafts: " .. tostring(state.stats.crafted), w)); y = y + 1
+  self:drawText("status", mon, 1, y, shorten("Substituicoes: " .. tostring(state.stats.substitutions), w)); y = y + 1
   self:drawText("status", mon, 1, y, shorten("Erros: " .. tostring(state.stats.errors), w)); y = y + 2
 
   self:drawText("status", mon, 1, y, shorten("Estoque Critico: [heuristica]", w)); y = y + 1
