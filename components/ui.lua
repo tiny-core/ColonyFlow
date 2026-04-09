@@ -201,31 +201,73 @@ function UI:renderNoCraft(state, mon)
   self:drawText("status", mon, math.max(1, w - #right + 1), 1, right, colors.gray)
   self:drawText("status", mon, 1, 2, string.rep("-", math.max(0, w)))
 
-  local nameW = math.max(8, math.floor(w * 0.35))
-  local tagW = math.max(8, w - nameW - 3)
-  self:drawText("status", mon, 1, 3, shorten("NOME", nameW) .. " | " .. shorten("TAG", tagW))
-  self:drawText("status", mon, 1, 4, string.rep("-", math.max(0, w)))
+  local sepW = 3
+  local minName, minTag = 8, 12
+  local maxName = 26
+  local nameW = #"NOME"
+  local tagW = #"TAG"
 
-  local pageSize = math.max(1, h - 5)
+  local pageSize = math.max(1, h - 6)
   local pages = math.max(1, math.ceil(#list / pageSize))
   if self.noCraftPage > pages then self.noCraftPage = pages end
   if self.noCraftPage < 1 then self.noCraftPage = 1 end
 
   local startIdx = (self.noCraftPage - 1) * pageSize + 1
   local endIdx = math.min(#list, startIdx + pageSize - 1)
+
+  for i = startIdx, endIdx do
+    local it = list[i]
+    if it then
+      if #tostring(it.name or "") > nameW then nameW = #tostring(it.name or "") end
+      if #tostring(it.tag or "") > tagW then tagW = #tostring(it.tag or "") end
+    end
+  end
+
+  if nameW > maxName then nameW = maxName end
+  if nameW < minName then nameW = minName end
+
+  local available = w - sepW
+  local desiredTag = tagW
+  if desiredTag < minTag then desiredTag = minTag end
+  local desiredName = nameW
+
+  if desiredName + desiredTag > available then
+    desiredTag = available - desiredName
+  end
+  if desiredTag < minTag then
+    desiredTag = minTag
+    desiredName = available - desiredTag
+  end
+  if desiredName < minName then
+    desiredName = minName
+    desiredTag = available - desiredName
+  end
+  if desiredTag < 1 then desiredTag = 1 end
+  if desiredName < 1 then desiredName = 1 end
+
+  nameW = desiredName
+  tagW = desiredTag
+
+  local header = string.format("%-" .. nameW .. "s | %-" .. tagW .. "s", "NOME", "TAG")
+  self:drawText("status", mon, 1, 3, padRight(header, w))
+  self:drawText("status", mon, 1, 4, string.rep("-", math.max(0, w)))
+
   local y = 5
   for i = startIdx, endIdx do
     local it = list[i]
-    local line = shorten(it.name, nameW) .. " | " .. shorten(it.tag, tagW)
+    local line = string.format("%-" .. nameW .. "s | %-" .. tagW .. "s", shorten(it.name, nameW), shorten(it.tag, tagW))
     self:drawText("status", mon, 1, y, padRight(line, w))
     y = y + 1
   end
-  for i = y, h - 1 do
+  for i = y, h - 2 do
     self:drawText("status", mon, 1, i, padRight("", w))
   end
 
   local btn = "< VOLTAR | PAG " .. tostring(self.noCraftPage) .. "/" .. tostring(pages) .. " | PROX >"
-  self:drawText("status", mon, 1, h, padRight(btn, w), colors.black, colors.lightGray)
+  self:drawText("status", mon, 1, h - 1, padRight(btn, w), colors.black, colors.lightGray)
+  self:drawText("status", mon, 1, h, padRight(centerText("TOQUE: ESQ=VOLTAR  MEIO=ANTERIOR  DIR=PROX", w), w),
+    colors.black,
+    colors.lightGray)
 end
 
 local function jobSymbol(jobState)
@@ -445,15 +487,16 @@ function UI:renderStatus(state, mon)
 
   self:drawText("status", mon, 1, y, shorten("Estoque Critico: [heuristica]", w)); y = y + 1
 
-  -- Clear remaining lines until bottom button
-  for i = y, h - 1 do
+  -- Clear remaining lines until bottom button (2 linhas)
+  for i = y, h - 2 do
     self:drawText("status", mon, 1, i, padRight("", w))
   end
 
   local noCraft = self:collectNoCraftItems(state)
-  local btn = "[SEM CRAFT: " .. tostring(#noCraft) .. "]"
+  local btn = "[SEM CRAFT: " .. tostring(#noCraft) .. "]  (TOQUE)"
   local btnBg = (#noCraft > 0) and colors.red or colors.gray
-  self:drawText("status", mon, 1, h, padRight(btn, w), colors.white, btnBg)
+  self:drawText("status", mon, 1, h - 1, padRight(centerText(btn, w), w), colors.white, btnBg)
+  self:drawText("status", mon, 1, h, padRight("", w), colors.white, btnBg)
 end
 
 function UI:handleEvent(event, side, x, y)
@@ -478,7 +521,7 @@ function UI:handleEvent(event, side, x, y)
     end
     if side == statusMonName then
       local w, h = self.state.devices.monitorStatus.getSize()
-      if y == h then
+      if y >= h - 1 then
         if self.statusView == "nocraft" then
           if x < math.floor(w / 3) then
             self.statusView = "main"
