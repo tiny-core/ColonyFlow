@@ -12,26 +12,25 @@ Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColo
 
 ### Validated
 
-(None yet — ship to validate)
+- Monitorar automaticamente requisições pendentes de NPCs e construções do MineColonies (Validated in Phase 02)
+- Consultar o sistema ME via Advanced Peripherals para verificar disponibilidade de itens (Validated in Phase 03)
+- Validar o conteúdo do baú ou inventário de destino antes de solicitar novos crafts (Validated in Phase 03)
+- Calcular apenas o faltante real antes de solicitar autocrafting (Validated in Phase 03)
+- Solicitar crafting automaticamente no AE2 e acompanhar o andamento da operação (Validated in Phase 03)
+- Entregar automaticamente os itens ao destino quando o inventário estiver conectado e identificável (Validated in Phase 03)
+- Implementar sistema de filtragem inteligente com equivalências entre mods (substituições configuráveis) (Validated in Phase 02)
+- Classificar automaticamente itens em tiers (iron/diamond/netherite) com heurísticas por tags/metadados e regras configuráveis (Validated in Phase 02)
+- Respeitar restrições de tier por nível de building/worker ao selecionar ferramentas/equipamentos substitutos (Validated in Phase 03)
+- Fornecer interface de configuração para adicionar mapeamentos manualmente e via arquivo JSON (Validated in Phase 04)
+- Exibir requisições e status operacional em dois Advanced Monitors com layout ASCII responsivo (Validated in Phase 04)
+- Registrar logs estruturados em português com rotação e níveis de severidade (Validated in Phase 01)
+- Operar em loop autônomo com fila, retentativas e recuperação segura de falhas (Validated in Phase 01)
 
 ### Active
 
-- [ ] Monitorar automaticamente requisições pendentes de NPCs e construções do MineColonies
-- [ ] Consultar o sistema ME via Advanced Peripherals para verificar disponibilidade de itens
-- [ ] Validar o conteúdo do baú ou inventário de destino antes de solicitar novos crafts
-- [ ] Calcular apenas o faltante real antes de solicitar autocrafting
-- [ ] Solicitar crafting automaticamente no AE2 e acompanhar o andamento da operação
-- [ ] Entregar automaticamente os itens ao destino quando o inventário estiver conectado e identificável
-- [ ] Implementar sistema de filtragem inteligente com equivalências entre mods (substituições configuráveis)
-- [ ] Classificar automaticamente itens em tiers (iron/diamond/netherite) com heurísticas por tags/metadados e regras configuráveis
-- [ ] Respeitar restrições de tier por nível de building/worker ao selecionar ferramentas/equipamentos substitutos
-- [ ] Fornecer interface de configuração para adicionar mapeamentos manualmente e via arquivo JSON
 - [ ] Implementar cache otimizado para consultas repetidas (ME, tiers, mapeamentos e destinos)
 - [ ] Incluir testes unitários para mapeamentos e regras de progressão (incluindo ATM10 v6.4 e mods populares)
 - [ ] Garantir compatibilidade de operação em singleplayer e multiplayer
-- [ ] Exibir requisições e status operacional em dois Advanced Monitors com layout ASCII responsivo
-- [ ] Registrar logs estruturados em português com rotação e níveis de severidade
-- [ ] Operar em loop autônomo com fila, retentativas e recuperação segura de falhas
 
 ### Out of Scope
 
