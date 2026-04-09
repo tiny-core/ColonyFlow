@@ -39,35 +39,51 @@ end
 
 local function main()
   local path = "data/mappings.json"
-  local db = loadDb(path)
 
-  print("Editor de mapeamentos (equivalências/tier)")
-  print("Arquivo: " .. path)
-  print("")
+  while true do
+    term.clear()
+    term.setCursorPos(1, 1)
+    print("Editor de mapeamentos (equivalências/tier)")
+    print("Arquivo: " .. path)
+    print("------------------------------------------")
+    print("[1] Editar Equivalencias")
+    print("[2] Sair")
+    print("")
 
-  local a = prompt("Item A (ex: minecraft:iron_chestplate)")
-  local b = prompt("Item B (equivalente)")
-  local class = prompt("Classe (ex: ARMOR_CHEST)")
-  local tier = prompt("Tier (ex: iron)")
+    local choice = prompt("Opção")
 
-  if a == "" or b == "" then
-    print("Itens inválidos.")
-    return
+    if choice == "1" then
+      local db = loadDb(path)
+      print("")
+      local a = prompt("Item A (ex: minecraft:iron_chestplate)")
+      local b = prompt("Item B (equivalente)")
+      local class = prompt("Classe (ex: ARMOR_CHEST, enter p/ ignorar)")
+      local tier = prompt("Tier (ex: iron, enter p/ ignorar)")
+
+      if a ~= "" and b ~= "" then
+        local itemA = ensureItem(db, a)
+        local itemB = ensureItem(db, b)
+        itemA.class = class ~= "" and class or itemA.class
+        itemB.class = class ~= "" and class or itemB.class
+        itemA.tier = tier ~= "" and tier or itemA.tier
+        itemB.tier = tier ~= "" and tier or itemB.tier
+
+        addEquivalent(itemA.equivalents, b)
+        addEquivalent(itemB.equivalents, a)
+
+        saveDb(path, db)
+        print("Salvo com sucesso.")
+      else
+        print("Itens inválidos.")
+      end
+      print("Pressione Enter para continuar...")
+      read()
+    elseif choice == "2" then
+      break
+    end
   end
-
-  local itemA = ensureItem(db, a)
-  local itemB = ensureItem(db, b)
-  itemA.class = class ~= "" and class or itemA.class
-  itemB.class = class ~= "" and class or itemB.class
-  itemA.tier = tier ~= "" and tier or itemA.tier
-  itemB.tier = tier ~= "" and tier or itemB.tier
-
-  addEquivalent(itemA.equivalents, b)
-  addEquivalent(itemB.equivalents, a)
-
-  saveDb(path, db)
-  print("")
-  print("Salvo com sucesso.")
+  term.clear()
+  term.setCursorPos(1, 1)
 end
 
 main()
