@@ -25,24 +25,30 @@ function UI:drawText(deviceKey, mon, x, y, text, fg, bg)
 
   self.buffers[deviceKey] = self.buffers[deviceKey] or {}
   local key = tostring(y) .. ":" .. tostring(x)
+  local w, _ = mon.getSize()
+  local maxLen = math.max(0, w - x + 1)
+  local rendered = shorten(text, maxLen)
   local current = self.buffers[deviceKey][key]
 
-  if current and current.text == text and current.fg == fg and current.bg == bg then
+  if current and current.text == rendered and current.fg == fg and current.bg == bg then
     return -- No change needed
   end
 
-  self.buffers[deviceKey][key] = { text = text, fg = fg, bg = bg }
+  self.buffers[deviceKey][key] = { text = rendered, fg = fg, bg = bg, len = #rendered }
 
   local old = term.current()
   term.redirect(mon)
   term.setTextColor(fg)
   term.setBackgroundColor(bg)
-  term.setCursorPos(1, y)
-  term.clearLine()
+  if x == 1 then
+    term.setCursorPos(1, y)
+    term.clearLine()
+  elseif current and type(current.len) == "number" and current.len > #rendered then
+    term.setCursorPos(x, y)
+    term.write(string.rep(" ", math.min(current.len, maxLen)))
+  end
   term.setCursorPos(x, y)
-  local w, _ = term.getSize()
-  local maxLen = math.max(0, w - x + 1)
-  term.write(shorten(text, maxLen))
+  term.write(rendered)
 
   term.redirect(old)
 end
@@ -71,6 +77,27 @@ local function itemLabel(name)
   s = s:gsub("_", " ")
   s = s:gsub("%s+", " ")
   return s
+end
+
+local function formatDecimal2(v)
+  local n = tonumber(v)
+  if not n then return "-" end
+  local s = string.format("%.2f", n)
+  return (s:gsub("%.", ","))
+end
+
+local function happinessColor(v)
+  local n = tonumber(v)
+  if not n then return colors.white end
+  if n >= 8 then return colors.lime end
+  if n >= 6 then return colors.green end
+  if n >= 4 then return colors.yellow end
+  if n >= 2 then return colors.orange end
+  return colors.red
+end
+
+local function boolLabel(v)
+  return v and "SIM" or "NAO"
 end
 
 local function jobSymbol(jobState)
@@ -212,7 +239,7 @@ function UI:renderRequests(state, mon)
     local line = string.format(
       "%-" .. reqW .. "s | %-" .. choMax .. "s | %" .. faltW .. "s | %-" .. jobMax .. "s",
       shorten(displayItem, reqW),
-      shorten(chosenDisplay, choMax),
+      centerText(shorten(chosenDisplay, choMax), choMax),
       shorten(missingLabel, faltW),
       centerText(shorten(jobSymbol(jobState), jobMax), jobMax)
     )
@@ -245,17 +272,38 @@ function UI:renderStatus(state, mon)
     term.redirect(old)
   end
 
-  self:drawText("status", mon, 1, 1, padRight("Status", w))
+  self:drawText("status", mon, 1, 1, padRight(centerText("STATUS", w), w))
   self:drawText("status", mon, 1, 2, string.rep("-", math.max(0, w)))
 
   local y = 3
   local cs = state.colonyStats or {}
+  self:drawText("status", mon, 1, y, centerText("COLONIA", w), colors.cyan); y = y + 1
+  self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
+
   self:drawText("status", mon, 1, y, shorten("Colonia: " .. tostring(cs.name or "-"), w)); y = y + 1
   self:drawText("status", mon, 1, y,
     shorten("Cidadaos: " .. tostring(cs.citizens or "-") .. "/" .. tostring(cs.maxCitizens or "-"), w)); y = y + 1
-  self:drawText("status", mon, 1, y, shorten("Felicidade: " .. tostring(cs.happiness or "-"), w)); y = y + 1
-  self:drawText("status", mon, 1, y, shorten("Ataque: " .. tostring(cs.underAttack or false), w)); y = y + 1
+
+  do
+    local label = "Felicidade: "
+    self:drawText("status", mon, 1, y, shorten(label, w))
+    local hv = formatDecimal2(cs.happiness)
+    self:drawText("status", mon, #label + 1, y, shorten(hv, math.max(0, w - #label)), happinessColor(cs.happiness))
+    y = y + 1
+  end
+
+  do
+    local label = "Ataque: "
+    local under = cs.underAttack == true
+    self:drawText("status", mon, 1, y, shorten(label, w))
+    self:drawText("status", mon, #label + 1, y, boolLabel(under), under and colors.red or colors.lime)
+    y = y + 1
+  end
+
   self:drawText("status", mon, 1, y, shorten("Obras: " .. tostring(cs.constructionSites or "-"), w)); y = y + 2
+
+  self:drawText("status", mon, 1, y, centerText("OPERACAO", w), colors.cyan); y = y + 1
+  self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
 
   self:drawText("status", mon, 1, y, shorten("Reqs: " .. tostring(#state.requests), w)); y = y + 1
   self:drawText("status", mon, 1, y, shorten("Ciclos: " .. tostring(state.stats.processed), w)); y = y + 1
