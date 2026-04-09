@@ -257,6 +257,9 @@ function Mine:getColonyStats()
   local okName, name = Util.safeCall(integrator.getColonyName)
   if okName then stats.name = name end
 
+  local okLoc, loc = Util.safeCall(integrator.getLocation)
+  if okLoc and type(loc) == "table" then stats.location = loc end
+
   local okCit, citizens = Util.safeCall(integrator.amountOfCitizens)
   if okCit then stats.citizens = citizens end
 

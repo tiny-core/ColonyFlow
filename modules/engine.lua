@@ -391,6 +391,36 @@ function Engine:tick()
     state.cache:set("mc", "citizens", citizens, 5)
   end
 
+  if type(state.colonyStats) ~= "table" then
+    state.colonyStats = {}
+  end
+  do
+    local guarded = 0
+    if type(buildings) == "table" then
+      for _, b in ipairs(buildings) do
+        if type(b) == "table" and b.guarded == true then
+          guarded = guarded + 1
+        end
+      end
+    end
+
+    local citizenAlert = 0
+    if type(citizens) == "table" then
+      for _, c in ipairs(citizens) do
+        if type(c) == "table" and type(c.state) == "string" then
+          local s = c.state:lower()
+          if s:find("raid") or s:find("attack") or s:find("combat") or s:find("fight") or s:find("flee") or s:find("barbar") then
+            citizenAlert = citizenAlert + 1
+          end
+        end
+      end
+    end
+
+    state.colonyStats.underAttackHeuristic = (guarded > 0) or (citizenAlert > 0)
+    state.colonyStats.underAttackGuardedBuildings = guarded
+    state.colonyStats.underAttackCitizenAlerts = citizenAlert
+  end
+
   for _, r in ipairs(requests) do
     if r and r.id and isPendingState(state.cfg, r.state) then
       local job = self.work[r.id]
