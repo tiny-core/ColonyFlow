@@ -328,6 +328,11 @@ end
 
 function Engine:tick()
   local state = self.state
+
+  if self.eq and self.eq.reloadIfChanged then
+    self.eq:reloadIfChanged()
+  end
+
   state.stats.processed = state.stats.processed + 1
 
   if not state.devices.colonyIntegrator then
@@ -613,16 +618,33 @@ function Engine:tick()
         work.status = "pending"
       end
 
+      local reqItem = (r.items and r.items[1] and r.items[1].name) or ""
+      if candidate.name ~= reqItem then
+        if not work.logged_substitution then
+          state.stats.substitutions = state.stats.substitutions + 1
+          state.logger:info("Substituindo item solicitado", {
+            requestId = r.id,
+            reqItem = reqItem,
+            chosen = candidate.name
+          })
+          work.logged_substitution = true
+        end
+      end
+
       self.work[r.id] = work
 
       if type(why) == "table" and type(why.equivalents) == "table" and #why.equivalents > 1 then
-        state.stats.substitutions = state.stats.substitutions + 1
-        state.logger:info("Equivalências conhecidas para o item escolhido", {
-          target = r.target,
-          item = candidate.name,
-          tier = why.tier,
-          class = why.class,
-        })
+        if not work.logged_equivalents then
+          state.logger:info("Equivalências conhecidas para o item escolhido", {
+            requestId = r.id,
+            requested = reqItem,
+            chosen = candidate.name,
+            target = r.target,
+            tier = why.tier,
+            class = why.class,
+          })
+          work.logged_equivalents = true
+        end
       end
     end
     ::continue::

@@ -17,10 +17,24 @@ local function loadDb()
 end
 
 function Equivalence.new(state)
+  local initialTime = fs.exists(DB_PATH) and fs.attributes(DB_PATH).modified or 0
   return setmetatable({
     state = state,
     db = loadDb(),
+    lastModified = initialTime
   }, Equivalence)
+end
+
+function Equivalence:reloadIfChanged()
+  if not fs.exists(DB_PATH) then return end
+  local currentModified = fs.attributes(DB_PATH).modified
+  if currentModified > self.lastModified then
+    self.lastModified = currentModified
+    self.db = loadDb()
+    if self.state and self.state.logger then
+      self.state.logger:info("Mapeamentos recarregados automaticamente (hot-reload)")
+    end
+  end
 end
 
 function Equivalence:reload()
