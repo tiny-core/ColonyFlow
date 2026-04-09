@@ -208,12 +208,16 @@ function Mine:listBuildings()
 
   local out = {}
   for _, b in ipairs(result) do
-    table.insert(out, {
-      name = b.name,
-      type = b.type,
-      level = b.level,
-      built = b.built,
-    })
+    if type(b) == "table" then
+      table.insert(out, {
+        name = b.name,
+        type = b.type,
+        level = b.level,
+        built = b.built,
+        guarded = b.guarded,
+        location = b.location,
+      })
+    end
   end
   return out
 end
@@ -233,8 +237,11 @@ function Mine:listCitizens()
 
   local out = {}
   for _, c in ipairs(result) do
+    if type(c) ~= "table" then
+      goto continue
+    end
     local work = nil
-    if type(c) == "table" and type(c.work) == "table" then
+    if type(c.work) == "table" then
       work = {
         name = c.work.name,
         type = c.work.type,
@@ -242,10 +249,13 @@ function Mine:listCitizens()
       }
     end
     table.insert(out, {
-      id = c and c.id or nil,
-      name = c and c.name or nil,
+      id = c.id,
+      name = c.name,
       work = work,
+      state = c.state,
+      location = c.location,
     })
+    ::continue::
   end
   return out
 end
