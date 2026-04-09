@@ -72,19 +72,126 @@ end
 
 function Mine:listRequests()
   local integrator = self.state.devices.colonyIntegrator
+  local out = {}
+
   local ok, result = Util.safeCall(integrator.getRequests)
   if not ok then
     self.state.logger:error("Falha ao ler requests do MineColonies", { err = tostring(result) })
-    return {}
-  end
-  if type(result) ~= "table" then
-    return {}
+  elseif type(result) == "table" then
+    for _, r in ipairs(result) do
+      table.insert(out, normalizeRequest(r))
+    end
   end
 
-  local out = {}
-  for _, r in ipairs(result) do
-    table.insert(out, normalizeRequest(r))
+  local hasWO = type(integrator.getWorkOrders) == "function"
+  local hasWOR = type(integrator.getWorkOrderResources) == "function"
+  local hasBR = type(integrator.getBuilderResources) == "function"
+  if hasWO and (hasWOR or hasBR) then
+    local okWO, woResult = Util.safeCall(integrator.getWorkOrders)
+    if not okWO then
+      self.state.logger:warn("Falha ao ler WorkOrders do MineColonies", { err = tostring(woResult) })
+    elseif type(woResult) == "table" then
+      local added = 0
+      local lastErr = nil
+
+      for _, wo in ipairs(woResult) do
+        local resources = nil
+
+        if hasWOR then
+          local okRes, resOrErr = Util.safeCall(integrator.getWorkOrderResources, wo.id)
+          if okRes and type(resOrErr) == "table" then
+            resources = resOrErr
+          else
+            lastErr = resOrErr
+          end
+        end
+
+        if (not resources) and hasBR and type(wo.builder) == "table" then
+          local okRes, resOrErr = Util.safeCall(integrator.getBuilderResources, wo.builder)
+          if okRes and type(resOrErr) == "table" then
+            resources = resOrErr
+          else
+            lastErr = resOrErr
+          end
+        end
+
+        if type(resources) == "table" then
+          for _, res in pairs(resources) do
+            if type(res) ~= "table" then goto continue_res end
+            local needed = tonumber(res.needs or res.needed or res.count or res.amount or 0) or 0
+
+            local available = 0
+            if type(res.available) == "number" then
+              available = tonumber(res.available) or 0
+            elseif type(res.available) == "boolean" then
+              available = res.available and needed or 0
+            end
+
+            local delivering = 0
+            if type(res.delivering) == "number" then
+              delivering = tonumber(res.delivering) or 0
+            elseif type(res.delivering) == "boolean" then
+              delivering = res.delivering and needed or 0
+            end
+
+            local itemName = nil
+            if type(res.item) == "string" then
+              itemName = res.item
+            elseif type(res.item) == "table" then
+              itemName = res.item.name or res.item.item
+            elseif type(res.name) == "string" then
+              itemName = res.name
+            end
+
+            local missing = math.max(0, needed - available - delivering)
+            if missing > 0 and itemName and itemName ~= "" then
+              local synthId = "wo:" .. tostring(wo.id) .. ":" .. tostring(itemName)
+              local acceptedItem = nil
+              if type(res.item) == "table" then
+                acceptedItem = {
+                  name = itemName,
+                  displayName = res.item.displayName,
+                  count = missing,
+                  maxStackSize = res.item.maxStackSize,
+                  tags = res.item.tags,
+                  nbt = res.item.nbt
+                }
+              else
+                acceptedItem = {
+                  name = itemName,
+                  displayName = res.displayName,
+                  count = missing,
+                  maxStackSize = res.maxStackSize,
+                  tags = res.tags,
+                  nbt = res.nbt
+                }
+              end
+
+              table.insert(out, normalizeRequest({
+                id = synthId,
+                name = itemName,
+                desc = "WorkOrder " .. tostring(wo.workOrderType or wo.type or ""),
+                state = "requested",
+                target = wo.buildingName or wo.type or "builder",
+                count = missing,
+                items = { acceptedItem }
+              }))
+              added = added + 1
+            end
+            ::continue_res::
+          end
+        end
+      end
+
+      if #woResult > 0 and added == 0 then
+        self.state.logger:warn("WorkOrders encontrados, mas nenhum recurso exportável foi gerado", {
+          work_orders = #woResult,
+          err = tostring(lastErr or ""),
+        })
+      end
+    end
   end
+
   return out
 end
 
@@ -106,6 +213,38 @@ function Mine:listBuildings()
       type = b.type,
       level = b.level,
       built = b.built,
+    })
+  end
+  return out
+end
+
+function Mine:listCitizens()
+  local integrator = self.state.devices.colonyIntegrator
+  if not integrator or type(integrator.getCitizens) ~= "function" then return {} end
+
+  local ok, result = Util.safeCall(integrator.getCitizens)
+  if not ok then
+    self.state.logger:error("Falha ao ler citizens do MineColonies", { err = tostring(result) })
+    return {}
+  end
+  if type(result) ~= "table" then
+    return {}
+  end
+
+  local out = {}
+  for _, c in ipairs(result) do
+    local work = nil
+    if type(c) == "table" and type(c.work) == "table" then
+      work = {
+        name = c.work.name,
+        type = c.work.type,
+        level = c.work.level,
+      }
+    end
+    table.insert(out, {
+      id = c and c.id or nil,
+      name = c and c.name or nil,
+      work = work,
     })
   end
   return out

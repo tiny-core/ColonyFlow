@@ -151,6 +151,13 @@ local function strLower(s)
   return s and tostring(s):lower() or ""
 end
 
+local function normalizeName(s)
+  s = strLower(s)
+  s = s:gsub("%s+", " ")
+  s = s:gsub("^%s+", ""):gsub("%s+$", "")
+  return s
+end
+
 local function resolveBuildingForTarget(buildings, target)
   local t = strLower(target)
   if t == "" then return nil, false end
@@ -162,6 +169,26 @@ local function resolveBuildingForTarget(buildings, target)
   for _, b in ipairs(buildings or {}) do
     if b and (strLower(b.name):find(t, 1, true) or strLower(b.type):find(t, 1, true)) then
       return b, true
+    end
+  end
+  return nil, false
+end
+
+local function resolveBuildingForRequest(buildings, citizens, target)
+  local b, ok = resolveBuildingForTarget(buildings, target)
+  if ok and b then return b, true end
+
+  local t = normalizeName(target)
+  if t == "" then return nil, false end
+  local tNoPrefix = t:match("^[^%s]+%s+(.+)$") or t
+  for _, c in ipairs(citizens or {}) do
+    local cn = c and normalizeName(c.name) or ""
+    if cn ~= "" then
+      local match = (cn == t) or (t:find(cn, 1, true) ~= nil) or (cn:find(t, 1, true) ~= nil) or (cn == tNoPrefix) or
+          (tNoPrefix:find(cn, 1, true) ~= nil) or (cn:find(tNoPrefix, 1, true) ~= nil)
+      if match and type(c.work) == "table" and c.work.type then
+        return { name = c.work.name or c.work.type, type = c.work.type, level = c.work.level, built = true }, true
+      end
     end
   end
   return nil, false
@@ -244,9 +271,15 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
       if not isVanilla then score = score + 100 end
     end
 
+    local enforceGating = state.cfg:getBool("progression", "enforce_building_gating", true)
+    local tierPrefEff = tierPref
+    if enforceGating and maxTierResolved then
+      tierPrefEff = "highest"
+    end
+
     local rank = tierRank(eq, className, t)
     if rank then
-      if tierPref == "highest" then
+      if tierPrefEff == "highest" then
         score = score + rank
       else
         score = score + (100 - rank)
@@ -347,6 +380,11 @@ function Engine:tick()
     buildings = self.mine:listBuildings()
     state.cache:set("mc", "buildings", buildings, 5)
   end
+  local citizens = state.cache:get("mc", "citizens")
+  if not citizens then
+    citizens = self.mine:listCitizens()
+    state.cache:set("mc", "citizens", citizens, 5)
+  end
 
   for _, r in ipairs(requests) do
     if r and r.id and isPendingState(state.cfg, r.state) then
@@ -355,7 +393,7 @@ function Engine:tick()
         goto continue
       end
 
-      local building, buildingResolved = resolveBuildingForTarget(buildings, r.target)
+      local building, buildingResolved = resolveBuildingForRequest(buildings, citizens, r.target)
       local candidate, why = pickCandidate(state, self.eq, self.tier, self.me, r, building, buildingResolved)
       local work = self.work[r.id] or {}
       work.request_state = r.state
@@ -419,6 +457,27 @@ function Engine:tick()
       local missingDest = missing
       local craftQty = math.max(0, missingDest - meAmount)
       local exportQty = math.min(meAmount, missingDest)
+
+      if exportQty > 0 then
+        local freeSpace, freeErr = Inventory.getFreeSpace(targetInv, candidate.name, candidate.maxStackSize)
+        if not freeSpace then
+          work.status = "waiting_retry"
+          work.err = "erro_capacidade_destino:" .. tostring(freeErr or "")
+          work.next_retry = os.epoch("utc") + 5000
+          state.logger:warn("Falha ao ler capacidade do destino", { request = r.id, err = freeErr })
+          goto continue
+        end
+        if freeSpace <= 0 then
+          work.status = "waiting_retry"
+          work.err = "destino_cheio_capacidade"
+          work.next_retry = os.epoch("utc") + 5000
+          state.logger:info("Destino cheio, aguardando espaço", { request = r.id, item = candidate.name })
+          exportQty = 0
+          craftQty = 0
+          goto continue
+        end
+        exportQty = math.min(exportQty, freeSpace)
+      end
 
       if craftQty > 0 then
         local lockTtlSeconds = 15

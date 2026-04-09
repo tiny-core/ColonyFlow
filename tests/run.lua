@@ -138,6 +138,69 @@ local tests = {
     assertEq(r1.accepted[1].name, "minecraft:iron_chestplate")
   end
   },
+  { "minecolonies_merge_workorders_builder_resources", function()
+    local Mine = require("modules.minecolonies")
+    local state = {
+      devices = {
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = "eq1", state = "requested", target = "guard", count = 1, items = { { name = "minecraft:iron_sword", count = 1 } } },
+            }
+          end,
+          getWorkOrders = function()
+            return {
+              { id = 99, buildingName = "builder", type = "builder", workOrderType = "WorkOrderBuilding" },
+            }
+          end,
+          getWorkOrderResources = function()
+            return {
+              { item = "minecraft:oak_planks", displayName = "Oak Planks", needs = 10, available = false, delivering = false },
+            }
+          end,
+        },
+      },
+      logger = { error = function() end },
+    }
+
+    local mine = Mine.new(state)
+    local reqs = mine:listRequests()
+    assertEq(#reqs, 2)
+    assertEq(reqs[1].id, "eq1")
+    assertEq(reqs[2].id, "wo:99:minecraft:oak_planks")
+    assertEq(reqs[2].accepted[1].name, "minecraft:oak_planks")
+    assertEq(reqs[2].requiredCount, 10)
+  end
+  },
+  { "minecolonies_merge_builder_resources_fallback", function()
+    local Mine = require("modules.minecolonies")
+    local state = {
+      devices = {
+        colonyIntegrator = {
+          getRequests = function() return {} end,
+          getWorkOrders = function()
+            return {
+              { id = 7, buildingName = "builder", type = "builder", builder = { x = 1, y = 2, z = 3 } },
+            }
+          end,
+          getBuilderResources = function()
+            return {
+              { item = "minecraft:cobblestone", displayName = "Cobblestone", needs = 99, available = false, delivering = false },
+            }
+          end,
+        },
+      },
+      logger = { error = function() end, warn = function() end },
+    }
+
+    local mine = Mine.new(state)
+    local reqs = mine:listRequests()
+    assertEq(#reqs, 1)
+    assertEq(reqs[1].id, "wo:7:minecraft:cobblestone")
+    assertEq(reqs[1].accepted[1].name, "minecraft:cobblestone")
+    assertEq(reqs[1].requiredCount, 99)
+  end
+  },
   { "engine_pending_configuravel", function()
     local Engine = require("modules.engine")
     local Cache = require("lib.cache")
@@ -523,317 +586,403 @@ local tests = {
     peripheral = oldPeripheral
   end
   },
-  { "engine_prefere_disponivel_ou_craftavel", function()
-      local Engine = require("modules.engine")
-      local Cache = require("lib.cache")
+  { "engine_guard_lv5_prefere_maior_tier_craftavel", function()
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
 
-      local inv = { list = function() return {} end }
-      local oldPeripheral = peripheral
-      peripheral = {
-        isPresent = function(name) return name == "test_inv" end,
-        wrap = function() return inv end,
-      }
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
 
-      local craftedName = nil
-      local meBridge = {
-        isConnected = function() return true end,
-        isOnline = function() return true end,
-        getItem = function(filter)
-          if filter.name == "minecraft:iron_sword" then
-            return { name = filter.name, amount = 1, isCraftable = false }
-          end
-          return { name = filter.name, amount = 0, isCraftable = false }
-        end,
-        isItemCraftable = function(filter)
-          if filter.name == "minecraft:netherite_sword" then return false end
-          if filter.name == "minecraft:iron_sword" then return true end
-          return false
-        end,
-        isItemCrafting = function(filter) return false end,
-        craftItem = function(filter) craftedName = filter.name; return true, "ok" end,
-      }
+    local craftedName = nil
+    local meBridge = {
+      isConnected = function() return true end,
+      isOnline = function() return true end,
+      getItem = function(filter) return { name = filter.name, amount = 0, isCraftable = false } end,
+      isItemCraftable = function(filter)
+        if filter.name == "minecraft:netherite_sword" then return false end
+        if filter.name == "minecraft:diamond_sword" then return true end
+        if filter.name == "minecraft:iron_sword" then return true end
+        return false
+      end,
+      isItemCrafting = function() return false end,
+      craftItem = function(filter)
+        craftedName = filter.name; return true, "ok"
+      end,
+    }
 
-      local cfg = makeCfg({
-        minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
-        delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "2" },
-        substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "highest" },
-      })
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "in_progress", completed_states_deny = "completed,done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "lowest" },
+      progression = { enforce_building_gating = "true" },
+    })
 
-      local state = {
-        cfg = cfg,
-        cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
-        logger = { warn = function() end, info = function() end, error = function() end },
-        devices = {
-          meBridge = meBridge,
-          colonyIntegrator = {
-            getRequests = function()
-              return {
-                {
-                  id = 14,
-                  state = "requested",
-                  target = "builder",
-                  count = 1,
-                  items = {
-                    { name = "minecraft:netherite_sword", count = 1 },
-                    { name = "minecraft:iron_sword", count = 1 },
-                  },
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = meBridge,
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              {
+                id = 200,
+                state = "in_progress",
+                target = "Knight Test",
+                count = 1,
+                items = {
+                  { name = "minecraft:netherite_sword", count = 1 },
+                  { name = "minecraft:diamond_sword",   count = 1 },
+                  { name = "minecraft:iron_sword",      count = 1 },
                 },
-              }
-            end,
-            getBuildings = function()
-              return { { name = "builder", type = "builder", level = 5, built = true } }
-            end,
-            getColonyName = function() return "t" end,
-            amountOfCitizens = function() return 0 end,
-            maxOfCitizens = function() return 0 end,
-            getHappiness = function() return 0 end,
-            isUnderAttack = function() return false end,
-            amountOfConstructionSites = function() return 0 end,
-          },
+              },
+            }
+          end,
+          getBuildings = function() return {} end,
+          getCitizens = function()
+            return {
+              { id = "c1", name = "Test", work = { type = "guardtower", level = 5, name = "Guard Tower" } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
         },
-        requests = {},
-        stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
-      }
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
 
-      local engine = Engine.new(state)
-      state.work = engine.work
-      engine:tick()
-      assertEq(state.work["14"].chosen, "minecraft:iron_sword")
-      assertEq(craftedName, nil, "não deveria craftar quando já existe em estoque")
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+    assertEq(state.work["200"].chosen, "minecraft:diamond_sword")
+    assertEq(craftedName, "minecraft:diamond_sword")
 
-      peripheral = oldPeripheral
-    end
+    peripheral = oldPeripheral
+  end
+  },
+  { "engine_prefere_disponivel_ou_craftavel", function()
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local craftedName = nil
+    local meBridge = {
+      isConnected = function() return true end,
+      isOnline = function() return true end,
+      getItem = function(filter)
+        if filter.name == "minecraft:iron_sword" then
+          return { name = filter.name, amount = 1, isCraftable = false }
+        end
+        return { name = filter.name, amount = 0, isCraftable = false }
+      end,
+      isItemCraftable = function(filter)
+        if filter.name == "minecraft:netherite_sword" then return false end
+        if filter.name == "minecraft:iron_sword" then return true end
+        return false
+      end,
+      isItemCrafting = function(filter) return false end,
+      craftItem = function(filter)
+        craftedName = filter.name; return true, "ok"
+      end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "2" },
+      substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "highest" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = meBridge,
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              {
+                id = 14,
+                state = "requested",
+                target = "builder",
+                count = 1,
+                items = {
+                  { name = "minecraft:netherite_sword", count = 1 },
+                  { name = "minecraft:iron_sword",      count = 1 },
+                },
+              },
+            }
+          end,
+          getBuildings = function()
+            return { { name = "builder", type = "builder", level = 5, built = true } }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+    assertEq(state.work["14"].chosen, "minecraft:iron_sword")
+    assertEq(craftedName, nil, "não deveria craftar quando já existe em estoque")
+
+    peripheral = oldPeripheral
+  end
   },
   { "me_amount_fallback_listItems", function()
-      local Engine = require("modules.engine")
-      local Cache = require("lib.cache")
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
 
-      local invCount = 0
-      local inv = {
-        list = function()
-          if invCount == 0 then return {} end
-          return { [1] = { name = "minecraft:dirt", count = invCount } }
-        end,
-      }
-      local oldPeripheral = peripheral
-      peripheral = {
-        isPresent = function(name) return name == "test_inv" end,
-        wrap = function() return inv end,
-      }
+    local invCount = 0
+    local inv = {
+      list = function()
+        if invCount == 0 then return {} end
+        return { [1] = { name = "minecraft:dirt", count = invCount } }
+      end,
+    }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
 
-      local meBridge = {
-        isConnected = function() return true end,
-        isOnline = function() return true end,
-        getItem = function(filter) return nil end,
-        getItems = function(filter)
-          return { { name = "minecraft:dirt", amount = 2, isCraftable = true } }
-        end,
-        exportItemToPeripheral = function(filter, target)
-          invCount = invCount + (filter.count or 0)
-          return tonumber(filter.count or 0), nil
-        end,
-      }
+    local meBridge = {
+      isConnected = function() return true end,
+      isOnline = function() return true end,
+      getItem = function(filter) return nil end,
+      getItems = function(filter)
+        return { { name = "minecraft:dirt", amount = 2, isCraftable = true } }
+      end,
+      exportItemToPeripheral = function(filter, target)
+        invCount = invCount + (filter.count or 0)
+        return tonumber(filter.count or 0), nil
+      end,
+    }
 
-      local cfg = makeCfg({
-        minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
-        delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "2" },
-        substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "lowest" },
-      })
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "2" },
+      substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "lowest" },
+    })
 
-      local state = {
-        cfg = cfg,
-        cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
-        logger = { warn = function() end, info = function() end, error = function() end },
-        devices = {
-          meBridge = meBridge,
-          colonyIntegrator = {
-            getRequests = function()
-              return { { id = 15, state = "requested", target = "x", count = 2, items = { { name = "minecraft:dirt", count = 2 } } } }
-            end,
-            getColonyName = function() return "t" end,
-            amountOfCitizens = function() return 0 end,
-            maxOfCitizens = function() return 0 end,
-            getHappiness = function() return 0 end,
-            isUnderAttack = function() return false end,
-            amountOfConstructionSites = function() return 0 end,
-          },
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = meBridge,
+        colonyIntegrator = {
+          getRequests = function()
+            return { { id = 15, state = "requested", target = "x", count = 2, items = { { name = "minecraft:dirt", count = 2 } } } }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
         },
-        requests = {},
-        stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
-      }
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
 
-      local engine = Engine.new(state)
-      state.work = engine.work
-      engine:tick()
-      assertEq(state.work["15"].status, "done")
-      assertEq(invCount, 2)
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+    assertEq(state.work["15"].status, "done")
+    assertEq(invCount, 2)
 
-      peripheral = oldPeripheral
-    end
+    peripheral = oldPeripheral
+  end
   },
   { "engine_export_auto_buffer_fallback", function()
-      local Engine = require("modules.engine")
-      local Cache = require("lib.cache")
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
 
-      local rackCount = 0
-      local bufferCount = 0
+    local rackCount = 0
+    local bufferCount = 0
 
-      local rackInv = {
-        list = function()
-          if rackCount == 0 then return {} end
-          return { [1] = { name = "minecraft:dirt", count = rackCount } }
-        end,
-      }
+    local rackInv = {
+      list = function()
+        if rackCount == 0 then return {} end
+        return { [1] = { name = "minecraft:dirt", count = rackCount } }
+      end,
+    }
 
-      local bufferInv = {
-        list = function()
-          if bufferCount == 0 then return {} end
-          return { [1] = { name = "minecraft:dirt", count = bufferCount } }
-        end,
-        pushItems = function(target, slot, limit)
-          assertEq(target, "minecolonies:rack_0")
-          local moved = math.min(bufferCount, limit or bufferCount)
-          bufferCount = bufferCount - moved
-          rackCount = rackCount + moved
-          return moved
-        end,
-      }
+    local bufferInv = {
+      list = function()
+        if bufferCount == 0 then return {} end
+        return { [1] = { name = "minecraft:dirt", count = bufferCount } }
+      end,
+      pushItems = function(target, slot, limit)
+        assertEq(target, "minecolonies:rack_0")
+        local moved = math.min(bufferCount, limit or bufferCount)
+        bufferCount = bufferCount - moved
+        rackCount = rackCount + moved
+        return moved
+      end,
+    }
 
-      local oldPeripheral = peripheral
-      peripheral = {
-        isPresent = function(name) return name == "minecolonies:rack_0" or name == "minecraft:chest_0" end,
-        wrap = function(name)
-          if name == "minecolonies:rack_0" then return rackInv end
-          if name == "minecraft:chest_0" then return bufferInv end
-          return nil
-        end,
-      }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "minecolonies:rack_0" or name == "minecraft:chest_0" end,
+      wrap = function(name)
+        if name == "minecolonies:rack_0" then return rackInv end
+        if name == "minecraft:chest_0" then return bufferInv end
+        return nil
+      end,
+    }
 
-      local meBridge = {
-        isConnected = function() return true end,
-        isOnline = function() return true end,
-        getItem = function(filter) return { name = filter.name, amount = 2, isCraftable = false } end,
-        exportItem = function(filter, dir)
-          assertEq(dir, "up")
-          bufferCount = bufferCount + (filter.count or 0)
-          return tonumber(filter.count or 0), nil
-        end,
-      }
+    local meBridge = {
+      isConnected = function() return true end,
+      isOnline = function() return true end,
+      getItem = function(filter) return { name = filter.name, amount = 2, isCraftable = false } end,
+      exportItem = function(filter, dir)
+        assertEq(dir, "up")
+        bufferCount = bufferCount + (filter.count or 0)
+        return tonumber(filter.count or 0), nil
+      end,
+    }
 
-      local cfg = makeCfg({
-        minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
-        delivery = {
-          default_target_container = "minecolonies:rack_0",
-          export_mode = "auto",
-          export_direction = "up",
-          export_buffer_container = "minecraft:chest_0",
-          destination_cache_ttl_seconds = "0",
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
+      delivery = {
+        default_target_container = "minecolonies:rack_0",
+        export_mode = "auto",
+        export_direction = "up",
+        export_buffer_container = "minecraft:chest_0",
+        destination_cache_ttl_seconds = "0",
+      },
+      substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "lowest" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = meBridge,
+        colonyIntegrator = {
+          getRequests = function()
+            return { { id = 16, state = "requested", target = "x", count = 2, items = { { name = "minecraft:dirt", count = 2 } } } }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
         },
-        substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "lowest" },
-      })
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
 
-      local state = {
-        cfg = cfg,
-        cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
-        logger = { warn = function() end, info = function() end, error = function() end },
-        devices = {
-          meBridge = meBridge,
-          colonyIntegrator = {
-            getRequests = function()
-              return { { id = 16, state = "requested", target = "x", count = 2, items = { { name = "minecraft:dirt", count = 2 } } } }
-            end,
-            getColonyName = function() return "t" end,
-            amountOfCitizens = function() return 0 end,
-            maxOfCitizens = function() return 0 end,
-            getHappiness = function() return 0 end,
-            isUnderAttack = function() return false end,
-            amountOfConstructionSites = function() return 0 end,
-          },
-        },
-        requests = {},
-        stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
-      }
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+    assertEq(state.work["16"].status, "done")
+    assertEq(rackCount, 2)
 
-      local engine = Engine.new(state)
-      state.work = engine.work
-      engine:tick()
-      assertEq(state.work["16"].status, "done")
-      assertEq(rackCount, 2)
-
-      peripheral = oldPeripheral
-    end
+    peripheral = oldPeripheral
+  end
   },
   { "engine_duas_requests_nao_compartilham_mesmo_item_no_destino", function()
-      local Engine = require("modules.engine")
-      local Cache = require("lib.cache")
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
 
-      local invCount = 1
-      local inv = {
-        list = function()
-          if invCount == 0 then return {} end
-          return { [1] = { name = "minecraft:iron_sword", count = invCount } }
-        end,
-      }
+    local invCount = 1
+    local inv = {
+      list = function()
+        if invCount == 0 then return {} end
+        return { [1] = { name = "minecraft:iron_sword", count = invCount } }
+      end,
+    }
 
-      local oldPeripheral = peripheral
-      peripheral = {
-        isPresent = function(name) return name == "minecolonies:rack_0" end,
-        wrap = function() return inv end,
-      }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "minecolonies:rack_0" end,
+      wrap = function() return inv end,
+    }
 
-      local meBridge = {
-        isConnected = function() return true end,
-        isOnline = function() return true end,
-        getItem = function(filter) return { name = filter.name, amount = 2, isCraftable = false } end,
-        exportItemToPeripheral = function(filter, target)
-          assertEq(target, "minecolonies:rack_0")
-          invCount = invCount + (filter.count or 0)
-          return tonumber(filter.count or 0), nil
-        end,
-      }
+    local meBridge = {
+      isConnected = function() return true end,
+      isOnline = function() return true end,
+      getItem = function(filter) return { name = filter.name, amount = 2, isCraftable = false } end,
+      exportItemToPeripheral = function(filter, target)
+        assertEq(target, "minecolonies:rack_0")
+        invCount = invCount + (filter.count or 0)
+        return tonumber(filter.count or 0), nil
+      end,
+    }
 
-      local cfg = makeCfg({
-        minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
-        delivery = { default_target_container = "minecolonies:rack_0", destination_cache_ttl_seconds = "0", export_mode = "peripheral" },
-        substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "lowest" },
-      })
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
+      delivery = { default_target_container = "minecolonies:rack_0", destination_cache_ttl_seconds = "0", export_mode = "peripheral" },
+      substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "lowest" },
+    })
 
-      local state = {
-        cfg = cfg,
-        cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
-        logger = { warn = function() end, info = function() end, error = function() end },
-        devices = {
-          meBridge = meBridge,
-          colonyIntegrator = {
-            getRequests = function()
-              return {
-                { id = 20, state = "requested", target = "a", count = 1, items = { { name = "minecraft:iron_sword", count = 1 } } },
-                { id = 21, state = "requested", target = "b", count = 1, items = { { name = "minecraft:iron_sword", count = 1 } } },
-              }
-            end,
-            getColonyName = function() return "t" end,
-            amountOfCitizens = function() return 0 end,
-            maxOfCitizens = function() return 0 end,
-            getHappiness = function() return 0 end,
-            isUnderAttack = function() return false end,
-            amountOfConstructionSites = function() return 0 end,
-          },
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = meBridge,
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 20, state = "requested", target = "a", count = 1, items = { { name = "minecraft:iron_sword", count = 1 } } },
+              { id = 21, state = "requested", target = "b", count = 1, items = { { name = "minecraft:iron_sword", count = 1 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
         },
-        requests = {},
-        stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
-      }
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
 
-      local engine = Engine.new(state)
-      state.work = engine.work
-      engine:tick()
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
 
-      assertEq(state.work["20"].status, "done")
-      assertEq(state.work["21"].status, "done")
-      assertEq(state.stats.delivered, 1, "deveria entregar 1 item adicional para a segunda request")
-      assertEq(invCount, 2)
+    assertEq(state.work["20"].status, "done")
+    assertEq(state.work["21"].status, "done")
+    assertEq(state.stats.delivered, 1, "deveria entregar 1 item adicional para a segunda request")
+    assertEq(invCount, 2)
 
-      peripheral = oldPeripheral
-    end
+    peripheral = oldPeripheral
+  end
   },
   { "me_bridge_api_fallbacks", function()
     local ME = require("modules.me")

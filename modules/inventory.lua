@@ -48,6 +48,28 @@ function M.snapshot(inv)
   return counts, nil
 end
 
+function M.getFreeSpace(inv, itemName, maxStackFallback)
+  local list, err = safeList(inv)
+  if not list then return nil, err end
+  local size = type(inv.size) == "function" and inv.size() or 27
+  local freeSpace = 0
+  local maxStack = tonumber(maxStackFallback) or 64
+
+  local occupiedSlots = 0
+  for slot, stack in pairs(list) do
+    occupiedSlots = occupiedSlots + 1
+    if stack and stack.name == itemName then
+      local stackMax = tonumber(stack.maxStackSize) or maxStack
+      local current = tonumber(stack.count) or 0
+      freeSpace = freeSpace + math.max(0, stackMax - current)
+    end
+  end
+  
+  local freeSlots = math.max(0, size - occupiedSlots)
+  freeSpace = freeSpace + (freeSlots * maxStack)
+  return freeSpace, nil
+end
+
 function M.countFromSnapshot(snapshot, itemName)
   if type(snapshot) ~= "table" then return 0 end
   return snapshot[itemName] or 0
