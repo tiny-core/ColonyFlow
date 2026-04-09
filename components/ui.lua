@@ -484,7 +484,8 @@ function UI:renderStatus(state, mon)
     y = y + 1
   end
 
-  self:drawText("status", mon, 1, y, shorten("Obras: " .. tostring(cs.constructionSites or "-"), w)); y = y + 2
+  self:drawText("status", mon, 1, y, shorten("Obras: " .. tostring(cs.constructionSites or "-"), w)); y = y + 1
+  self:drawText("status", mon, 1, y, padRight("", w)); y = y + 1
 
   self:drawText("status", mon, 1, y, centerText("OPERACAO", w), colors.cyan); y = y + 1
   self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
@@ -493,7 +494,8 @@ function UI:renderStatus(state, mon)
   self:drawText("status", mon, 1, y, shorten("Entregues: " .. tostring(state.stats.delivered), w)); y = y + 1
   self:drawText("status", mon, 1, y, shorten("Crafts: " .. tostring(state.stats.crafted), w)); y = y + 1
   self:drawText("status", mon, 1, y, shorten("Substituicoes: " .. tostring(state.stats.substitutions), w)); y = y + 1
-  self:drawText("status", mon, 1, y, shorten("Erros: " .. tostring(state.stats.errors), w)); y = y + 2
+  self:drawText("status", mon, 1, y, shorten("Erros: " .. tostring(state.stats.errors), w)); y = y + 1
+  self:drawText("status", mon, 1, y, padRight("", w)); y = y + 1
 
   self:drawText("status", mon, 1, y, shorten("Estoque Critico: [heuristica]", w)); y = y + 1
 
