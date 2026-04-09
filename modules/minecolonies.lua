@@ -266,8 +266,57 @@ function Mine:getColonyStats()
   local okHappy, happiness = Util.safeCall(integrator.getHappiness)
   if okHappy then stats.happiness = happiness end
 
-  local okAtk, underAttack = Util.safeCall(integrator.isUnderAttack)
-  if okAtk then stats.underAttack = underAttack end
+  local under = false
+  if type(integrator.isUnderAttack) == "function" then
+    local okAtk, underAttack = Util.safeCall(integrator.isUnderAttack)
+    if okAtk then
+      if underAttack == true or underAttack == 1 or underAttack == "true" or underAttack == "TRUE" then
+        under = true
+      end
+    end
+  end
+
+  if not under and type(integrator.getColonyInfo) == "function" then
+    local okInfo, info = Util.safeCall(integrator.getColonyInfo)
+    if okInfo and type(info) == "table" then
+      local v = info.underAttack or info.isUnderAttack or info.under_attack or info.is_under_attack
+      if v == true or v == 1 or v == "true" or v == "TRUE" then
+        under = true
+      end
+      local raid = info.raid or info.raids
+      if not under and type(raid) == "table" then
+        if raid.active == true or raid.isActive == true or raid.ongoing == true or raid.inProgress == true then
+          under = true
+        end
+        if not under and #raid > 0 then
+          under = true
+        end
+      end
+    end
+  end
+
+  if not under and type(integrator.getRaids) == "function" then
+    local okR, raids = Util.safeCall(integrator.getRaids)
+    if okR and type(raids) == "table" then
+      for _, r in pairs(raids) do
+        if r == true then
+          under = true
+          break
+        end
+        if type(r) == "table" then
+          if r.active == true or r.isActive == true or r.ongoing == true or r.inProgress == true then
+            under = true
+            break
+          end
+        end
+      end
+      if not under and #raids > 0 then
+        under = true
+      end
+    end
+  end
+
+  stats.underAttack = under
 
   local okSites, sites = Util.safeCall(integrator.amountOfConstructionSites)
   if okSites then stats.constructionSites = sites end
