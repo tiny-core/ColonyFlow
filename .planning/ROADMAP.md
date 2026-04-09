@@ -110,7 +110,7 @@ Inclui:
   5. Logs permitem depurar uma substituição a partir do request id e do item escolhido.
 
 Plans:
-- [ ] 04-01: Implementar UI dual-monitor e ferramentas operacionais de mapeamento
+- [x] 04-01: Implementar UI dual-monitor e ferramentas operacionais de mapeamento
 
 ### Phase 5: Testes + Endurecimento
 

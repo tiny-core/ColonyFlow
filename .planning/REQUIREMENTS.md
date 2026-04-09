@@ -30,7 +30,7 @@
 - [ ] **EQ-01**: O sistema mantém um banco de equivalências que agrupa itens por “classe” e tier (ex.: `ARMOR_CHEST/IRON`) e permite mapear itens equivalentes entre mods.
 - [ ] **EQ-02**: O sistema suporta mapeamentos explícitos como “Armored Jetpack é equivalente a Iron Chestplate (mesmo tier/classe)” e usa isso para priorizar itens disponíveis.
 - [ ] **EQ-03**: Ao decidir qual item atender, o sistema respeita a lista de itens aceitos pela requisição; quando a substituição não for explicitamente aceita, o sistema apenas sugere/indica a equivalência na UI/log e mantém o pedido na fila.
-- [ ] **EQ-04**: O sistema registra em log todas as substituições/sugestões com motivo (disponibilidade, tier, restrição de building, regra de mapeamento).
+- [x] **EQ-04**: O sistema registra em log todas as substituições/sugestões com motivo (disponibilidade, tier, restrição de building, regra de mapeamento).
 
 ### Tiers e Restrições por Progressão
 
@@ -43,7 +43,7 @@
 - [ ] **CFG-01**: Na raiz do computador existem apenas `startup.lua` e `config.ini`; demais arquivos ficam em subpastas funcionais.
 - [ ] **CFG-02**: O sistema carrega `config.ini` com defaults quando o arquivo não existir e registra quais defaults foram aplicados.
 - [ ] **CFG-03**: O sistema carrega mapeamentos adicionais de equivalência e tiers via arquivo JSON em pasta dedicada e permite mesclar com regras embutidas.
-- [ ] **CFG-04**: O sistema fornece uma interface de configuração no terminal para adicionar/editar mapeamentos (persistindo no JSON) sem editar código.
+- [x] **CFG-04**: O sistema fornece uma interface de configuração no terminal para adicionar/editar mapeamentos (persistindo no JSON) sem editar código.
 
 ### Cache e Performance
 
@@ -52,9 +52,9 @@
 
 ### Interface Dual-Monitor
 
-- [ ] **UI-01**: O sistema usa 2 Advanced Monitors: um painel para requisições e outro painel misto (colônia + operação + estoque crítico).
-- [ ] **UI-02**: As telas renderizam tabelas ASCII com layout responsivo ao tamanho do monitor e paginação eficiente para listas longas.
-- [ ] **UI-03**: A UI mostra, por requisição, o item pedido, o item escolhido, se houve substituição/sugestão, e o estado (pendente/craftando/entregando/erro/aguardando retry).
+- [x] **UI-01**: O sistema usa 2 Advanced Monitors: um painel para requisições e outro painel misto (colônia + operação + estoque crítico).
+- [x] **UI-02**: As telas renderizam tabelas ASCII com layout responsivo ao tamanho do monitor e paginação eficiente para listas longas.
+- [x] **UI-03**: A UI mostra, por requisição, o item pedido, o item escolhido, se houve substituição/sugestão, e o estado (pendente/craftando/entregando/erro/aguardando retry).
 
 ### Logs e Robustez
 
@@ -100,19 +100,19 @@
 | EQ-01 | Phase 2 | Pending |
 | EQ-02 | Phase 2 | Pending |
 | EQ-03 | Phase 3 | Pending |
-| EQ-04 | Phase 4 | Pending |
+| EQ-04 | Phase 4 | Complete |
 | TIER-01 | Phase 2 | Pending |
 | TIER-02 | Phase 2 | Pending |
 | TIER-03 | Phase 3 | Pending |
 | CFG-01 | Phase 1 | Pending |
 | CFG-02 | Phase 1 | Pending |
 | CFG-03 | Phase 2 | Pending |
-| CFG-04 | Phase 4 | Pending |
+| CFG-04 | Phase 4 | Complete |
 | CACHE-01 | Phase 1 | Pending |
 | CACHE-02 | Phase 2 | Pending |
-| UI-01 | Phase 4 | Pending |
-| UI-02 | Phase 4 | Pending |
-| UI-03 | Phase 4 | Pending |
+| UI-01 | Phase 4 | Complete |
+| UI-02 | Phase 4 | Complete |
+| UI-03 | Phase 4 | Complete |
 | LOG-01 | Phase 1 | Pending |
 | LOG-02 | Phase 1 | Pending |
 | ROB-01 | Phase 1 | Pending |
