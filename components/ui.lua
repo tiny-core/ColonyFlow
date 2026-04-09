@@ -16,6 +16,8 @@ function UI.new(state)
     buffers = { requests = {}, status = {} },
     sizes = { requests = nil, status = nil },
     page = 1,
+    statusView = "main",
+    noCraftPage = 1,
     lastAutoRotation = os.epoch("utc")
   }, UI)
 end
@@ -102,6 +104,12 @@ local function boolLabel(v)
   return v and "SIM" or "NAO"
 end
 
+local function errCode(err)
+  if type(err) ~= "string" then return nil end
+  local code = err:match("^([^:]+):") or err
+  return tostring(code):lower()
+end
+
 local function formatAlert(err, job)
   if err == nil then return nil end
   if type(err) ~= "string" then
@@ -166,6 +174,60 @@ local function formatAlert(err, job)
   return msg
 end
 
+function UI:collectNoCraftItems(state)
+  local out = {}
+  local seen = {}
+  for _, r in ipairs(state.requests or {}) do
+    local job = state.work and state.work[r.id] or nil
+    if job and errCode(job.err) == "nao_craftavel" then
+      local tag = tostring(job.chosen or job.requested or "")
+      if tag ~= "" and not seen[tag] then
+        seen[tag] = true
+        table.insert(out, { tag = tag, name = itemLabel(tag) })
+      end
+    end
+  end
+  table.sort(out, function(a, b) return tostring(a.name) < tostring(b.name) end)
+  return out
+end
+
+function UI:renderNoCraft(state, mon)
+  if not mon then return end
+  local w, h = mon.getSize()
+  local list = self:collectNoCraftItems(state)
+
+  self:drawText("status", mon, 1, 1, padRight(centerText("ITENS SEM CRAFT", w), w))
+  local right = os.date("!%H:%M:%SZ") .. " " .. VERSION
+  self:drawText("status", mon, math.max(1, w - #right + 1), 1, right, colors.gray)
+  self:drawText("status", mon, 1, 2, string.rep("-", math.max(0, w)))
+
+  local nameW = math.max(8, math.floor(w * 0.35))
+  local tagW = math.max(8, w - nameW - 3)
+  self:drawText("status", mon, 1, 3, shorten("NOME", nameW) .. " | " .. shorten("TAG", tagW))
+  self:drawText("status", mon, 1, 4, string.rep("-", math.max(0, w)))
+
+  local pageSize = math.max(1, h - 5)
+  local pages = math.max(1, math.ceil(#list / pageSize))
+  if self.noCraftPage > pages then self.noCraftPage = pages end
+  if self.noCraftPage < 1 then self.noCraftPage = 1 end
+
+  local startIdx = (self.noCraftPage - 1) * pageSize + 1
+  local endIdx = math.min(#list, startIdx + pageSize - 1)
+  local y = 5
+  for i = startIdx, endIdx do
+    local it = list[i]
+    local line = shorten(it.name, nameW) .. " | " .. shorten(it.tag, tagW)
+    self:drawText("status", mon, 1, y, padRight(line, w))
+    y = y + 1
+  end
+  for i = y, h - 1 do
+    self:drawText("status", mon, 1, i, padRight("", w))
+  end
+
+  local btn = "< VOLTAR | PAG " .. tostring(self.noCraftPage) .. "/" .. tostring(pages) .. " | PROX >"
+  self:drawText("status", mon, 1, h, padRight(btn, w), colors.black, colors.lightGray)
+end
+
 local function jobSymbol(jobState)
   local s = tostring(jobState or "")
   s = s:lower()
@@ -195,7 +257,8 @@ function UI:renderRequests(state, mon)
   end
 
   self:drawText("requests", mon, 1, 1, padRight("Requisicoes (MineColonies)", w))
-  self:drawText("requests", mon, math.max(1, w - #VERSION + 1), 1, VERSION, colors.gray)
+  local right = os.date("!%H:%M:%SZ") .. " " .. VERSION
+  self:drawText("requests", mon, math.max(1, w - #right + 1), 1, right, colors.gray)
   self:drawText("requests", mon, 1, 2, string.rep("-", math.max(0, w)))
 
   local pageSize = math.max(1, h - 5)
@@ -340,7 +403,8 @@ function UI:renderStatus(state, mon)
   end
 
   self:drawText("status", mon, 1, 1, padRight(centerText("STATUS", w), w))
-  self:drawText("status", mon, math.max(1, w - #VERSION + 1), 1, VERSION, colors.gray)
+  local right = os.date("!%H:%M:%SZ") .. " " .. VERSION
+  self:drawText("status", mon, math.max(1, w - #right + 1), 1, right, colors.gray)
   self:drawText("status", mon, 1, 2, string.rep("-", math.max(0, w)))
 
   local y = 3
@@ -374,7 +438,6 @@ function UI:renderStatus(state, mon)
   self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
 
   self:drawText("status", mon, 1, y, shorten("Reqs: " .. tostring(#state.requests), w)); y = y + 1
-  self:drawText("status", mon, 1, y, shorten("Ciclos: " .. tostring(state.stats.processed), w)); y = y + 1
   self:drawText("status", mon, 1, y, shorten("Entregues: " .. tostring(state.stats.delivered), w)); y = y + 1
   self:drawText("status", mon, 1, y, shorten("Craft req.: " .. tostring(state.stats.crafted), w)); y = y + 1
   self:drawText("status", mon, 1, y, shorten("Subst: " .. tostring(state.stats.substitutions), w)); y = y + 1
@@ -382,31 +445,15 @@ function UI:renderStatus(state, mon)
 
   self:drawText("status", mon, 1, y, shorten("Estoque Critico: [heuristica]", w)); y = y + 1
 
-  -- Clear remaining lines until bottom banner
-  for i = y, h - 2 do
+  -- Clear remaining lines until bottom button
+  for i = y, h - 1 do
     self:drawText("status", mon, 1, i, padRight("", w))
   end
 
-  -- Active alerts (from job.err)
-  local activeError = nil
-  local activeJob = nil
-  for _, r in ipairs(state.requests) do
-    local job = state.work and state.work[r.id]
-    if job and job.err then
-      activeError = job.err
-      activeJob = job
-      break
-    end
-  end
-
-  if activeError then
-    local msg = formatAlert(activeError, activeJob) or tostring(activeError)
-    self:drawText("status", mon, 1, h - 1, padRight("! " .. shorten(msg, w - 2), w), colors.white, colors.red)
-  else
-    self:drawText("status", mon, 1, h - 1, padRight("", w), colors.white, colors.black)
-  end
-
-  self:drawText("status", mon, 1, h, shorten(os.date("!%H:%M:%SZ"), w), colors.white, colors.black)
+  local noCraft = self:collectNoCraftItems(state)
+  local btn = "[SEM CRAFT: " .. tostring(#noCraft) .. "]"
+  local btnBg = (#noCraft > 0) and colors.red or colors.gray
+  self:drawText("status", mon, 1, h, padRight(btn, w), colors.white, btnBg)
 end
 
 function UI:handleEvent(event, side, x, y)
@@ -414,6 +461,10 @@ function UI:handleEvent(event, side, x, y)
     local reqMonName = nil
     if self.state.devices.monitorRequests then
       reqMonName = peripheral.getName(self.state.devices.monitorRequests)
+    end
+    local statusMonName = nil
+    if self.state.devices.monitorStatus then
+      statusMonName = peripheral.getName(self.state.devices.monitorStatus)
     end
     if side == reqMonName then
       local w, _ = self.state.devices.monitorRequests.getSize()
@@ -425,13 +476,38 @@ function UI:handleEvent(event, side, x, y)
       self.lastAutoRotation = os.epoch("utc") + 5000 -- delay auto rotation after touch
       self:tick()                                    -- immediate visual update
     end
+    if side == statusMonName then
+      local w, h = self.state.devices.monitorStatus.getSize()
+      if y == h then
+        if self.statusView == "nocraft" then
+          if x < math.floor(w / 3) then
+            self.statusView = "main"
+          elseif x > math.floor((2 * w) / 3) then
+            self.noCraftPage = (self.noCraftPage or 1) + 1
+          else
+            self.noCraftPage = (self.noCraftPage or 1) - 1
+          end
+        else
+          local list = self:collectNoCraftItems(self.state)
+          if #list > 0 then
+            self.statusView = "nocraft"
+            self.noCraftPage = 1
+          end
+        end
+        self:tick()
+      end
+    end
   end
 end
 
 function UI:tick()
   local state = self.state
   self:renderRequests(state, state.devices.monitorRequests)
-  self:renderStatus(state, state.devices.monitorStatus)
+  if self.statusView == "nocraft" then
+    self:renderNoCraft(state, state.devices.monitorStatus)
+  else
+    self:renderStatus(state, state.devices.monitorStatus)
+  end
 end
 
 return {
