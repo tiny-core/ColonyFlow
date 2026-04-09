@@ -53,6 +53,15 @@ local function padRight(s, len)
   return s .. string.rep(" ", len - #s)
 end
 
+local function centerText(s, width)
+  s = tostring(s or "")
+  if width <= 0 then return "" end
+  if #s >= width then return s:sub(1, width) end
+  local left = math.floor((width - #s) / 2)
+  local right = width - #s - left
+  return string.rep(" ", left) .. s .. string.rep(" ", right)
+end
+
 local function itemLabel(name)
   local s = tostring(name or "")
   local mod, item = s:match("^([^:]+):(.+)$")
@@ -62,17 +71,6 @@ local function itemLabel(name)
   s = s:gsub("_", " ")
   s = s:gsub("%s+", " ")
   return s
-end
-
-local function stateSymbol(state)
-  local s = tostring(state or "")
-  s = s:lower()
-  if s:find("in_prog") or s:find("progress") or s:find("running") then return "A" end
-  if s:find("done") or s:find("complete") or s:find("deliv") then return "OK" end
-  if s:find("error") or s:find("fail") then return "ER" end
-  if s:find("req") or s:find("request") then return "P" end
-  if s == "" then return "--" end
-  return shorten(s, 2)
 end
 
 local function jobSymbol(jobState)
@@ -85,33 +83,6 @@ local function jobSymbol(jobState)
   if s:find("pend") then return "PD" end
   if s:find("err") or s:find("fail") then return "ER" end
   return shorten(s, 2)
-end
-
-local function computeColumns(w)
-  local stateW = 3
-  local faltW = 5
-  local sepW = 3
-  local seps = 4 * sepW
-
-  local remaining = w - (stateW + faltW + seps)
-  if remaining < 0 then remaining = 0 end
-
-  local minReq, minCho, minJob = 12, 12, 5
-  local reqW = math.max(minReq, math.floor(remaining * 0.45))
-  local choW = math.max(minCho, math.floor(remaining * 0.35))
-  local jobW = remaining - reqW - choW
-
-  if jobW < minJob then
-    local deficit = minJob - jobW
-    jobW = minJob
-    local takeReq = math.min(deficit, math.max(0, reqW - minReq))
-    reqW = reqW - takeReq
-    deficit = deficit - takeReq
-    local takeCho = math.min(deficit, math.max(0, choW - minCho))
-    choW = choW - takeCho
-  end
-
-  return stateW, reqW, choW, faltW, jobW
 end
 
 function UI:renderRequests(state, mon)
@@ -133,14 +104,6 @@ function UI:renderRequests(state, mon)
   self:drawText("requests", mon, 1, 1, padRight("Requisicoes (MineColonies)", w))
   self:drawText("requests", mon, 1, 2, string.rep("-", math.max(0, w)))
 
-  local stateW, reqW, choW, faltW, jobW = computeColumns(w)
-  local header = string.format(
-    "%-" .. stateW .. "s | %-" .. reqW .. "s | %-" .. choW .. "s | %" .. faltW .. "s | %-" .. jobW .. "s",
-    "SIT", "PEDIDO", "ESCOLHIDO", "FALTA", "ETAPA"
-  )
-  self:drawText("requests", mon, 1, 3, header)
-  self:drawText("requests", mon, 1, 4, string.rep("-", math.max(0, w)))
-
   local pageSize = math.max(1, h - 5)
   local total = #state.requests
   local pages = math.max(1, math.ceil(total / pageSize))
@@ -156,6 +119,56 @@ function UI:renderRequests(state, mon)
 
   local startIdx = (self.page - 1) * pageSize + 1
   local endIdx = math.min(total, startIdx + pageSize - 1)
+
+  local faltW = 5
+  local sepW = 3
+  local seps = 3 * sepW
+  local reqMin, choMin, jobMin = 12, 10, 5
+  local choMax = #"ESCOLHIDO"
+  local jobMax = #"ETAPA"
+
+  for i = startIdx, endIdx do
+    local r = state.requests[i]
+    local job = state.work and state.work[r.id] or nil
+    local reqItem = (r.items[1] and r.items[1].name) or ""
+    local chosen = job and job.chosen or ""
+    local jobState = job and job.status or ""
+
+    local reqLabel = itemLabel(reqItem)
+    local chosenLabel = itemLabel(chosen)
+    local chosenDisplay = "-"
+    if chosenLabel ~= "" and chosen ~= reqItem then
+      chosenDisplay = chosenLabel
+    end
+
+    local etapa = jobSymbol(jobState)
+    if #chosenDisplay > choMax then choMax = #chosenDisplay end
+    if #etapa > jobMax then jobMax = #etapa end
+  end
+
+  if choMax > 24 then choMax = 24 end
+  if jobMax > 10 then jobMax = 10 end
+
+  local reqW = w - (choMax + jobMax + faltW + seps)
+  if reqW < reqMin then
+    local need = reqMin - reqW
+    local takeCho = math.min(need, math.max(0, choMax - choMin))
+    choMax = choMax - takeCho
+    need = need - takeCho
+    local takeJob = math.min(need, math.max(0, jobMax - jobMin))
+    jobMax = jobMax - takeJob
+    reqW = w - (choMax + jobMax + faltW + seps)
+  end
+  if reqW < 1 then reqW = 1 end
+  if choMax < 1 then choMax = 1 end
+  if jobMax < 1 then jobMax = 1 end
+
+  local header = string.format(
+    "%-" .. reqW .. "s | %-" .. choMax .. "s | %" .. faltW .. "s | %-" .. jobMax .. "s",
+    "PEDIDO", "ESCOLHIDO", "FALTA", centerText("ETAPA", jobMax)
+  )
+  self:drawText("requests", mon, 1, 3, header)
+  self:drawText("requests", mon, 1, 4, string.rep("-", math.max(0, w)))
 
   local y = 5
   for i = startIdx, endIdx do
@@ -197,12 +210,11 @@ function UI:renderRequests(state, mon)
     end
 
     local line = string.format(
-      "%-" .. stateW .. "s | %-" .. reqW .. "s | %-" .. choW .. "s | %" .. faltW .. "s | %-" .. jobW .. "s",
-      stateSymbol(r.state),
+      "%-" .. reqW .. "s | %-" .. choMax .. "s | %" .. faltW .. "s | %-" .. jobMax .. "s",
       shorten(displayItem, reqW),
-      shorten(chosenDisplay, choW),
+      shorten(chosenDisplay, choMax),
       shorten(missingLabel, faltW),
-      jobSymbol(jobState)
+      centerText(shorten(jobSymbol(jobState), jobMax), jobMax)
     )
     self:drawText("requests", mon, 1, y, line, fg)
     y = y + 1
