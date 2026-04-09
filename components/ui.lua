@@ -207,7 +207,7 @@ function UI:renderNoCraft(state, mon)
   local nameW = #"NOME"
   local tagW = #"TAG"
 
-  local pageSize = math.max(1, h - 5)
+  local pageSize = math.max(1, h - 6)
   local pages = math.max(1, math.ceil(#list / pageSize))
   if self.noCraftPage > pages then self.noCraftPage = pages end
   if self.noCraftPage < 1 then self.noCraftPage = 1 end
@@ -256,12 +256,15 @@ function UI:renderNoCraft(state, mon)
   for i = startIdx, endIdx do
     local it = list[i]
     local line = string.format("%-" .. nameW .. "s | %-" .. tagW .. "s", shorten(it.name, nameW), shorten(it.tag, tagW))
-    self:drawText("status", mon, 1, y, padRight(line, w))
+    local bg = (((y - 5) % 2) == 0) and colors.black or colors.gray
+    self:drawText("status", mon, 1, y, padRight(line, w), colors.white, bg)
     y = y + 1
   end
-  for i = y, h - 1 do
+  for i = y, h - 2 do
     self:drawText("status", mon, 1, i, padRight("", w))
   end
+
+  self:drawText("status", mon, 1, h - 1, string.rep("-", math.max(0, w)), colors.gray, colors.black)
 
   local left = "[VOLTAR]"
   local right = "PAG " .. tostring(self.noCraftPage) .. "/" .. tostring(pages) .. "  TOTAL " .. tostring(#list)
@@ -305,7 +308,7 @@ function UI:renderRequests(state, mon)
   self:drawText("requests", mon, math.max(1, w - #right + 1), 1, right, colors.gray)
   self:drawText("requests", mon, 1, 2, string.rep("-", math.max(0, w)))
 
-  local pageSize = math.max(1, h - 5)
+  local pageSize = math.max(1, h - 6)
   local total = #state.requests
   local pages = math.max(1, math.ceil(total / pageSize))
 
@@ -410,6 +413,7 @@ function UI:renderRequests(state, mon)
       fg = colors.green
     end
 
+    local bg = (((y - 5) % 2) == 0) and colors.black or colors.gray
     local line = string.format(
       "%-" .. reqW .. "s | %-" .. choMax .. "s | %" .. faltW .. "s | %-" .. jobMax .. "s",
       shorten(displayItem, reqW),
@@ -417,16 +421,17 @@ function UI:renderRequests(state, mon)
       shorten(missingLabel, faltW),
       centerText(shorten(jobSymbol(jobState), jobMax), jobMax)
     )
-    self:drawText("requests", mon, 1, y, line, fg)
+    self:drawText("requests", mon, 1, y, line, fg, bg)
     y = y + 1
     if y > h then break end
   end
 
   -- Clear remaining lines in buffer if any
-  for i = y, h - 1 do
+  for i = y, h - 2 do
     self:drawText("requests", mon, 1, i, padRight("", w))
   end
 
+  self:drawText("requests", mon, 1, h - 1, string.rep("-", math.max(0, w)), colors.gray, colors.black)
   self:drawText("requests", mon, 1, h, shorten(string.format("Pagina %d/%d | Total %d", self.page, pages, total), w))
 end
 
@@ -490,13 +495,14 @@ function UI:renderStatus(state, mon)
   self:drawText("status", mon, 1, y, shorten("Estoque Critico: [heuristica]", w)); y = y + 1
 
   -- Clear remaining lines until bottom button
-  for i = y, h - 1 do
+  for i = y, h - 2 do
     self:drawText("status", mon, 1, i, padRight("", w))
   end
 
   local noCraft = self:collectNoCraftItems(state)
   local btn = "SEM CRAFT: " .. tostring(#noCraft) .. "  (TOQUE)"
   local btnFg = (#noCraft > 0) and colors.red or colors.gray
+  self:drawText("status", mon, 1, h - 1, string.rep("-", math.max(0, w)), colors.gray, colors.black)
   self:drawText("status", mon, 1, h, padRight(btn, w), btnFg, colors.black)
 end
 
