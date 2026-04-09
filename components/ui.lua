@@ -1,6 +1,8 @@
 local UI = {}
 UI.__index = UI
 
+local VERSION = "v1"
+
 local function shorten(s, maxLen)
   s = tostring(s or "")
   if #s <= maxLen then return s end
@@ -100,6 +102,70 @@ local function boolLabel(v)
   return v and "SIM" or "NAO"
 end
 
+local function formatAlert(err, job)
+  if err == nil then return nil end
+  if type(err) ~= "string" then
+    return "Erro interno"
+  end
+
+  local s = err
+  local code, detail = s:match("^([^:]+):(.+)$")
+  code = (code or s):lower()
+  detail = detail or ""
+
+  local item = nil
+  if type(job) == "table" then
+    item = job.chosen or job.requested or nil
+  end
+  local itemTxt = item and itemLabel(item) or nil
+
+  if code == "nao_craftavel" then
+    local msg = "Nao craftavel agora (sem padrao/receita no ME)"
+    if itemTxt then msg = msg .. ": " .. itemTxt end
+    return msg
+  end
+  if code == "me_offline" then
+    return "ME offline"
+  end
+  if code == "destino_indisponivel" then
+    return "Destino indisponivel"
+  end
+  if code == "destino_cheio_capacidade" then
+    return "Destino cheio (sem espaco)"
+  end
+  if code == "erro_capacidade_destino" then
+    return "Falha ao calcular espaco no destino"
+  end
+  if code == "destino_cheio_ou_export_falhou" then
+    local msg = "Entrega falhou ou destino cheio"
+    if itemTxt then msg = msg .. ": " .. itemTxt end
+    return msg
+  end
+  if code == "craft_falhou" then
+    local msg = "Falha ao iniciar craft"
+    if itemTxt then msg = msg .. ": " .. itemTxt end
+    return msg
+  end
+  if code == "blocked_by_tier" then
+    local msg = "Bloqueado por tier"
+    if itemTxt then msg = msg .. ": " .. itemTxt end
+    return msg
+  end
+  if code == "unsupported" or code == "nao_suportado" then
+    local msg = "Item nao suportado"
+    if itemTxt then msg = msg .. ": " .. itemTxt end
+    return msg
+  end
+
+  local msg = code:gsub("_", " ")
+  if msg == "" then msg = "Alerta" end
+  if itemTxt then msg = msg .. ": " .. itemTxt end
+  if detail ~= "" and #detail <= 24 then
+    msg = msg .. " (" .. detail:gsub("[%c]", "") .. ")"
+  end
+  return msg
+end
+
 local function jobSymbol(jobState)
   local s = tostring(jobState or "")
   s = s:lower()
@@ -129,6 +195,7 @@ function UI:renderRequests(state, mon)
   end
 
   self:drawText("requests", mon, 1, 1, padRight("Requisicoes (MineColonies)", w))
+  self:drawText("requests", mon, math.max(1, w - #VERSION + 1), 1, VERSION, colors.gray)
   self:drawText("requests", mon, 1, 2, string.rep("-", math.max(0, w)))
 
   local pageSize = math.max(1, h - 5)
@@ -192,7 +259,7 @@ function UI:renderRequests(state, mon)
 
   local header = string.format(
     "%-" .. reqW .. "s | %-" .. choMax .. "s | %" .. faltW .. "s | %-" .. jobMax .. "s",
-    "PEDIDO", "ESCOLHIDO", "FALTA", centerText("ETAPA", jobMax)
+    "PEDIDO", centerText("ESCOLHIDO", choMax), "FALTA", centerText("ETAPA", jobMax)
   )
   self:drawText("requests", mon, 1, 3, header)
   self:drawText("requests", mon, 1, 4, string.rep("-", math.max(0, w)))
@@ -273,6 +340,7 @@ function UI:renderStatus(state, mon)
   end
 
   self:drawText("status", mon, 1, 1, padRight(centerText("STATUS", w), w))
+  self:drawText("status", mon, math.max(1, w - #VERSION + 1), 1, VERSION, colors.gray)
   self:drawText("status", mon, 1, 2, string.rep("-", math.max(0, w)))
 
   local y = 3
@@ -321,21 +389,24 @@ function UI:renderStatus(state, mon)
 
   -- Active alerts (from job.err)
   local activeError = nil
+  local activeJob = nil
   for _, r in ipairs(state.requests) do
     local job = state.work and state.work[r.id]
     if job and job.err then
       activeError = job.err
+      activeJob = job
       break
     end
   end
 
   if activeError then
-    self:drawText("status", mon, 1, h - 1, padRight("! " .. shorten(activeError, w - 2), w), colors.white, colors.red)
+    local msg = formatAlert(activeError, activeJob) or tostring(activeError)
+    self:drawText("status", mon, 1, h - 1, padRight("! " .. shorten(msg, w - 2), w), colors.white, colors.red)
   else
     self:drawText("status", mon, 1, h - 1, padRight("", w), colors.white, colors.black)
   end
 
-  self:drawText("status", mon, 1, h, shorten("v1 | " .. os.date("!%H:%M:%SZ"), w), colors.white, colors.black)
+  self:drawText("status", mon, 1, h, shorten(os.date("!%H:%M:%SZ"), w), colors.white, colors.black)
 end
 
 function UI:handleEvent(event, side, x, y)
