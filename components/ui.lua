@@ -256,9 +256,11 @@ function UI:renderNoCraft(state, mon)
   for i = startIdx, endIdx do
     local it = list[i]
     local line = string.format("%-" .. nameW .. "s | %-" .. tagW .. "s", shorten(it.name, nameW), shorten(it.tag, tagW))
-    local bg = (((y - 5) % 2) == 0) and colors.black or colors.lightGray
-    local fg = (bg == colors.lightGray) and colors.black or colors.white
-    self:drawText("status", mon, 1, y, padRight(line, w), fg, bg)
+    local fg = colors.white
+    if (((y - 5) % 2) ~= 0) then
+      fg = colors.gray
+    end
+    self:drawText("status", mon, 1, y, padRight(line, w), fg, colors.black)
     y = y + 1
   end
   for i = y, h - 2 do
@@ -414,9 +416,8 @@ function UI:renderRequests(state, mon)
       fg = colors.green
     end
 
-    local bg = (((y - 5) % 2) == 0) and colors.black or colors.lightGray
-    if bg == colors.lightGray and fg == colors.white then
-      fg = colors.black
+    if fg == colors.white and (((y - 5) % 2) ~= 0) then
+      fg = colors.gray
     end
     local line = string.format(
       "%-" .. reqW .. "s | %-" .. choMax .. "s | %" .. faltW .. "s | %-" .. jobMax .. "s",
@@ -425,7 +426,7 @@ function UI:renderRequests(state, mon)
       shorten(missingLabel, faltW),
       centerText(shorten(jobSymbol(jobState), jobMax), jobMax)
     )
-    self:drawText("requests", mon, 1, y, line, fg, bg)
+    self:drawText("requests", mon, 1, y, line, fg, colors.black)
     y = y + 1
     if y > h then break end
   end
