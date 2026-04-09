@@ -57,23 +57,46 @@ local function itemLabel(name)
   local s = tostring(name or "")
   local mod, item = s:match("^([^:]+):(.+)$")
   if mod and item then
-    if mod == "minecraft" then return item end
-    return mod .. ":" .. item
+    s = item
   end
+  s = s:gsub("_", " ")
+  s = s:gsub("%s+", " ")
   return s
 end
 
-local function computeColumns(w)
-  local stateW = 8
-  local idW = 6
-  local faltW = 6
-  local sepW = 3
-  local seps = 5 * sepW
+local function stateSymbol(state)
+  local s = tostring(state or "")
+  s = s:lower()
+  if s:find("in_prog") or s:find("progress") or s:find("running") then return "A" end
+  if s:find("done") or s:find("complete") or s:find("deliv") then return "OK" end
+  if s:find("error") or s:find("fail") then return "ER" end
+  if s:find("req") or s:find("request") then return "P" end
+  if s == "" then return "--" end
+  return shorten(s, 2)
+end
 
-  local remaining = w - (stateW + idW + faltW + seps)
+local function jobSymbol(jobState)
+  local s = tostring(jobState or "")
+  s = s:lower()
+  if s == "" then return "--" end
+  if s == "done" then return "OK" end
+  if s:find("wait") or s:find("await") then return "AG" end
+  if s:find("craft") then return "CR" end
+  if s:find("pend") then return "PD" end
+  if s:find("err") or s:find("fail") then return "ER" end
+  return shorten(s, 2)
+end
+
+local function computeColumns(w)
+  local stateW = 3
+  local faltW = 5
+  local sepW = 3
+  local seps = 4 * sepW
+
+  local remaining = w - (stateW + faltW + seps)
   if remaining < 0 then remaining = 0 end
 
-  local minReq, minCho, minJob = 8, 8, 6
+  local minReq, minCho, minJob = 12, 12, 5
   local reqW = math.max(minReq, math.floor(remaining * 0.45))
   local choW = math.max(minCho, math.floor(remaining * 0.35))
   local jobW = remaining - reqW - choW
@@ -88,7 +111,7 @@ local function computeColumns(w)
     choW = choW - takeCho
   end
 
-  return stateW, idW, reqW, choW, faltW, jobW
+  return stateW, reqW, choW, faltW, jobW
 end
 
 function UI:renderRequests(state, mon)
@@ -110,11 +133,10 @@ function UI:renderRequests(state, mon)
   self:drawText("requests", mon, 1, 1, padRight("Requisicoes (MineColonies)", w))
   self:drawText("requests", mon, 1, 2, string.rep("-", math.max(0, w)))
 
-  local stateW, idW, reqW, choW, faltW, jobW = computeColumns(w)
+  local stateW, reqW, choW, faltW, jobW = computeColumns(w)
   local header = string.format(
-    "%-" ..
-    stateW .. "s | %-" .. idW .. "s | %-" .. reqW .. "s | %-" .. choW .. "s | %" .. faltW .. "s | %-" .. jobW .. "s",
-    "STATE", "ID", "REQ", "ESCOLH", "FALT", "JOB"
+    "%-" .. stateW .. "s | %-" .. reqW .. "s | %-" .. choW .. "s | %" .. faltW .. "s | %-" .. jobW .. "s",
+    "SIT", "PEDIDO", "ESCOLHIDO", "FALTA", "ETAPA"
   )
   self:drawText("requests", mon, 1, 3, header)
   self:drawText("requests", mon, 1, 4, string.rep("-", math.max(0, w)))
@@ -153,15 +175,34 @@ function UI:renderRequests(state, mon)
       fg = colors.yellow
     end
 
+    local missingLabel = tostring(missing or "")
+    if missingLabel == "" then missingLabel = "-" end
+    local chosenDisplay = "-"
+    if chosenLabel ~= "" and chosen ~= reqItem then
+      chosenDisplay = chosenLabel
+    end
+
+    local doneState = false
+    do
+      local st = tostring(r.state or ""):lower()
+      if st:find("done") or st:find("complete") or st:find("fulfill") or st:find("success") then
+        doneState = true
+      end
+      if tostring(jobState or ""):lower() == "done" then
+        doneState = true
+      end
+    end
+    if doneState then
+      fg = colors.green
+    end
+
     local line = string.format(
-      "%-" ..
-      stateW .. "s | %-" .. idW .. "s | %-" .. reqW .. "s | %-" .. choW .. "s | %" .. faltW .. "s | %-" .. jobW .. "s",
-      shorten(r.state, stateW),
-      shorten(r.id, idW),
+      "%-" .. stateW .. "s | %-" .. reqW .. "s | %-" .. choW .. "s | %" .. faltW .. "s | %-" .. jobW .. "s",
+      stateSymbol(r.state),
       shorten(displayItem, reqW),
-      shorten(chosenLabel, choW),
-      shorten(missing, faltW),
-      shorten(jobState, jobW)
+      shorten(chosenDisplay, choW),
+      shorten(missingLabel, faltW),
+      jobSymbol(jobState)
     )
     self:drawText("requests", mon, 1, y, line, fg)
     y = y + 1
