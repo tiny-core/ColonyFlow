@@ -1,10 +1,18 @@
 local UI = {}
 UI.__index = UI
 
+local function shorten(s, maxLen)
+  s = tostring(s or "")
+  if #s <= maxLen then return s end
+  if maxLen <= 2 then return s:sub(1, maxLen) end
+  return s:sub(1, maxLen - 2) .. ".."
+end
+
 function UI.new(state)
   return setmetatable({
     state = state,
     buffers = { requests = {}, status = {} },
+    sizes = { requests = nil, status = nil },
     page = 1,
     lastAutoRotation = os.epoch("utc")
   }, UI)
@@ -16,35 +24,27 @@ function UI:drawText(deviceKey, mon, x, y, text, fg, bg)
   bg = bg or colors.black
 
   self.buffers[deviceKey] = self.buffers[deviceKey] or {}
-  local current = self.buffers[deviceKey][y]
+  local key = tostring(y) .. ":" .. tostring(x)
+  local current = self.buffers[deviceKey][key]
 
   if current and current.text == text and current.fg == fg and current.bg == bg then
     return -- No change needed
   end
 
-  self.buffers[deviceKey][y] = { text = text, fg = fg, bg = bg }
+  self.buffers[deviceKey][key] = { text = text, fg = fg, bg = bg }
 
   local old = term.current()
   term.redirect(mon)
-  term.setCursorPos(x, y)
   term.setTextColor(fg)
   term.setBackgroundColor(bg)
-  term.write(text)
-
-  -- Clear the rest of the line if the new text is shorter
+  term.setCursorPos(1, y)
+  term.clearLine()
+  term.setCursorPos(x, y)
   local w, _ = term.getSize()
-  if #text < w then
-    term.write(string.rep(" ", w - #text))
-  end
+  local maxLen = math.max(0, w - x + 1)
+  term.write(shorten(text, maxLen))
 
   term.redirect(old)
-end
-
-local function shorten(s, maxLen)
-  s = tostring(s or "")
-  if #s <= maxLen then return s end
-  if maxLen <= 1 then return s:sub(1, maxLen) end
-  return s:sub(1, maxLen - 1) .. "…"
 end
 
 local function padRight(s, len)
@@ -53,15 +53,70 @@ local function padRight(s, len)
   return s .. string.rep(" ", len - #s)
 end
 
+local function itemLabel(name)
+  local s = tostring(name or "")
+  local mod, item = s:match("^([^:]+):(.+)$")
+  if mod and item then
+    if mod == "minecraft" then return item end
+    return mod .. ":" .. item
+  end
+  return s
+end
+
+local function computeColumns(w)
+  local stateW = 8
+  local idW = 6
+  local faltW = 6
+  local sepW = 3
+  local seps = 5 * sepW
+
+  local remaining = w - (stateW + idW + faltW + seps)
+  if remaining < 0 then remaining = 0 end
+
+  local minReq, minCho, minJob = 8, 8, 6
+  local reqW = math.max(minReq, math.floor(remaining * 0.45))
+  local choW = math.max(minCho, math.floor(remaining * 0.35))
+  local jobW = remaining - reqW - choW
+
+  if jobW < minJob then
+    local deficit = minJob - jobW
+    jobW = minJob
+    local takeReq = math.min(deficit, math.max(0, reqW - minReq))
+    reqW = reqW - takeReq
+    deficit = deficit - takeReq
+    local takeCho = math.min(deficit, math.max(0, choW - minCho))
+    choW = choW - takeCho
+  end
+
+  return stateW, idW, reqW, choW, faltW, jobW
+end
+
 function UI:renderRequests(state, mon)
   if not mon then return end
   local w, h = mon.getSize()
 
+  local sizeKey = tostring(w) .. "x" .. tostring(h)
+  if self.sizes.requests ~= sizeKey then
+    self.sizes.requests = sizeKey
+    self.buffers.requests = {}
+    local old = term.current()
+    term.redirect(mon)
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.white)
+    term.clear()
+    term.redirect(old)
+  end
+
   self:drawText("requests", mon, 1, 1, padRight("Requisicoes (MineColonies)", w))
   self:drawText("requests", mon, 1, 2, string.rep("-", math.max(0, w)))
 
-  local header = string.format("%-8s %-6s %-14s %-14s %6s %-10s", "STATE", "ID", "REQ", "ESCOLH", "FALT", "JOB")
-  self:drawText("requests", mon, 1, 3, shorten(header, w))
+  local stateW, idW, reqW, choW, faltW, jobW = computeColumns(w)
+  local header = string.format(
+    "%-" ..
+    stateW .. "s | %-" .. idW .. "s | %-" .. reqW .. "s | %-" .. choW .. "s | %" .. faltW .. "s | %-" .. jobW .. "s",
+    "STATE", "ID", "REQ", "ESCOLH", "FALT", "JOB"
+  )
+  self:drawText("requests", mon, 1, 3, header)
   self:drawText("requests", mon, 1, 4, string.rep("-", math.max(0, w)))
 
   local pageSize = math.max(1, h - 5)
@@ -89,23 +144,26 @@ function UI:renderRequests(state, mon)
     local missing = job and job.missing or ""
     local jobState = job and job.status or ""
 
-    local displayItem = reqItem
+    local reqLabel = itemLabel(reqItem)
+    local chosenLabel = itemLabel(chosen)
+    local displayItem = reqLabel
     local fg = colors.white
     if chosen ~= "" and chosen ~= reqItem then
-      displayItem = shorten(reqItem, 10) .. "(S)"
+      displayItem = shorten(reqLabel, math.max(1, reqW - 3)) .. "(S)"
       fg = colors.yellow
     end
 
     local line = string.format(
-      "%-8s %-6s %-14s %-14s %6s %-10s",
-      shorten(r.state, 8),
-      shorten(r.id, 6),
-      shorten(displayItem, 14),
-      shorten(chosen, 14),
-      shorten(missing, 6),
-      shorten(jobState, 10)
+      "%-" ..
+      stateW .. "s | %-" .. idW .. "s | %-" .. reqW .. "s | %-" .. choW .. "s | %" .. faltW .. "s | %-" .. jobW .. "s",
+      shorten(r.state, stateW),
+      shorten(r.id, idW),
+      shorten(displayItem, reqW),
+      shorten(chosenLabel, choW),
+      shorten(missing, faltW),
+      shorten(jobState, jobW)
     )
-    self:drawText("requests", mon, 1, y, shorten(line, w), fg)
+    self:drawText("requests", mon, 1, y, line, fg)
     y = y + 1
     if y > h then break end
   end
@@ -121,6 +179,18 @@ end
 function UI:renderStatus(state, mon)
   if not mon then return end
   local w, h = mon.getSize()
+
+  local sizeKey = tostring(w) .. "x" .. tostring(h)
+  if self.sizes.status ~= sizeKey then
+    self.sizes.status = sizeKey
+    self.buffers.status = {}
+    local old = term.current()
+    term.redirect(mon)
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.white)
+    term.clear()
+    term.redirect(old)
+  end
 
   self:drawText("status", mon, 1, 1, padRight("Status", w))
   self:drawText("status", mon, 1, 2, string.rep("-", math.max(0, w)))

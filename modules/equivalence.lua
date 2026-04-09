@@ -51,7 +51,8 @@ end
 
 function Equivalence:isVanilla(name)
   if not name then return false end
-  return tostring(name):sub(1, 10) == "minecraft:"
+  local s = tostring(name)
+  return s:sub(1, 10) == "minecraft:" or s:sub(1, 17) == "domum_ornamentum:" or s:sub(1, 13) == "minecolonies:"
 end
 
 function Equivalence:isAllowed(name)
