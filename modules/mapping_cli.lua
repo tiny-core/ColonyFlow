@@ -1,3 +1,9 @@
+if type(package) == "table" and type(package.path) == "string" then
+  if not package.path:find("/%?%.lua", 1, true) then
+    package.path = "/?.lua;/?/init.lua;" .. package.path
+  end
+end
+
 local Util = require("lib.util")
 
 local function loadDb(path)
@@ -50,7 +56,7 @@ local function main()
     print("[2] Sair")
     print("")
 
-    local choice = prompt("Opção")
+    local choice = prompt("Opcao")
 
     if choice == "1" then
       local db = loadDb(path)

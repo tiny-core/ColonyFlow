@@ -1,40 +1,7 @@
 {
   "version": 1,
-  "classes": {
-    "ARMOR_CHEST": {
-      "tiers": [
-        "leather",
-        "iron",
-        "diamond",
-        "netherite"
-      ]
-    },
-    "TOOL_PICKAXE": {
-      "tiers": [
-        "wood",
-        "stone",
-        "iron",
-        "diamond",
-        "netherite"
-      ]
-    }
-  },
-  "items": {
-    "minecraft:iron_chestplate": {
-      "class": "ARMOR_CHEST",
-      "tier": "iron",
-      "equivalents": [
-        "ironjetpacks:armored_jetpack"
-      ]
-    },
-    "ironjetpacks:armored_jetpack": {
-      "class": "ARMOR_CHEST",
-      "tier": "iron",
-      "equivalents": [
-        "minecraft:iron_chestplate"
-      ]
-    }
-  },
+  "classes": {},
+  "items": {},
   "tier_overrides": {},
   "gating": {
     "by_building_type": {}

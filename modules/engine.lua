@@ -141,7 +141,9 @@ local function isMeCraftable(me, itemName, count)
   if type(me.getItem) == "function" then
     local res = me:getItem({ name = itemName })
     if type(res) == "table" and res.isCraftable ~= nil then
-      return res.isCraftable == true, nil
+      if res.isCraftable == true then
+        return true, nil
+      end
     end
   end
   if type(me.isCraftable) ~= "function" then return nil, nil end
@@ -251,7 +253,7 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
         local className = eq:getClass(it.name) or guessClass(it.name)
         if className == "ARMOR_CHEST" then
           local tierPrefix, piece = tostring(it.name):match(
-          "^minecraft:(leather|iron|diamond|netherite)_(helmet|chestplate|leggings|boots)$")
+            "^minecraft:(leather|iron|diamond|netherite)_(helmet|chestplate|leggings|boots)$")
           if piece then
             local tiers = { "leather", "iron", "diamond", "netherite" }
             for _, tName in ipairs(tiers) do
@@ -269,6 +271,7 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
   end
 
   local blockedByTier = {}
+  local blockedByCraft = {}
   local best, bestWhy, bestScore = nil, nil, -math.huge
   for idx, it in ipairs(eligible) do
     local className = eq:getClass(it.name) or guessClass(it.name)
@@ -286,6 +289,10 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
     if amount <= 0 then
       craftable, craftableErr = isMeCraftable(me, it.name,
         tonumber(it.count or request.requiredCount or request.count or 1) or 1)
+    end
+    if amount <= 0 and craftable == false then
+      table.insert(blockedByCraft, { name = it.name, class = className, tier = t, max = maxTier, err = craftableErr })
+      goto continue_item
     end
     local score = 0
 
@@ -306,10 +313,15 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
       tierPrefEff = "highest"
     end
 
+    local isAvailable = (amount > 0) or (craftable == true)
     local rank = tierRank(eq, className, t)
     if rank then
       if tierPrefEff == "highest" then
-        score = score + rank
+        if isAvailable then
+          score = score + (rank * 100000)
+        else
+          score = score + rank
+        end
       else
         score = score + (100 - rank)
       end
@@ -349,6 +361,9 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
                 { name = building.name, type = building.type, level = building.level } or nil,
             blocked = blockedByTier
           }
+    end
+    if #blockedByCraft > 0 then
+      return nil, "nao_craftavel"
     end
     return nil, "sem_candidato"
   end
@@ -441,12 +456,22 @@ function Engine:tick()
           work.err = "blocked_by_tier"
           work.next_retry = os.epoch("utc") + 15000
         else
-          work.status = (why == "nao_suportado") and "unsupported" or "error"
-          work.err = why
-          work.next_retry = os.epoch("utc") + 15000
+          if why == "nao_craftavel" then
+            work.status = "waiting_retry"
+            work.err = "nao_craftavel"
+            work.next_retry = os.epoch("utc") + 15000
+          else
+            work.status = (why == "nao_suportado") and "unsupported" or "error"
+            work.err = why
+            work.next_retry = os.epoch("utc") + 15000
+          end
         end
         self.work[r.id] = work
-        state.logger:warn("Request sem candidato", { request = r.id, reason = why })
+        if why == "nao_craftavel" then
+          state.logger:warn("Item não craftável agora; aguardando...", { request = r.id, item = work.requested })
+        else
+          state.logger:warn("Request sem candidato", { request = r.id, reason = why })
+        end
         goto continue
       end
 
@@ -671,6 +696,10 @@ function Engine:tick()
             target = r.target,
             tier = why.tier,
             class = why.class,
+            max_tier = why.max_tier,
+            resolved = why.max_tier_resolved,
+            source = why.max_tier_source,
+            building = why.building,
           })
           work.logged_equivalents = true
         end

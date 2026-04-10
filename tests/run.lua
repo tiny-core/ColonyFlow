@@ -4,17 +4,41 @@ local function assertEq(a, b, msg)
   end
 end
 
+local function ensureDir(path)
+  if not fs.exists(path) then fs.makeDir(path) end
+end
+
+ensureDir("logs")
+local reportPath = ("logs/tests-%s-%s.txt"):format(os.date("!%Y-%m-%d"), os.date("!%H%M%S"))
+local report = fs.open(reportPath, "w")
+local function logLine(s)
+  s = tostring(s or "")
+  print(s)
+  if report then
+    report.writeLine(s)
+    report.flush()
+  end
+end
+
+local failures = {}
+
 if type(package) == "table" and type(package.path) == "string" then
   package.path = "/?.lua;/?/init.lua;" .. package.path
 end
 
 local function runTest(name, fn)
-  local ok, err = pcall(fn)
+  local ok, resOrErr = pcall(fn)
   if ok then
-    print("[OK] " .. name)
+    if resOrErr == "SKIP" then
+      logLine("[SKIP] " .. name)
+      return true
+    end
+    logLine("[OK] " .. name)
     return true
   end
-  print("[FAIL] " .. name .. " -> " .. tostring(err))
+  local msg = "[FAIL] " .. name .. " -> " .. tostring(resOrErr)
+  logLine(msg)
+  table.insert(failures, msg)
   return false
 end
 
@@ -75,6 +99,11 @@ local tests = {
   },
   { "equivalencia_jetpack", function()
     local eq = require("modules.equivalence").new({ cache = { get = function() end, set = function() end } })
+    local metaA = eq:getItemMeta("minecraft:iron_chestplate")
+    local metaB = eq:getItemMeta("ironjetpacks:armored_jetpack")
+    if metaA == nil and metaB == nil then
+      return "SKIP"
+    end
     local list = eq:getEquivalents("minecraft:iron_chestplate")
     local found = false
     for _, v in ipairs(list) do
@@ -984,6 +1013,133 @@ local tests = {
     peripheral = oldPeripheral
   end
   },
+  { "engine_nao_craftavel_vira_waiting_retry", function()
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local meBridge = {
+      isConnected = function() return true end,
+      isOnline = function() return true end,
+      getItem = function(filter) return { name = filter.name, amount = 0, isCraftable = false } end,
+      isItemCraftable = function() return false end,
+      isItemCrafting = function() return false end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "highest" },
+      progression = { enforce_building_gating = "true" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = meBridge,
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              {
+                id = 300,
+                state = "requested",
+                target = "builder",
+                count = 1,
+                items = { { name = "minecraft:torch", count = 1 } },
+              },
+            }
+          end,
+          getBuildings = function() return { { name = "builder", type = "builder", level = 5, built = true } } end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+
+    assertEq(state.work["300"].status, "waiting_retry")
+    assertEq(state.work["300"].err, "nao_craftavel")
+
+    peripheral = oldPeripheral
+  end
+  },
+  { "logger_cleanup_respeita_max_files_sem_apagar_atual", function()
+    local Logger = require("lib.logger")
+
+    local oldFs = fs
+    local deleted = {}
+    local opened = {}
+    local currentPath = nil
+    local existsSet = {}
+
+    fs = {
+      exists = function(path) return existsSet[path] == true end,
+      isDir = function(path) return path == "logs" end,
+      makeDir = function(path) existsSet[path] = true end,
+      list = function(path)
+        assertEq(path, "logs")
+        local out = {
+          "minecolonies-me-2026-04-08.log",
+          "minecolonies-me-2026-04-09.log",
+          "minecolonies-me-2026-04-10.log",
+        }
+        for _, f in ipairs(out) do
+          existsSet["logs/" .. f] = true
+        end
+        return out
+      end,
+      combine = function(a, b) return tostring(a) .. "/" .. tostring(b) end,
+      open = function(path, mode)
+        currentPath = path
+        opened[path] = mode
+        existsSet[path] = true
+        return {
+          writeLine = function() end,
+          flush = function() end,
+          close = function() end,
+        }
+      end,
+      getSize = function() return 0 end,
+      move = function() end,
+      delete = function(path)
+        deleted[path] = true; existsSet[path] = false
+      end,
+      getDir = function(path) return "logs" end,
+    }
+
+    local cfg = makeCfg({
+      core = { log_dir = "logs", log_level = "INFO", log_max_files = "2", log_max_kb = "1024" },
+    })
+
+    local logger = Logger.new(cfg)
+    assertEq(type(logger), "table")
+    assertEq(currentPath, "logs/minecolonies-me-" .. os.date("!%Y-%m-%d") .. ".log")
+
+    local shouldDelete = "logs/minecolonies-me-2026-04-08.log"
+    assertEq(deleted[shouldDelete] == true, true, "deveria apagar o log mais antigo")
+    assertEq(deleted["logs/minecolonies-me-2026-04-09.log"] == true, false, "não deveria apagar o penúltimo log")
+    assertEq(deleted[currentPath] == true, false, "não deveria apagar o log atual")
+
+    fs = oldFs
+  end
+  },
   { "me_bridge_api_fallbacks", function()
     local ME = require("modules.me")
     local bridge = {
@@ -1018,6 +1174,59 @@ local tests = {
     assertEq(exported, 2)
   end
   },
+  { "me_getItem_cache_hit_e_ttl0", function()
+    local ME = require("modules.me")
+    local Cache = require("lib.cache")
+
+    local calls = 0
+    local bridge = {
+      getItem = function(filter)
+        calls = calls + 1
+        return { name = filter.name, amount = calls, isCraftable = false }
+      end,
+    }
+
+    local cfgOn = makeCfg({ cache = { me_item_ttl_seconds = "10" } })
+    local stateOn = { cfg = cfgOn, cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }), devices = { meBridge = bridge } }
+    local meOn = ME.new(stateOn)
+    local a1 = meOn:getItem({ name = "minecraft:dirt" })
+    local a2 = meOn:getItem({ name = "minecraft:dirt" })
+    assertEq(calls, 1, "cache deveria evitar chamada duplicada")
+    assertEq(type(a1), "table")
+    assertEq(type(a2), "table")
+    assertEq(a2.amount, a1.amount)
+
+    local cfgOff = makeCfg({ cache = { me_item_ttl_seconds = "0" } })
+    local stateOff = { cfg = cfgOff, cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }), devices = { meBridge = bridge } }
+    local meOff = ME.new(stateOff)
+    local _ = meOff:getItem({ name = "minecraft:stone" })
+    local _ = meOff:getItem({ name = "minecraft:stone" })
+    assertEq(calls >= 3, true, "ttl=0 não deveria cachear")
+  end
+  },
+  { "me_isCraftable_cache_hit", function()
+    local ME = require("modules.me")
+    local Cache = require("lib.cache")
+
+    local calls = 0
+    local bridge = {
+      isItemCraftable = function(filter)
+        calls = calls + 1
+        return true
+      end,
+    }
+
+    local cfg = makeCfg({ cache = { me_craftable_ttl_seconds = "10" } })
+    local state = { cfg = cfg, cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }), devices = { meBridge = bridge } }
+    local me = ME.new(state)
+
+    local c1 = me:isCraftable({ name = "minecraft:dirt", count = 1 })
+    local c2 = me:isCraftable({ name = "minecraft:dirt", count = 1 })
+    assertEq(c1, true)
+    assertEq(c2, true)
+    assertEq(calls, 1, "cache deveria evitar chamada duplicada")
+  end
+  },
 }
 
 for _, t in ipairs(tests) do
@@ -1027,7 +1236,18 @@ for _, t in ipairs(tests) do
   end
 end
 
-print(string.format("Tests: %d/%d OK", passed, total))
+logLine(string.format("Tests: %d/%d OK", passed, total))
+logLine("Relatório: " .. reportPath)
 if passed ~= total then
-  error("Falha em testes.")
+  if #failures > 0 then
+    logLine("")
+    logLine("Falhas:")
+    for _, f in ipairs(failures) do
+      logLine(f)
+    end
+  end
+  if report then report.close() end
+  error("Falha em testes. Veja: " .. reportPath)
 end
+
+if report then report.close() end

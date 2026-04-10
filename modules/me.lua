@@ -29,6 +29,24 @@ local function isDirection(target)
       or t == "north" or t == "south" or t == "east" or t == "west" or t == "up" or t == "down"
 end
 
+local function cacheTtl(state, key, default)
+  if not state or not state.cfg then return default end
+  if type(state.cfg.getNumber) ~= "function" then return default end
+  return state.cfg:getNumber("cache", key, default)
+end
+
+local function cacheGet(state, ns, key)
+  if not state or not state.cache then return nil end
+  if type(state.cache.get) ~= "function" then return nil end
+  return state.cache:get(ns, key)
+end
+
+local function cacheSet(state, ns, key, value, ttl)
+  if not state or not state.cache then return end
+  if type(state.cache.set) ~= "function" then return end
+  state.cache:set(ns, key, value, ttl)
+end
+
 function ME.new(state)
   return setmetatable({ state = state }, ME)
 end
@@ -48,11 +66,36 @@ end
 
 function ME:getItem(filter)
   local b = self.state.devices.meBridge
+  local name = filter and filter.name
+  local ttl = cacheTtl(self.state, "me_item_ttl_seconds", 1)
+  if ttl and ttl > 0 and type(name) == "string" and name ~= "" then
+    local cached = cacheGet(self.state, "me_item", name)
+    if cached ~= nil then return cached, nil end
+    local res, err = call(b, "getItem", filter)
+    if res ~= nil then cacheSet(self.state, "me_item", name, res, ttl) end
+    return res, err
+  end
   return call(b, "getItem", filter)
 end
 
 function ME:listItems(filter)
   local b = self.state.devices.meBridge
+  local name = filter and filter.name
+  local ttl = cacheTtl(self.state, "me_list_ttl_seconds", 1)
+  if ttl and ttl > 0 and type(name) == "string" and name ~= "" then
+    local cached = cacheGet(self.state, "me_list", name)
+    if cached ~= nil then return cached, nil end
+    local res, err = nil, nil
+    if b and type(b.getItems) == "function" then
+      res, err = call(b, "getItems", filter or {})
+    elseif b and type(b.listItems) == "function" then
+      res, err = call(b, "listItems", filter or {})
+    else
+      res, err = {}, nil
+    end
+    if res ~= nil then cacheSet(self.state, "me_list", name, res, ttl) end
+    return res, err
+  end
   if b and type(b.getItems) == "function" then
     return call(b, "getItems", filter or {})
   end
@@ -71,6 +114,17 @@ end
 
 function ME:isCraftable(filter)
   local b = self.state.devices.meBridge
+  local name = filter and filter.name
+  local count = filter and filter.count
+  local ttl = cacheTtl(self.state, "me_craftable_ttl_seconds", 2)
+  if ttl and ttl > 0 and type(name) == "string" and name ~= "" then
+    local key = name .. "|" .. tostring(count or "")
+    local cached = cacheGet(self.state, "me_craftable", key)
+    if cached ~= nil then return cached, nil end
+    local res, err = callAny(b, { "isCraftable", "isItemCraftable" }, filter)
+    if type(res) == "boolean" then cacheSet(self.state, "me_craftable", key, res, ttl) end
+    return res, err
+  end
   return callAny(b, { "isCraftable", "isItemCraftable" }, filter)
 end
 

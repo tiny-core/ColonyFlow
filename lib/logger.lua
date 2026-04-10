@@ -50,6 +50,7 @@ function Logger.new(cfg)
   }, Logger)
 
   o:openCurrentFile()
+  o:cleanupOldFiles()
   return o
 end
 
@@ -83,6 +84,9 @@ function Logger:rotateIfNeeded()
 end
 
 function Logger:cleanupOldFiles()
+  local maxFiles = math.floor(tonumber(self.maxFiles or 0) or 0)
+  if maxFiles <= 0 then return end
+
   local files = fs.list(self.dir)
   local logs = {}
   for _, f in ipairs(files) do
@@ -91,11 +95,21 @@ function Logger:cleanupOldFiles()
     end
   end
   table.sort(logs)
-  local extra = #logs - self.maxFiles
-  if extra <= 0 then return end
-  for i = 1, extra do
-    local p = fs.combine(self.dir, logs[i])
-    if fs.exists(p) then fs.delete(p) end
+  local remaining = #logs
+  if remaining <= maxFiles then return end
+
+  local current = self.filePath
+  for _, f in ipairs(logs) do
+    if remaining <= maxFiles then break end
+    local p = fs.combine(self.dir, f)
+    if current and p == current then
+      goto continue
+    end
+    if fs.exists(p) then
+      fs.delete(p)
+      remaining = remaining - 1
+    end
+    ::continue::
   end
 end
 
