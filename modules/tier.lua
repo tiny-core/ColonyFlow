@@ -58,7 +58,7 @@ end
 
 function Tier:isTierAllowed(className, tier, maxTier)
   if not tier or not maxTier then return false end
-  if className == "ARMOR_CHEST" then
+  if type(className) == "string" and className:match("^ARMOR_") then
     return (TIERS_ARMOR[tier] or 0) <= (TIERS_ARMOR[maxTier] or 0)
   end
   return (TIERS_TOOL[tier] or 0) <= (TIERS_TOOL[maxTier] or 0)

@@ -22,6 +22,7 @@ local function guessClass(name)
   if not name then return nil end
   local n = name:lower()
   if n:find("chestplate", 1, true) or n:find("jetpack", 1, true) then return "ARMOR_CHEST" end
+  if n:find("helmet", 1, true) or n:find("leggings", 1, true) or n:find("boots", 1, true) then return "ARMOR_CHEST" end
   if n:find("pickaxe", 1, true) then return "TOOL_PICKAXE" end
   return nil
 end
@@ -41,7 +42,7 @@ local function tierRank(eq, className, tierName)
   if idx then return idx end
   local tool = { wood = 1, stone = 2, iron = 3, diamond = 4, netherite = 5 }
   local armor = { leather = 1, iron = 2, diamond = 3, netherite = 4 }
-  if className == "ARMOR_CHEST" then return armor[tierName] end
+  if type(className) == "string" and className:match("^ARMOR_") then return armor[tierName] end
   return tool[tierName]
 end
 
@@ -239,6 +240,34 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
     return nil, "sem_candidato"
   end
 
+  do
+    local expanded = {}
+    local seen = {}
+    for _, it in ipairs(eligible) do
+      if it and it.name and not seen[it.name] then
+        seen[it.name] = true
+        table.insert(expanded, it)
+
+        local className = eq:getClass(it.name) or guessClass(it.name)
+        if className == "ARMOR_CHEST" then
+          local tierPrefix, piece = tostring(it.name):match(
+          "^minecraft:(leather|iron|diamond|netherite)_(helmet|chestplate|leggings|boots)$")
+          if piece then
+            local tiers = { "leather", "iron", "diamond", "netherite" }
+            for _, tName in ipairs(tiers) do
+              local n = "minecraft:" .. tName .. "_" .. piece
+              if not seen[n] then
+                seen[n] = true
+                table.insert(expanded, { name = n, count = it.count, tags = it.tags })
+              end
+            end
+          end
+        end
+      end
+    end
+    eligible = expanded
+  end
+
   local blockedByTier = {}
   local best, bestWhy, bestScore = nil, nil, -math.huge
   for idx, it in ipairs(eligible) do
@@ -389,78 +418,6 @@ function Engine:tick()
   if not citizens then
     citizens = self.mine:listCitizens()
     state.cache:set("mc", "citizens", citizens, 5)
-  end
-
-  if type(state.colonyStats) ~= "table" then
-    state.colonyStats = {}
-  end
-  do
-    local guarded = 0
-    local sumDx, sumDz = 0, 0
-    local origin = nil
-    if type(state.colonyStats.location) == "table" and state.colonyStats.location.x and state.colonyStats.location.z then
-      origin = { x = tonumber(state.colonyStats.location.x), z = tonumber(state.colonyStats.location.z) }
-      if not origin.x or not origin.z then origin = nil end
-    end
-
-    local function addVector(pos)
-      if not origin then return end
-      if type(pos) ~= "table" then return end
-      local x = tonumber(pos.x)
-      local z = tonumber(pos.z)
-      if not x or not z then return end
-      sumDx = sumDx + (x - origin.x)
-      sumDz = sumDz + (z - origin.z)
-    end
-
-    local function directionFromVector(dx, dz)
-      if dx == 0 and dz == 0 then return nil end
-      local adx = math.abs(dx)
-      local adz = math.abs(dz)
-      if adx >= adz * 2 then
-        return (dx > 0) and "LESTE" or "OESTE"
-      end
-      if adz >= adx * 2 then
-        return (dz < 0) and "NORTE" or "SUL"
-      end
-      local ns = (dz < 0) and "NORTE" or "SUL"
-      local ew = (dx > 0) and "LESTE" or "OESTE"
-      if ns == "NORTE" and ew == "LESTE" then return "NORDESTE" end
-      if ns == "NORTE" and ew == "OESTE" then return "NOROESTE" end
-      if ns == "SUL" and ew == "LESTE" then return "SUDESTE" end
-      return "SUDOESTE"
-    end
-
-    if type(buildings) == "table" then
-      for _, b in ipairs(buildings) do
-        if type(b) == "table" and b.guarded == true then
-          guarded = guarded + 1
-          addVector(b.location)
-        end
-      end
-    end
-
-    local citizenAlert = 0
-    if type(citizens) == "table" then
-      for _, c in ipairs(citizens) do
-        if type(c) == "table" and type(c.state) == "string" then
-          local s = c.state:lower()
-          if s:find("raid") or s:find("attack") or s:find("combat") or s:find("fight") or s:find("flee") or s:find("barbar") then
-            citizenAlert = citizenAlert + 1
-            addVector(c.location)
-          end
-        end
-      end
-    end
-
-    state.colonyStats.underAttackHeuristic = (guarded > 0) or (citizenAlert > 0)
-    state.colonyStats.underAttackGuardedBuildings = guarded
-    state.colonyStats.underAttackCitizenAlerts = citizenAlert
-    if state.colonyStats.underAttackHeuristic == true then
-      state.colonyStats.underAttackDirection = directionFromVector(sumDx, sumDz)
-    else
-      state.colonyStats.underAttackDirection = nil
-    end
   end
 
   for _, r in ipairs(requests) do

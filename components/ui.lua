@@ -464,17 +464,6 @@ function UI:renderStatus(state, mon)
   self:drawText("status", mon, 1, y, centerText("COLONIA", w), colors.cyan); y = y + 1
   self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
 
-  local under = (cs.underAttack == true) or (cs.underAttackHeuristic == true)
-  if under then
-    local dir = cs.underAttackDirection
-    local msg = "ALERTA: RAID/ATAQUE EM ANDAMENTO"
-    if type(dir) == "string" and dir ~= "" then
-      msg = msg .. " - " .. dir
-    end
-    self:drawText("status", mon, 1, y, padRight(msg, w), colors.red, colors.black)
-    y = y + 1
-  end
-
   self:drawText("status", mon, 1, y, shorten("Colonia: " .. tostring(cs.name or "-"), w)); y = y + 1
   self:drawText("status", mon, 1, y,
     shorten("Cidadaos: " .. tostring(cs.citizens or "-") .. "/" .. tostring(cs.maxCitizens or "-"), w)); y = y + 1
@@ -484,13 +473,6 @@ function UI:renderStatus(state, mon)
     self:drawText("status", mon, 1, y, shorten(label, w))
     local hv = formatDecimal2(cs.happiness)
     self:drawText("status", mon, #label + 1, y, shorten(hv, math.max(0, w - #label)), happinessColor(cs.happiness))
-    y = y + 1
-  end
-
-  do
-    local label = "Ataque: "
-    self:drawText("status", mon, 1, y, shorten(label, w))
-    self:drawText("status", mon, #label + 1, y, boolLabel(under), under and colors.red or colors.lime)
     y = y + 1
   end
 
