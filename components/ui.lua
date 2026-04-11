@@ -525,25 +525,26 @@ function UI:handleEvent(event, side, x, y)
     end
     if side == statusMonName then
       local w, h = self.state.devices.monitorStatus.getSize()
-      if y == h then
-        if self.statusView == "nocraft" then
-          if x <= (#"[VOLTAR]" + 2) then
-            self.statusView = "main"
-          else
-            if x < w / 2 then
-              self.noCraftPage = (self.noCraftPage or 1) - 1
-            else
-              self.noCraftPage = (self.noCraftPage or 1) + 1
-            end
-          end
+      if self.statusView == "nocraft" then
+        if y == h and x <= (#"[VOLTAR]" + 2) then
+          self.statusView = "main"
         else
+          if x < w / 2 then
+            self.noCraftPage = (self.noCraftPage or 1) - 1
+          else
+            self.noCraftPage = (self.noCraftPage or 1) + 1
+          end
+        end
+        self:tick()
+      else
+        if y == h then
           local list = self:collectNoCraftItems(self.state)
           if #list > 0 then
             self.statusView = "nocraft"
             self.noCraftPage = 1
+            self:tick()
           end
         end
-        self:tick()
       end
     end
   end

@@ -1080,6 +1080,64 @@ local tests = {
     peripheral = oldPeripheral
   end
   },
+  { "ui_falta_mostra_needed_mesmo_sem_candidato", function()
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local meBridge = {
+      isConnected = function() return true end,
+      isOnline = function() return true end,
+      getItem = function(filter) return { name = filter.name, amount = 0, isCraftable = false } end,
+      isItemCraftable = function() return false end,
+      isItemCrafting = function() return false end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "completed,done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "highest" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = meBridge,
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 310, state = "requested", target = "builder", count = 3, items = { { name = "minecraft:torch", count = 3 } } },
+            }
+          end,
+          getBuildings = function() return { { name = "builder", type = "builder", level = 5, built = true } } end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+    assertEq(state.work["310"].missing, 3)
+
+    peripheral = oldPeripheral
+  end
+  },
   { "logger_cleanup_respeita_max_files_sem_apagar_atual", function()
     local Logger = require("lib.logger")
 

@@ -406,10 +406,15 @@ function Engine:tick()
     for _, r in ipairs(requests) do
       if r and r.id and isPendingState(state.cfg, r.state) then
         local work = self.work[r.id] or {}
+        local needed = tonumber(r.requiredCount or r.count or 0) or 0
         work.status = "waiting_retry"
         work.request_state = r.state
         work.target = r.target
         work.err = "destino_indisponivel"
+        work.needed = needed
+        work.present_total = nil
+        work.present = 0
+        work.missing = needed
         work.next_retry = os.epoch("utc") + 5000
         self.work[r.id] = work
       end
@@ -451,6 +456,25 @@ function Engine:tick()
           (r.items and r.items[1] and r.items[1].name) or nil
 
       if not candidate then
+        do
+          local reqItem = work.requested or ""
+          local needed = tonumber(r.requiredCount or r.count or 0) or 0
+          if snap and reqItem ~= "" then
+            local presentTotal = Inventory.countFromSnapshot(snap, reqItem)
+            local alloc = math.min(tonumber(available[reqItem] or 0) or 0, needed)
+            available[reqItem] = (tonumber(available[reqItem] or 0) or 0) - alloc
+            local missing = math.max(0, needed - alloc)
+            work.needed = needed
+            work.present_total = presentTotal
+            work.present = alloc
+            work.missing = missing
+          else
+            work.needed = needed
+            work.present_total = nil
+            work.present = 0
+            work.missing = needed
+          end
+        end
         if type(why) == "table" and why.reason == "blocked_by_tier" then
           work.status = "blocked_by_tier"
           work.err = "blocked_by_tier"
