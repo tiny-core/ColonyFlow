@@ -28,9 +28,12 @@ Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColo
 
 ### Active
 
-- [ ] Implementar cache otimizado para consultas repetidas (ME, tiers, mapeamentos e destinos)
-- [ ] Incluir testes unitários para mapeamentos e regras de progressão (incluindo ATM10 v6.4 e mods populares)
+- [ ] Gerar `config.ini` automaticamente com defaults quando ausente e registrar defaults aplicados
+- [ ] Mesclar mapeamentos do JSON com regras embutidas opcionais (sem impor equivalências padrão)
 - [ ] Garantir compatibilidade de operação em singleplayer e multiplayer
+- [ ] Consolidar dataset opcional de testes para mapeamentos (ATM10/mods populares) sem obrigatoriedade
+- [ ] Evoluir estrutura e comportamento do sistema de mapeamentos (mappings v2 + migração + editor)
+- [ ] Criar instalador in-game que baixa e atualiza os arquivos do sistema direto do repositório Git
 
 ### Out of Scope
 

@@ -29,7 +29,7 @@
 
 - [x] **EQ-01**: O sistema mantém um banco de equivalências que agrupa itens por “classe” e tier (ex.: `ARMOR_CHEST/IRON`) e permite mapear itens equivalentes entre mods.
 - [x] **EQ-02**: O sistema suporta mapeamentos explícitos como “Armored Jetpack é equivalente a Iron Chestplate (mesmo tier/classe)” e usa isso para priorizar itens disponíveis.
-- [ ] **EQ-03**: Ao decidir qual item atender, o sistema respeita a lista de itens aceitos pela requisição; quando a substituição não for explicitamente aceita, o sistema apenas sugere/indica a equivalência na UI/log e mantém o pedido na fila.
+- [x] **EQ-03**: Ao decidir qual item atender, o sistema respeita a lista de itens aceitos pela requisição; quando a substituição não for explicitamente aceita, o sistema apenas sugere/indica a equivalência na UI/log e mantém o pedido na fila.
 - [x] **EQ-04**: O sistema registra em log todas as substituições/sugestões com motivo (disponibilidade, tier, restrição de building, regra de mapeamento).
 
 ### Tiers e Restrições por Progressão
@@ -58,7 +58,7 @@
 
 ### Logs e Robustez
 
-- [ ] **LOG-01**: O sistema implementa logging com níveis (DEBUG/INFO/WARN/ERROR) e mensagens em português, com contexto estruturado (evento, item, quantidades, destino, request id).
+- [x] **LOG-01**: O sistema implementa logging com níveis (DEBUG/INFO/WARN/ERROR) e mensagens em português, com contexto estruturado (evento, item, quantidades, destino, request id).
 - [x] **LOG-02**: O sistema implementa rotação de logs por tamanho e/ou quantidade máxima de arquivos.
 - [x] **ROB-01**: O sistema roda em loop autônomo e se recupera de falhas transitórias de periféricos sem travar (usa `pcall` e backoff simples).
 - [ ] **ROB-02**: O sistema funciona em singleplayer e multiplayer (não depende de estado local do jogador; depende apenas de periféricos e permissões do servidor).
@@ -99,7 +99,7 @@
 | DEL-04 | Phase 2 | Complete |
 | EQ-01 | Phase 2 | Complete |
 | EQ-02 | Phase 2 | Complete |
-| EQ-03 | Phase 3 | Pending |
+| EQ-03 | Phase 3 | Complete |
 | EQ-04 | Phase 4 | Complete |
 | TIER-01 | Phase 2 | Complete |
 | TIER-02 | Phase 2 | Complete |
@@ -113,7 +113,7 @@
 | UI-01 | Phase 4 | Complete |
 | UI-02 | Phase 4 | Complete |
 | UI-03 | Phase 4 | Complete |
-| LOG-01 | Phase 1 | Pending |
+| LOG-01 | Phase 1 | Complete |
 | LOG-02 | Phase 1 | Complete |
 | ROB-01 | Phase 1 | Complete |
 | ROB-02 | Phase 1 | Pending |

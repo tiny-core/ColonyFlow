@@ -10,8 +10,11 @@ Objetivo: entregar um sistema autônomo em Lua (CC: Tweaked) que lê requisiçõ
 - [x] **Phase 2: Núcleo de Requisições + Filtros** - Normalizar requests, resolver equivalências/tiers e calcular faltante real por destino
 - [x] **Phase 3: Craft + Entrega com Progressão** - Integrar ME para craft e entrega, evitando duplicidade e respeitando tier gating por building
 - [x] **Phase 4: UI + Configuração Operacional** - UI dual-monitor, paginação, status misto e editor de mapeamentos com logs de substituição
-- [ ] **Phase 5: Testes + Endurecimento** - Harness de testes, cobertura de mapeamentos e ajustes de performance/estabilidade
-- [ ] **Phase 6: Cache + Robustez Operacional** - Cache TTL para consultas do ME e endurecimento para operação longa
+- [x] **Phase 5: Testes + Endurecimento** - Harness de testes, cobertura de mapeamentos e ajustes de performance/estabilidade
+- [x] **Phase 6: Cache + Robustez Operacional** - Cache TTL para consultas do ME e endurecimento para operação longa
+- [ ] **Phase 7: Auto-Setup + Compatibilidade MP** - Auto-geração de config.ini, validação/diagnóstico de periféricos e endurecimento para multiplayer
+- [ ] **Phase 8: Mapping v2 (Estrutura + Comportamento)** - Evoluir estrutura do mappings.json e o comportamento de equivalências/tiers
+- [ ] **Phase 9: Instalador In-Game (Git)** - Script de instalação/atualização que baixa os arquivos do sistema do repositório direto no CC
 
 ## Phase Details
 
@@ -171,7 +174,78 @@ Inclui:
 
 Plans:
 
-- [ ] 06-01: Implementar cache de ME Bridge com TTL e testes
+- [x] 06-01: Implementar cache de ME Bridge com TTL e testes
+
+### Phase 7: Auto-Setup + Compatibilidade MP
+
+**Goal**: reduzir atrito de instalação e garantir operação previsível em singleplayer e multiplayer (diagnóstico claro e defaults seguros).
+**Depends on**: Phase 6
+**Requirements**: CFG-02, CFG-03, ROB-02
+**Plans**: 1 plan
+
+Inclui:
+
+- Gerar `config.ini` com defaults quando ausente e registrar quais defaults foram aplicados
+- Melhorar diagnóstico de periféricos (mensagens mais acionáveis quando algo está ausente)
+- Checklist e endurecimento para ambiente multiplayer (permissões, nomes de periféricos, modem)
+
+**Success Criteria** (what must be TRUE):
+
+1. `config.ini` ausente → o sistema cria um arquivo com defaults e continua operando.
+2. Logs mostram claramente qual periférico está faltando e qual chave/config resolver.
+3. Operação em multiplayer não depende do jogador e falha de forma previsível quando faltar permissão/periférico.
+
+Plans:
+
+- [ ] 07-01: Auto-geração de config e robustez MP
+
+### Phase 8: Mapping v2 (Estrutura + Comportamento)
+
+**Goal**: evoluir o sistema de mapeamentos para suportar estrutura mais expressiva e regras mais previsíveis sem exigir edição manual em massa.
+**Depends on**: Phase 7
+**Requirements**: CFG-03, EQ-01, EQ-02, EQ-03, TIER-01, TIER-02
+**Plans**: 1 plan
+
+Inclui:
+
+- Revisão do formato `data/mappings.json` (v2) mantendo compatibilidade retroativa quando possível
+- Regras de resolução de equivalências mais explícitas (ex.: preferências, direção, bloqueios)
+- Mecanismo de migração (v1 -> v2) e validação do arquivo
+- Atualização do editor (`startup map`) para suportar o novo formato
+
+**Success Criteria** (what must be TRUE):
+
+1. O sistema carrega `mappings.json` v2 e mantém fallback para v1 (ou migra automaticamente).
+2. `startup map` consegue editar os principais campos do novo formato.
+3. Logs/UI continuam explicando claramente por que um item foi escolhido/substituído.
+
+Plans:
+
+- [ ] 08-01: Implementar mappings v2, migração e editor
+
+### Phase 9: Instalador In-Game (Git)
+
+**Goal**: permitir instalação/atualização dentro do jogo com um único script, baixando arquivos do repositório via HTTP.
+**Depends on**: Phase 8
+**Requirements**: CFG-01, ROB-01
+**Plans**: 1 plan
+
+Inclui:
+
+- Script `install.lua` que baixa uma lista de arquivos do repositório (raw) e escreve no disco do computador
+- Modo update: sobrescrever arquivos gerenciados e preservar `config.ini`/dados do usuário quando configurado
+- Validação básica (hash/tamanho) e logs de progresso
+- Documentação de pré-requisito: HTTP habilitado no CC:Tweaked
+
+**Success Criteria** (what must be TRUE):
+
+1. Um computador “limpo” consegue instalar e rodar o sistema com `pastebin`/`wget`/`http.get` (conforme disponibilidade) apontando para o repositório.
+2. Atualização não apaga `config.ini` nem `data/mappings.json` por padrão.
+3. Falhas de HTTP/permissões geram mensagens acionáveis.
+
+Plans:
+
+- [ ] 09-01: Implementar instalador/atualizador via Git raw
 
 ## Progress
 
@@ -182,4 +256,7 @@ Plans:
 | 3. Craft + Entrega com Progressão  | 1/1            | Complete    | 2026-04-10 |
 | 4. UI + Configuração Operacional   | 1/1            | Complete    | 2026-04-10 |
 | 5. Testes + Endurecimento          | 1/1            | Complete    | 2026-04-10 |
-| 6. Cache + Robustez Operacional    | 0/1            | In progress | -          |
+| 6. Cache + Robustez Operacional    | 1/1            | Complete    | 2026-04-11 |
+| 7. Auto-Setup + Compatibilidade MP | 0/1            | Not started | -          |
+| 8. Mapping v2 (Estrutura + Comportamento) | 0/1      | Not started | -          |
+| 9. Instalador In-Game (Git)        | 0/1            | Not started | -          |
