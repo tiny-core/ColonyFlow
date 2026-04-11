@@ -197,7 +197,7 @@ Inclui:
 
 Plans:
 
-- [ ] 07-01: Auto-geração de config e robustez MP
+- [x] 07-01: Auto-geração de config e robustez MP
 
 ### Phase 8: Mapping v2 (Estrutura + Comportamento)
 
@@ -249,14 +249,15 @@ Plans:
 
 ## Progress
 
-| Phase                              | Plans Complete | Status      | Completed  |
-| ---------------------------------- | -------------- | ----------- | ---------- |
-| 1. Fundação Operacional            | 1/1            | Complete    | 2026-04-05 |
-| 2. Núcleo de Requisições + Filtros | 1/1            | Complete    | 2026-04-10 |
-| 3. Craft + Entrega com Progressão  | 1/1            | Complete    | 2026-04-10 |
-| 4. UI + Configuração Operacional   | 1/1            | Complete    | 2026-04-10 |
-| 5. Testes + Endurecimento          | 1/1            | Complete    | 2026-04-10 |
-| 6. Cache + Robustez Operacional    | 1/1            | Complete    | 2026-04-11 |
-| 7. Auto-Setup + Compatibilidade MP | 0/1            | Not started | -          |
-| 8. Mapping v2 (Estrutura + Comportamento) | 0/1      | Not started | -          |
-| 9. Instalador In-Game (Git)        | 0/1            | Not started | -          |
+| Phase                                     | Plans Complete | Status      | Completed  |
+| ----------------------------------------- | -------------- | ----------- | ---------- |
+| 1. Fundação Operacional                   | 1/1            | Complete    | 2026-04-05 |
+| 2. Núcleo de Requisições + Filtros        | 1/1            | Complete    | 2026-04-10 |
+| 3. Craft + Entrega com Progressão         | 1/1            | Complete    | 2026-04-10 |
+| 4. UI + Configuração Operacional          | 1/1            | Complete    | 2026-04-10 |
+| 5. Testes + Endurecimento                 | 1/1            | Complete    | 2026-04-10 |
+| 6. Cache + Robustez Operacional           | 1/1            | Complete    | 2026-04-11 |
+| 7. Auto-Setup + Compatibilidade MP        | 0/1            | Not started | -          |
+| 8. Mapping v2 (Estrutura + Comportamento) | 0/1            | Not started | -          |
+| 9. Instalador In-Game (Git)               | 0/1            | Not started | -          |
+

@@ -41,8 +41,8 @@
 ### Configuração e Mapeamentos
 
 - [x] **CFG-01**: Na raiz do computador existem apenas `startup.lua` e `config.ini`; demais arquivos ficam em subpastas funcionais.
-- [ ] **CFG-02**: O sistema carrega `config.ini` com defaults quando o arquivo não existir e registra quais defaults foram aplicados.
-- [ ] **CFG-03**: O sistema carrega mapeamentos adicionais de equivalência e tiers via arquivo JSON em pasta dedicada e permite mesclar com regras embutidas.
+- [x] **CFG-02**: O sistema carrega `config.ini` com defaults quando o arquivo não existir e registra quais defaults foram aplicados.
+- [x] **CFG-03**: O sistema carrega mapeamentos adicionais de equivalência e tiers via arquivo JSON em pasta dedicada e permite mesclar com regras embutidas.
 - [x] **CFG-04**: O sistema fornece uma interface de configuração no terminal para adicionar/editar mapeamentos (persistindo no JSON) sem editar código.
 
 ### Cache e Performance
@@ -61,7 +61,7 @@
 - [x] **LOG-01**: O sistema implementa logging com níveis (DEBUG/INFO/WARN/ERROR) e mensagens em português, com contexto estruturado (evento, item, quantidades, destino, request id).
 - [x] **LOG-02**: O sistema implementa rotação de logs por tamanho e/ou quantidade máxima de arquivos.
 - [x] **ROB-01**: O sistema roda em loop autônomo e se recupera de falhas transitórias de periféricos sem travar (usa `pcall` e backoff simples).
-- [ ] **ROB-02**: O sistema funciona em singleplayer e multiplayer (não depende de estado local do jogador; depende apenas de periféricos e permissões do servidor).
+- [x] **ROB-02**: O sistema funciona em singleplayer e multiplayer (não depende de estado local do jogador; depende apenas de periféricos e permissões do servidor).
 
 ### Testes
 
@@ -105,8 +105,8 @@
 | TIER-02 | Phase 2 | Complete |
 | TIER-03 | Phase 3 | Complete |
 | CFG-01 | Phase 1 | Complete |
-| CFG-02 | Phase 1 | Pending |
-| CFG-03 | Phase 2 | Pending |
+| CFG-02 | Phase 1 | Complete |
+| CFG-03 | Phase 2 | Complete |
 | CFG-04 | Phase 4 | Complete |
 | CACHE-01 | Phase 6 | Complete |
 | CACHE-02 | Phase 2 | Complete |
@@ -116,7 +116,7 @@
 | LOG-01 | Phase 1 | Complete |
 | LOG-02 | Phase 1 | Complete |
 | ROB-01 | Phase 1 | Complete |
-| ROB-02 | Phase 1 | Pending |
+| ROB-02 | Phase 1 | Complete |
 | TEST-01 | Phase 5 | Complete |
 | TEST-02 | Phase 5 | Pending |
 
