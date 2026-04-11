@@ -2,14 +2,50 @@ local Util = require("lib.util")
 
 local M = {}
 
+local function safePeripheralWrap(name)
+  local ok, res = pcall(peripheral.wrap, name)
+  if ok then return res end
+  return nil, tostring(res)
+end
+
+local function safePeripheralFind(...)
+  local ok, res = pcall(peripheral.find, ...)
+  if ok then return res end
+  return nil, tostring(res)
+end
+
+local function safePeripheralGetNames()
+  local ok, res = pcall(peripheral.getNames)
+  if ok then return res end
+  return {}, tostring(res)
+end
+
+local function getAvailablePeripheralsStr()
+  local names, err = safePeripheralGetNames()
+  if type(names) ~= "table" then return "(erro ao listar periféricos: " .. tostring(err) .. ")" end
+  local count = #names
+  if count == 0 then return "(0 encontrados)" end
+  local max_list = 20
+  local list = {}
+  for i = 1, math.min(count, max_list) do
+    table.insert(list, tostring(names[i]))
+  end
+  local str = table.concat(list, ", ")
+  if count > max_list then
+    str = str .. " ... (" .. (count - max_list) .. " omitidos)"
+  end
+  return string.format("%d encontrados: [%s]", count, str)
+end
+
 local function tryWrapByName(name)
   if not name or name == "" then return nil end
-  if not peripheral.isPresent(name) then return nil end
-  return peripheral.wrap(name)
+  local ok, present = pcall(peripheral.isPresent, name)
+  if not ok or not present then return nil end
+  return safePeripheralWrap(name)
 end
 
 local function tryFindByType(typeName)
-  return peripheral.find(typeName)
+  return safePeripheralFind(typeName)
 end
 
 local function resolve(cfg, logger, key, typeName)
@@ -20,37 +56,71 @@ local function resolve(cfg, logger, key, typeName)
   if type(typeName) == "table" then
     for _, t in ipairs(typeName) do
       dev = tryFindByType(t)
-      if dev then return dev, peripheral.getName(dev) end
+      if dev then
+        local ok, pName = pcall(peripheral.getName, dev)
+        if ok and pName then return dev, pName end
+      end
     end
   else
     dev = tryFindByType(typeName)
-    if dev then return dev, peripheral.getName(dev) end
+    if dev then
+      local ok, pName = pcall(peripheral.getName, dev)
+      if ok and pName then return dev, pName end
+    end
   end
 
   local typeLabel = type(typeName) == "table" and table.concat(typeName, "|") or tostring(typeName)
-  logger:warn("Periférico não encontrado: " .. key .. " (" .. typeLabel .. ")")
-  return nil, nil
+  local available = getAvailablePeripheralsStr()
+  local hintMsg = string.format("Ajuste config.ini: [peripherals] %s=<nome do peripheral.getNames()>", key)
+
+  logger:warn("Periférico não resolvido", {
+    key = key,
+    expected_type = typeLabel,
+    configured_name = name,
+    hint = hintMsg,
+    available_peripherals = available
+  })
+
+  return nil, nil, typeLabel, name
 end
 
 function M.discover(cfg, logger)
   local issues = {}
 
-  local colonyIntegrator, colonyName = resolve(cfg, logger, "colony_integrator", "colonyIntegrator")
-  if not colonyIntegrator then table.insert(issues, "colonyIntegrator ausente") end
-
-  local meBridge, meName = resolve(cfg, logger, "me_bridge", { "meBridge", "me_bridge" })
-  if not meBridge then table.insert(issues, "meBridge ausente") end
-
-  local modem, modemName = resolve(cfg, logger, "modem", "modem")
-  if not modem then
-    table.insert(issues, "modem ausente (rede de periféricos pode não funcionar)")
+  local colonyIntegrator, colonyName, colType, colCfg = resolve(cfg, logger, "colony_integrator", "colonyIntegrator")
+  if not colonyIntegrator then
+    table.insert(issues,
+      string.format("[peripherals] %s ausente. Ajuste %s=<nome> (tipo: %s)", "colony_integrator", "colony_integrator",
+        colType))
   end
 
-  local monReq, monReqName = resolve(cfg, logger, "monitor_requests", "monitor")
-  local monStat, monStatName = resolve(cfg, logger, "monitor_status", "monitor")
+  local meBridge, meName, meType, meCfg = resolve(cfg, logger, "me_bridge", { "meBridge", "me_bridge" })
+  if not meBridge then
+    table.insert(issues,
+      string.format("[peripherals] %s ausente. Ajuste %s=<nome> (tipo: %s)", "me_bridge", "me_bridge", meType))
+  end
 
-  if not monReq then table.insert(issues, "monitor_requests ausente") end
-  if not monStat then table.insert(issues, "monitor_status ausente") end
+  local modem, modemName, modemType, modemCfg = resolve(cfg, logger, "modem", "modem")
+  if not modem then
+    table.insert(issues,
+      string.format(
+      "[peripherals] %s ausente. Impacto na rede. Em MP, verifique permissões/alcance/bloqueios. Ajuste %s=<nome> (tipo: %s)",
+        "modem", "modem", modemType))
+  end
+
+  local monReq, monReqName, monReqType, monReqCfg = resolve(cfg, logger, "monitor_requests", "monitor")
+  local monStat, monStatName, monStatType, monStatCfg = resolve(cfg, logger, "monitor_status", "monitor")
+
+  if not monReq then
+    table.insert(issues,
+      string.format("[peripherals] %s ausente. Ajuste %s=<nome> (tipo: %s)", "monitor_requests", "monitor_requests",
+        monReqType))
+  end
+  if not monStat then
+    table.insert(issues,
+      string.format("[peripherals] %s ausente. Ajuste %s=<nome> (tipo: %s)", "monitor_status", "monitor_status",
+        monStatType))
+  end
 
   local devices = {
     colonyIntegrator = colonyIntegrator,

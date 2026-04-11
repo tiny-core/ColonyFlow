@@ -90,6 +90,87 @@ local function makeCfg(values)
 end
 
 local tests = {
+  { "config_ini_autogerado_com_defaults", function()
+    local oldFs = fs
+    local writtenContent = nil
+    fs = {
+      exists = function(path) return false end,
+      open = function(path, mode)
+        if mode == "w" then
+          return {
+            write = function(content) writtenContent = content end,
+            close = function() end
+          }
+        end
+      end
+    }
+    local Config = require("lib.config")
+    local res = Config.ensureDefaults("config.ini")
+    fs = oldFs
+
+    assertEq(res.created, true, "deveria ter criado o arquivo")
+    assertEq(type(res.defaults), "table", "deveria retornar os defaults parseados")
+    assertEq(string.match(writtenContent, "%[core%]") ~= nil, true, "deveria conter a secao core")
+    assertEq(string.match(writtenContent, "log_level=INFO") ~= nil, true, "deveria conter log_level=INFO")
+  end },
+  { "mappings_json_skeleton_quando_ausente", function()
+    local oldFsExists = fs.exists
+    local oldFsOpen = fs.open
+    local oldFsMakeDir = fs.makeDir
+    local oldFsIsDir = fs.isDir
+    local oldFsGetDir = fs.getDir
+
+    local writtenContent = nil
+    fs.exists = function(path) return false end
+    fs.open = function(path, mode)
+      if mode == "w" then
+        return {
+          write = function(content) writtenContent = content end,
+          close = function() end
+        }
+      end
+    end
+    fs.makeDir = function() end
+    fs.isDir = function() return true end
+    fs.getDir = function() return "data" end
+
+    local Equivalence = require("modules.equivalence")
+    local eq = Equivalence.new({ logger = { info = function() end } })
+
+    fs.exists = oldFsExists
+    fs.open = oldFsOpen
+    fs.makeDir = oldFsMakeDir
+    fs.isDir = oldFsIsDir
+    fs.getDir = oldFsGetDir
+
+    assertEq(type(writtenContent), "string", "deveria ter escrito algo")
+    assertEq(string.match(writtenContent, '"items"') ~= nil, true, "deveria conter items")
+    assertEq(string.match(writtenContent, '"gating"') ~= nil, true, "deveria conter gating")
+    assertEq(string.match(writtenContent, '"by_building_type"') ~= nil, true, "deveria conter by_building_type")
+  end },
+  { "peripherals_discover_nao_crasha_em_erro", function()
+    local oldPeripheral = peripheral
+    peripheral = {
+      find = function() error("fake find error") end,
+      wrap = function() error("fake wrap error") end,
+      getNames = function() error("fake getNames error") end,
+      isPresent = function() error("fake isPresent error") end,
+      getName = function() error("fake getName error") end
+    }
+
+    local Peripherals = require("modules.peripherals")
+    local logger = { warn = function() end, info = function() end, error = function() end }
+
+    local cfg = makeCfg({ peripherals = {}, core = { log_dir = "logs" } })
+
+    local devices, issues = Peripherals.discover(cfg, logger)
+
+    peripheral = oldPeripheral
+
+    assertEq(type(devices), "table", "devices deveria ser uma tabela")
+    assertEq(type(issues), "table", "issues deveria ser uma tabela")
+    assertEq(#issues > 0, true, "deveria ter reportado problemas por nao achar perifericos")
+  end },
   { "equivalencias_basicas", function()
     local eq = require("modules.equivalence").new({ cache = { get = function() end, set = function() end } })
     local list = eq:getEquivalents("minecraft:iron_chestplate")

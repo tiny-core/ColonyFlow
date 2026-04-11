@@ -3,6 +3,56 @@ local Util = require("lib.util")
 local Config = {}
 Config.__index = Config
 
+local DEFAULT_INI = [[
+[core]
+poll_interval_seconds=2
+ui_refresh_seconds=1
+log_level=INFO
+log_dir=logs
+log_max_files=10
+log_max_kb=256
+
+[peripherals]
+colony_integrator=colony_integrator_2
+me_bridge=me_bridge_2
+modem=modem_0
+monitor_requests=monitor_0
+monitor_status=monitor_1
+
+[minecolonies]
+pending_states_allow=
+completed_states_deny=done,completed,fulfilled,success
+
+[delivery]
+default_target_container=minecolonies:rack_0,entangled:tile_0
+export_mode=auto
+export_direction=up
+export_buffer_container=minecolonies:rack_1
+destination_cache_ttl_seconds=2
+
+[substitution]
+mode=safe
+vanilla_first=true
+allow_unmapped_mods=false
+tier_preference=highest
+
+[tiers]
+default_tool_tier=wood
+default_armor_tier=leather
+max_tool_tier=netherite
+max_armor_tier=netherite
+
+[cache]
+max_entries=2000
+default_ttl_seconds=5
+me_item_ttl_seconds=1
+me_list_ttl_seconds=1
+me_craftable_ttl_seconds=2
+
+[progression]
+enforce_building_gating=true
+]]
+
 local function parseIni(text)
   local data = {}
   local section = nil
@@ -30,6 +80,22 @@ local function parseIni(text)
   end
 
   return data
+end
+
+function Config.ensureDefaults(path)
+  if fs.exists(path) then
+    return { created = false }
+  end
+  local ok, err = pcall(function()
+    local h = fs.open(path, "w")
+    if not h then error("failed to open file for writing") end
+    h.write(DEFAULT_INI)
+    h.close()
+  end)
+  if not ok then
+    return { created = false, err = tostring(err) }
+  end
+  return { created = true, defaults = parseIni(DEFAULT_INI) }
 end
 
 function Config.load(path)

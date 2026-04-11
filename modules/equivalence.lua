@@ -5,7 +5,23 @@ local DB_PATH = "data/mappings.json"
 local Equivalence = {}
 Equivalence.__index = Equivalence
 
-local function loadDb()
+local function loadDb(state)
+  if not fs.exists(DB_PATH) then
+    local skeleton = {
+      items = {},
+      classes = {},
+      tier_overrides = {},
+      gating = { by_building_type = {} }
+    }
+    pcall(function()
+      Util.writeFile(DB_PATH, Util.jsonEncode(skeleton))
+    end)
+    if state and state.logger then
+      state.logger:info("data/mappings.json ausente; arquivo criado com estrutura mínima")
+    end
+    return skeleton
+  end
+
   local txt = Util.readFile(DB_PATH)
   local db = Util.jsonDecode(txt) or {}
   db.items = db.items or {}
@@ -17,10 +33,11 @@ local function loadDb()
 end
 
 function Equivalence.new(state)
+  local db = loadDb(state)
   local initialTime = fs.exists(DB_PATH) and fs.attributes(DB_PATH).modified or 0
   return setmetatable({
     state = state,
-    db = loadDb(),
+    db = db,
     lastModified = initialTime
   }, Equivalence)
 end
@@ -30,7 +47,7 @@ function Equivalence:reloadIfChanged()
   local currentModified = fs.attributes(DB_PATH).modified
   if currentModified > self.lastModified then
     self.lastModified = currentModified
-    self.db = loadDb()
+    self.db = loadDb(self.state)
     if self.state and self.state.logger then
       self.state.logger:info("Mapeamentos recarregados automaticamente (hot-reload)")
     end
@@ -38,7 +55,7 @@ function Equivalence:reloadIfChanged()
 end
 
 function Equivalence:reload()
-  self.db = loadDb()
+  self.db = loadDb(self.state)
 end
 
 function Equivalence:getItemMeta(name)

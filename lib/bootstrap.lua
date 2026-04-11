@@ -9,8 +9,21 @@ local UI = require("components.ui")
 local M = {}
 
 function M.run()
+  local ensure = Config.ensureDefaults("config.ini")
   local cfg = Config.load("config.ini")
   local logger = Logger.new(cfg)
+
+  if ensure.err then
+    logger:error("Erro ao criar config.ini padrão: " .. ensure.err)
+  elseif ensure.created then
+    logger:info("config.ini criado com defaults")
+    for section, keys in pairs(ensure.defaults) do
+      for key, value in pairs(keys) do
+        logger:info("Default aplicado", { section = section, key = key, value = value })
+      end
+    end
+  end
+
   logger:info("Inicializando sistema...")
 
   local cache = Cache.new({
