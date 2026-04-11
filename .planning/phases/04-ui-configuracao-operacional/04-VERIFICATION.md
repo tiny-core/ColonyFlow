@@ -1,6 +1,6 @@
 ---
 status: passed
-phase: 04-ui-configura-o-operacional
+phase: 04-ui-configuracao-operacional
 started: 2026-04-09T00:00:00Z
 updated: 2026-04-09T00:00:00Z
 ---

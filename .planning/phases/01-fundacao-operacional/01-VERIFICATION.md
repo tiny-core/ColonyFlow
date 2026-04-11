@@ -1,11 +1,11 @@
 ---
-phase: 01-funda-o-operacional
+phase: 01-fundacao-operacional
 verified: "2026-04-05T16:41:22.824Z"
 status: passed
 score: 3/3 must-haves verified
 ---
 
-# Phase 1: funda-o-operacional — Verification
+# Phase 1: fundacao-operacional — Verification
 
 ## Observable Truths
 
@@ -20,14 +20,14 @@ score: 3/3 must-haves verified
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
 | `.planning/ROADMAP.md` | Formato padrão do GSD (Phases + Phase Details + Progress) | passed | Migrado e validado por `roadmap analyze` |
-| `.planning/phases/01-funda-o-operacional/01-01-PLAN.md` | Frontmatter válido + tasks | passed | `frontmatter validate` + `verify plan-structure` OK |
-| `.planning/phases/01-funda-o-operacional/01-01-SUMMARY.md` | Summary verificável | passed | `verify-summary` OK |
+| `.planning/phases/01-fundacao-operacional/01-01-PLAN.md` | Frontmatter válido + tasks | passed | `frontmatter validate` + `verify plan-structure` OK |
+| `.planning/phases/01-fundacao-operacional/01-01-SUMMARY.md` | Summary verificável | passed | `verify-summary` OK |
 
 ## Key Link Verification
 
 | From | To | Via | Status | Details |
 |------|----|----|--------|---------|
-| `.planning/ROADMAP.md` | `.planning/phases/01-funda-o-operacional/01-01-PLAN.md` | Plans: 01-01 | passed | Link presente em Phase 1 |
+| `.planning/ROADMAP.md` | `.planning/phases/01-fundacao-operacional/01-01-PLAN.md` | Plans: 01-01 | passed | Link presente em Phase 1 |
 
 ## Requirements Coverage
 

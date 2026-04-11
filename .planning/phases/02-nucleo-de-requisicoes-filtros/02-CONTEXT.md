@@ -64,7 +64,7 @@ Nenhuma — decisões acima travadas.
 - `.planning/ROADMAP.md` — definição da Fase 2 (goal, inclui e success criteria)
 - `.planning/REQUIREMENTS.md` — requisitos MC-01/02, DEL-01/02/04, EQ-01/02, TIER-01/02, CACHE-02, CFG-03
 - `.planning/PROJECT.md` — visão, constraints e decisões globais (logs PT, cache TTL, operação autônoma)
-- `.planning/phases/01-funda-o-operacional/01-CONTEXT.md` — decisões travadas da base (logs, cache, estrutura)
+- `.planning/phases/01-fundacao-operacional/01-CONTEXT.md` — decisões travadas da base (logs, cache, estrutura)
 
 ### Banco de mapeamentos (tiers/equivalências/allowlist)
 - `data/mappings.json` — fonte de classes, tiers, equivalents e allowlist/editável via CLI
@@ -120,5 +120,5 @@ None — discussion stayed within phase scope
 
 ---
 
-*Phase: 02-n-cleo-de-requisi-es-filtros*
+*Phase: 02-nucleo-de-requisicoes-filtros*
 *Context gathered: 2026-04-05*

@@ -55,9 +55,9 @@ Tornar o sistema operável em produção com:
 - `.planning/ROADMAP.md` — definição da Fase 4 (goal, inclui e success criteria)
 - `.planning/REQUIREMENTS.md` — requisitos UI-01/02/03, CFG-04, EQ-04
 - `.planning/PROJECT.md` — constraints (logs PT, operação autônoma, dual-monitor)
-- `.planning/phases/01-funda-o-operacional/01-CONTEXT.md` — decisões globais (logs/cache/estrutura)
-- `.planning/phases/02-n-cleo-de-requisi-es-filtros/02-CONTEXT.md` — pedido vs escolhido, equivalências auditáveis
-- `.planning/phases/03-craft-entrega-com-progress-o/03-CONTEXT.md` — estados operacionais e progressão (gating/retry)
+- `.planning/phases/01-fundacao-operacional/01-CONTEXT.md` — decisões globais (logs/cache/estrutura)
+- `.planning/phases/02-nucleo-de-requisicoes-filtros/02-CONTEXT.md` — pedido vs escolhido, equivalências auditáveis
+- `.planning/phases/03-craft-entrega-com-progressao/03-CONTEXT.md` — estados operacionais e progressão (gating/retry)
 
 ### UI (monitor/terminal)
 - `components/ui.lua` — baseline atual de dual-monitor + paginação automática (ponto de evolução da Fase 4)
@@ -109,5 +109,5 @@ None — discussion stayed within phase scope
 
 ---
 
-*Phase: 04-ui-configura-o-operacional*
+*Phase: 04-ui-configuracao-operacional*
 *Context gathered: 2026-04-09*

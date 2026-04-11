@@ -1,11 +1,11 @@
 ---
-phase: 02-n-cleo-de-requisi-es-filtros
+phase: 02-nucleo-de-requisicoes-filtros
 verified: "2026-04-05T00:00:00.000Z"
 status: pending
 score: 0/5 must-haves verified
 ---
 
-# Phase 2: n-cleo-de-requisi-es-filtros — Verification
+# Phase 2: nucleo-de-requisicoes-filtros — Verification
 
 ## Observable Truths
 

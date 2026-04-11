@@ -1,5 +1,5 @@
 ---
-phase: 03-craft-entrega-com-progress-o
+phase: 03-craft-entrega-com-progressao
 plan: 01
 subsystem: "craft-delivery"
 tags: [cc-tweaked, advanced-peripherals, ae2, minecolonies, delivery, gating, gsd]

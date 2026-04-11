@@ -1,5 +1,5 @@
 ---
-phase: 02-n-cleo-de-requisi-es-filtros
+phase: 02-nucleo-de-requisicoes-filtros
 plan: 01
 subsystem: "requests-core"
 tags: [cc-tweaked, minecolonies, filters, tiers, equivalence, gsd]

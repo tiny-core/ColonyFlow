@@ -1,11 +1,11 @@
 ---
-phase: 03-craft-entrega-com-progress-o
+phase: 03-craft-entrega-com-progressao
 verified: "2026-04-05T18:00:00.000Z"
 status: human_needed
 score: 4/5 must-haves verified
 ---
 
-# Phase 3: craft-entrega-com-progress-o — Verification
+# Phase 3: craft-entrega-com-progressao — Verification
 
 ## Observable Truths
 

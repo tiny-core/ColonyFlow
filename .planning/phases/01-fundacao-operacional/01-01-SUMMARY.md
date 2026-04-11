@@ -1,5 +1,5 @@
 ---
-phase: 01-funda-o-operacional
+phase: 01-fundacao-operacional
 plan: 01
 subsystem: "foundation"
 tags: [cc-tweaked, minecolonies, ae2, advanced-peripherals, gsd]
@@ -9,7 +9,7 @@ tech-stack:
   added: [Lua (CC: Tweaked)]
   patterns: [módulos por responsabilidade, logging estruturado, cache TTL, descoberta de periféricos]
 key-files:
-  created: [.planning/phases/01-funda-o-operacional/01-CONTEXT.md, .planning/phases/01-funda-o-operacional/01-01-PLAN.md]
+  created: [.planning/phases/01-fundacao-operacional/01-CONTEXT.md, .planning/phases/01-fundacao-operacional/01-01-PLAN.md]
   modified: [.planning/ROADMAP.md]
 key-decisions:
   - "Adotar ROADMAP no formato padrão do GSD para permitir phase-plan-index/phase complete."
@@ -40,8 +40,8 @@ completed: 2026-04-05
 
 ## Files Created/Modified
 
-- `.planning/phases/01-funda-o-operacional/01-CONTEXT.md` - Contexto e decisões travadas da fase 01
-- `.planning/phases/01-funda-o-operacional/01-01-PLAN.md` - Plano executável (retroativo) para fundação operacional
+- `.planning/phases/01-fundacao-operacional/01-CONTEXT.md` - Contexto e decisões travadas da fase 01
+- `.planning/phases/01-fundacao-operacional/01-01-PLAN.md` - Plano executável (retroativo) para fundação operacional
 - `.planning/ROADMAP.md` - Roadmap migrado para formato compatível com ferramentas GSD
 
 ## Decisions & Deviations

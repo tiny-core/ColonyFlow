@@ -53,8 +53,8 @@ Nenhuma — decisões acima travadas.
 - `.planning/ROADMAP.md` — definição da Fase 3 (goal, inclui e success criteria)
 - `.planning/REQUIREMENTS.md` — requisitos ME-02/03/04, DEL-03, EQ-03, TIER-03, MC-03
 - `.planning/PROJECT.md` — constraints (operação autônoma, logs PT, cache TTL, estrutura)
-- `.planning/phases/01-funda-o-operacional/01-CONTEXT.md` — decisões globais da base (logs, cache, estrutura)
-- `.planning/phases/02-n-cleo-de-requisi-es-filtros/02-CONTEXT.md` — decisões sobre escolha de candidato, faltante real e destino padrão
+- `.planning/phases/01-fundacao-operacional/01-CONTEXT.md` — decisões globais da base (logs, cache, estrutura)
+- `.planning/phases/02-nucleo-de-requisicoes-filtros/02-CONTEXT.md` — decisões sobre escolha de candidato, faltante real e destino padrão
 
 ### Configuração e dados
 - `config.ini` — defaults operacionais (inclui estados e destino padrão)
@@ -104,5 +104,5 @@ None — discussion stayed within phase scope
 
 ---
 
-*Phase: 03-craft-entrega-com-progress-o*
+*Phase: 03-craft-entrega-com-progressao*
 *Context gathered: 2026-04-05*

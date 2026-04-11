@@ -1,6 +1,6 @@
 ---
 phase: 03
-slug: craft-entrega-com-progress-o
+slug: craft-entrega-com-progressao
 status: draft
 nyquist_compliant: false
 wave_0_complete: true

@@ -1,6 +1,6 @@
 ---
 status: partial
-phase: 03-craft-entrega-com-progress-o
+phase: 03-craft-entrega-com-progressao
 source: [03-VERIFICATION.md]
 started: "2026-04-05T18:00:00.000Z"
 updated: "2026-04-06T21:45:00.000Z"

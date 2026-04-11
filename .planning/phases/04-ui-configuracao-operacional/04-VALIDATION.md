@@ -1,4 +1,4 @@
-# Phase 04: ui-configura-o-operacional - Nyquist Validation
+# Phase 04: ui-configuracao-operacional - Nyquist Validation
 
 **Date:** 2026-04-09
 **Status:** Generated
