@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v6.4
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 08 executed
+status: executing
+stopped_at: Phase 08 complete
 last_updated: "2026-04-12T00:00:00Z"
-last_activity: 2026-04-11
+last_activity: 2026-04-12
 progress:
   total_phases: 9
   completed_phases: 8
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColonies e entrega do item correto, craftando somente o necessário.
-**Current focus:** Phase 08 — mapping-v2
+**Current focus:** Phase 09 — instalador-git
 
 ## Current Position
 
 Phase: 08
 Plan: 08-01
-Status: Phase complete — ready for verification
-Last activity: 2026-04-11
+Status: Phase complete
+Last activity: 2026-04-12
 
 Progress: [███████░░░] 67%
 

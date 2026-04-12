@@ -258,5 +258,5 @@ Plans:
 | 5. Testes + Endurecimento                 | 1/1            | Complete    | 2026-04-10 |
 | 6. Cache + Robustez Operacional           | 1/1            | Complete    | 2026-04-11 |
 | 7. Auto-Setup + Compatibilidade MP        | 0/1            | Not started | -          |
-| 8. Mapping v2 (Estrutura + Comportamento) | 1/1            | Verifying   | 2026-04-12 |
+| 8. Mapping v2 (Estrutura + Comportamento) | 1/1            | Complete    | 2026-04-12 |
 | 9. Instalador In-Game (Git)               | 0/1            | Not started | -          |
