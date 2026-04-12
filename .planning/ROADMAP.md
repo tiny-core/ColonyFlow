@@ -245,7 +245,7 @@ Inclui:
 
 Plans:
 
-- [ ] 09-01: Implementar instalador/atualizador via Git raw
+- [x] 09-01: Implementar instalador/atualizador via Git raw
 
 ## Progress
 
