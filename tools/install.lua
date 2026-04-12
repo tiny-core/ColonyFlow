@@ -1,6 +1,6 @@
 local args = { ... }
 
-local DEFAULT_BASE_URL = "https://raw.githubusercontent.com/OWNER/REPO/"
+local DEFAULT_BASE_URL = "https://raw.githubusercontent.com/tiny-core/ColonyFlow/"
 local DEFAULT_REF = "main"
 local DEFAULT_MANIFEST_PATH = "manifest.json"
 
