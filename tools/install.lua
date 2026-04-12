@@ -64,64 +64,6 @@ local function httpAvailable()
   return type(http) == "table" and type(http.get) == "function"
 end
 
-local function parseOverrides(argv, startIdx)
-  local o = {}
-  local i = startIdx or 1
-  while i <= #argv do
-    local a = tostring(argv[i] or "")
-    if a == "--base-url" then
-      local v = argv[i + 1]
-      if v == nil then return nil, "Faltou valor para --base-url" end
-      o.base_url = tostring(v)
-      i = i + 2
-    elseif a == "--repo" then
-      local v = argv[i + 1]
-      if v == nil then return nil, "Faltou valor para --repo" end
-      o.repo = tostring(v)
-      i = i + 2
-    elseif a == "--ref" then
-      local v = argv[i + 1]
-      if v == nil then return nil, "Faltou valor para --ref" end
-      o.ref = tostring(v)
-      i = i + 2
-    elseif a == "--manifest" then
-      local v = argv[i + 1]
-      if v == nil then return nil, "Faltou valor para --manifest" end
-      o.manifest_path = tostring(v)
-      i = i + 2
-    elseif a == "" then
-      i = i + 1
-    else
-      return nil, "Flag desconhecida: " .. a
-    end
-  end
-  return o
-end
-
-local function applyOverrides(cfg, overrides)
-  if type(overrides) ~= "table" then return false end
-  local changed = false
-
-  if overrides.repo and trim(overrides.repo) ~= "" then
-    cfg.base_url = "https://raw.githubusercontent.com/" .. trim(overrides.repo) .. "/"
-    changed = true
-  end
-  if overrides.base_url and trim(overrides.base_url) ~= "" then
-    cfg.base_url = trim(overrides.base_url)
-    changed = true
-  end
-  if overrides.ref and trim(overrides.ref) ~= "" then
-    cfg.ref = trim(overrides.ref)
-    changed = true
-  end
-  if overrides.manifest_path and trim(overrides.manifest_path) ~= "" then
-    cfg.manifest_path = trim(overrides.manifest_path)
-    changed = true
-  end
-
-  return changed
-end
-
 local function doctor(cfg)
   print("Instalador - Doctor")
   print("Hora UTC: " .. nowUtc())
@@ -133,15 +75,8 @@ local function doctor(cfg)
     return false
   end
 
-  if cfg.base_url == DEFAULT_BASE_URL then
-    print("ATENÇÃO: base_url ainda está no placeholder padrão.")
-    print("Ação: edite data/install.json e configure base_url para o raw do seu repositório, ou rode:")
-    print("  tools/install.lua doctor --repo OWNER/REPO --ref main")
-    return false
-  end
-
-  local base = normalizeBaseUrl(cfg.base_url)
-  local ref = trim(cfg.ref or DEFAULT_REF)
+  local base = normalizeBaseUrl(DEFAULT_BASE_URL)
+  local ref = DEFAULT_REF
   local manifestPath = trim(cfg.manifest_path or DEFAULT_MANIFEST_PATH)
   local manifestUrl = base .. ref .. "/" .. manifestPath
 
@@ -168,8 +103,6 @@ local function loadOrCreateInstallConfig()
   local cfg = jsonDecode(txt) or {}
   if type(cfg) ~= "table" then cfg = {} end
 
-  if trim(cfg.base_url) == "" then cfg.base_url = DEFAULT_BASE_URL end
-  if trim(cfg.ref) == "" then cfg.ref = DEFAULT_REF end
   if trim(cfg.manifest_path) == "" then cfg.manifest_path = DEFAULT_MANIFEST_PATH end
 
   if not txt then
@@ -246,8 +179,8 @@ local function validateManifest(manifest)
 end
 
 local function loadManifest(cfg)
-  local base = normalizeBaseUrl(cfg.base_url)
-  local ref = trim(cfg.ref or DEFAULT_REF)
+  local base = normalizeBaseUrl(DEFAULT_BASE_URL)
+  local ref = DEFAULT_REF
   local manifestPath = trim(cfg.manifest_path or DEFAULT_MANIFEST_PATH)
   local url = base .. ref .. "/" .. manifestPath
 
@@ -404,13 +337,8 @@ local function deleteOrphans(paths)
   end
 end
 
-local function installOrUpdate(mode, overrides)
+local function installOrUpdate(mode)
   local cfg = loadOrCreateInstallConfig()
-  local changed = applyOverrides(cfg, overrides)
-  if changed then
-    writeFile("data/install.json", jsonEncode(cfg))
-    print("Atualizado: data/install.json")
-  end
 
   if mode == "doctor" then
     local ok = doctor(cfg)
@@ -421,16 +349,6 @@ local function installOrUpdate(mode, overrides)
   if not httpAvailable() then
     print("ERRO: HTTP API indisponível (http.get não existe).")
     print("Ação: habilite HTTP no CC: Tweaked (config do mod/servidor) e tente novamente.")
-    setExitCode(1)
-    return 1
-  end
-
-  if cfg.base_url == DEFAULT_BASE_URL then
-    print("ERRO: base_url ainda está no placeholder padrão.")
-    print("Ação: configure data/install.json ou passe --repo/--base-url neste comando.")
-    print("Exemplos:")
-    print("  tools/install.lua " .. mode .. " --repo OWNER/REPO --ref main")
-    print("  tools/install.lua " .. mode .. " --base-url https://raw.githubusercontent.com/OWNER/REPO/ --ref main")
     setExitCode(1)
     return 1
   end
@@ -549,23 +467,13 @@ local sub = trim(args[1])
 if sub == "" then sub = "doctor" end
 if sub ~= "doctor" and sub ~= "install" and sub ~= "update" then
   print("Uso:")
-  print("  tools/install.lua doctor [--repo OWNER/REPO] [--ref main] [--base-url URL] [--manifest manifest.json]")
-  print("  tools/install.lua install [--repo OWNER/REPO] [--ref main] [--base-url URL] [--manifest manifest.json]")
-  print("  tools/install.lua update [--repo OWNER/REPO] [--ref main] [--base-url URL] [--manifest manifest.json]")
+  print("  tools/install.lua doctor")
+  print("  tools/install.lua install")
+  print("  tools/install.lua update")
   return
 end
 
-local overrides, oErr = parseOverrides(args, 2)
-if not overrides then
-  print("ERRO: " .. tostring(oErr))
-  print("")
-  print("Uso:")
-  print("  tools/install.lua " .. sub .. " [--repo OWNER/REPO] [--ref main] [--base-url URL] [--manifest manifest.json]")
-  setExitCode(1)
-  return
-end
-
-local code = installOrUpdate(sub, overrides)
+local code = installOrUpdate(sub)
 if code ~= 0 then
   print("Falha (" .. tostring(sub) .. "). Veja mensagens acima.")
   setExitCode(code)

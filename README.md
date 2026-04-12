@@ -55,28 +55,19 @@ O instalador suporta `doctor`, `install` e `update`. Ele baixa os arquivos defin
 No computador vazio:
 
 ```bash
-wget run https://raw.githubusercontent.com/OWNER/REPO/main/tools/install.lua install --repo OWNER/REPO --ref main
+wget run https://raw.githubusercontent.com/tiny-core/ColonyFlow/main/tools/install.lua install
 ```
 
-- Substitua `OWNER/REPO` pelo repositório.
-- Se você usa outra branch/tag/commit, troque `--ref`.
+O instalador sempre baixa do repositório oficial `tiny-core/ColonyFlow` no branch `main`.
 
 ### 2) Configuração do instalador (persistida)
 
-O comando acima grava/atualiza:
+O comando acima grava/cria:
 
 - `data/install.json` (config do instalador)
 - `data/version.json` (ref instalada + lista de arquivos gerenciados)
 
-Também é possível configurar manualmente `data/install.json`:
-
-```json
-{
-  "base_url": "https://raw.githubusercontent.com/OWNER/REPO/",
-  "ref": "main",
-  "manifest_path": "manifest.json"
-}
-```
+`data/install.json` existe apenas para guardar configurações internas do instalador (ex.: caminho do manifesto).
 
 ### 3) Diagnóstico
 
@@ -130,12 +121,11 @@ startup map
 
 Os testes manuais do instalador estão em:
 
-- [.planning/phases/09-instalador-git/09-VERIFICATION.md](file:///d:/Game/Minecraft/Instances/All%20the%20Mods%2010%20-%20ATM10/saves/Tests/computercraft/computer/0/.planning/phases/09-instalador-git/09-VERIFICATION.md)
-- [.planning/phases/09-instalador-git/09-HUMAN-UAT.md](file:///d:/Game/Minecraft/Instances/All%20the%20Mods%2010%20-%20ATM10/saves/Tests/computercraft/computer/0/.planning/phases/09-instalador-git/09-HUMAN-UAT.md)
+- [.planning/phases/09-instalador-git/09-VERIFICATION.md](.planning/phases/09-instalador-git/09-VERIFICATION.md)
+- [.planning/phases/09-instalador-git/09-HUMAN-UAT.md](.planning/phases/09-instalador-git/09-HUMAN-UAT.md)
 
 ## Desenvolvimento / Contribuição
 
 - Preferir mudanças pequenas e commits atômicos.
 - Manter mensagens e logs em português.
 - Rodar `startup test` após mudanças em módulos críticos.
-
