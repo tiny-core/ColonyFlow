@@ -260,3 +260,13 @@ Plans:
 | 7. Auto-Setup + Compatibilidade MP        | 0/1            | Not started | -          |
 | 8. Mapping v2 (Estrutura + Comportamento) | 1/1            | Complete    | 2026-04-12 |
 | 9. Instalador In-Game (Git)               | 0/1            | Not started | -          |
+
+### Phase 10: Config CLI (editar config.ini e perifericos)
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 9
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 10 to break down)

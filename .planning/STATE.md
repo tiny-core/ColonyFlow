@@ -65,6 +65,10 @@ Recent decisions affecting current work:
 
 None yet.
 
+### Roadmap Evolution
+
+- Phase 10 added: Config CLI (editar config.ini e perifericos)
+
 ## Session Continuity
 
 Last session: 2026-04-12T21:24:36.845Z
