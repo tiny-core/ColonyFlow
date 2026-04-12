@@ -23,7 +23,12 @@ end
 local failures = {}
 
 if type(package) == "table" and type(package.path) == "string" then
-  package.path = "/?.lua;/?/init.lua;" .. package.path
+  local cwd = shell and shell.dir() or ""
+  if cwd == "" then
+    package.path = "/?.lua;/?/init.lua;" .. package.path
+  else
+    package.path = "/" .. cwd .. "/?.lua;/" .. cwd .. "/?/init.lua;/?.lua;/?/init.lua;" .. package.path
+  end
 end
 
 local function runTest(name, fn)
@@ -91,6 +96,7 @@ end
 
 local tests = {
   { "config_ini_autogerado_com_defaults", function()
+    local Config = require("lib.config")
     local oldFs = fs
     local writtenContent = nil
     fs = {
@@ -104,7 +110,6 @@ local tests = {
         end
       end
     }
-    local Config = require("lib.config")
     local res = Config.ensureDefaults("config.ini")
     fs = oldFs
 
@@ -114,6 +119,8 @@ local tests = {
     assertEq(string.match(writtenContent, "log_level=INFO") ~= nil, true, "deveria conter log_level=INFO")
   end },
   { "mappings_json_skeleton_quando_ausente", function()
+    local Equivalence = require("modules.equivalence")
+    
     local oldFsExists = fs.exists
     local oldFsOpen = fs.open
     local oldFsMakeDir = fs.makeDir
@@ -134,7 +141,6 @@ local tests = {
     fs.isDir = function() return true end
     fs.getDir = function() return "data" end
 
-    local Equivalence = require("modules.equivalence")
     local eq = Equivalence.new({ logger = { info = function() end } })
 
     fs.exists = oldFsExists
@@ -144,11 +150,13 @@ local tests = {
     fs.getDir = oldFsGetDir
 
     assertEq(type(writtenContent), "string", "deveria ter escrito algo")
-    assertEq(string.match(writtenContent, '"items"') ~= nil, true, "deveria conter items")
+    assertEq(string.match(writtenContent, '"rules"') ~= nil, true, "deveria conter rules")
+    assertEq(string.match(writtenContent, '"tier_overrides"') ~= nil, true, "deveria conter tier_overrides")
     assertEq(string.match(writtenContent, '"gating"') ~= nil, true, "deveria conter gating")
     assertEq(string.match(writtenContent, '"by_building_type"') ~= nil, true, "deveria conter by_building_type")
   end },
   { "peripherals_discover_nao_crasha_em_erro", function()
+    local Peripherals = require("modules.peripherals")
     local oldPeripheral = peripheral
     peripheral = {
       find = function() error("fake find error") end,
@@ -157,8 +165,6 @@ local tests = {
       isPresent = function() error("fake isPresent error") end,
       getName = function() error("fake getName error") end
     }
-
-    local Peripherals = require("modules.peripherals")
     local logger = { warn = function() end, info = function() end, error = function() end }
 
     local cfg = makeCfg({ peripherals = {}, core = { log_dir = "logs" } })
@@ -210,9 +216,9 @@ local tests = {
   { "tier_gating", function()
     local eqMod = require("modules.equivalence").new({ cache = { get = function() end, set = function() end } })
     local tier = require("modules.tier").new({}, eqMod)
-    assertEq(tier:isTierAllowed("TOOL_PICKAXE", "iron", "diamond"), true)
-    assertEq(tier:isTierAllowed("TOOL_PICKAXE", "netherite", "diamond"), false)
-    assertEq(tier:isTierAllowed("ARMOR_CHEST", "diamond", "iron"), false)
+    assertEq(tier:isTierAllowed("tool_pickaxe", "iron", "diamond"), true)
+    assertEq(tier:isTierAllowed("tool_pickaxe", "netherite", "diamond"), false)
+    assertEq(tier:isTierAllowed("armor_chestplate", "diamond", "iron"), false)
   end
   },
   { "minecolonies_id_estavel_sem_rid", function()
@@ -1364,6 +1370,135 @@ local tests = {
     assertEq(c1, true)
     assertEq(c2, true)
     assertEq(calls, 1, "cache deveria evitar chamada duplicada")
+  end
+  },
+  { "mapping_v2_carrega_regras_por_item", function()
+    local Equivalence = require("modules.equivalence")
+    local oldFs = fs
+    local json = textutils.serializeJSON({
+      version = 2,
+      rules = {
+        { selector = "mod:item", kind = "item", class = "tool_pickaxe", prefer_equivalent = true },
+      },
+      items = {},
+      classes = {},
+      tier_overrides = {},
+      gating = { by_building_type = {} }
+    }, { pretty = true })
+
+    fs = {
+      exists = function(path) return path == "data/mappings.json" end,
+      open = function(path, mode)
+        if path ~= "data/mappings.json" or mode ~= "r" then return nil end
+        return {
+          readAll = function() return json end,
+          close = function() end
+        }
+      end,
+      isDir = function() return true end,
+      makeDir = function() end,
+      getDir = function() return "data" end,
+      attributes = function() return { modified = 1 } end,
+    }
+
+    local eq = Equivalence.new({ logger = { warn = function() end, info = function() end } })
+    local cls = eq:getClassFor({ name = "mod:item", tags = {} })
+    local pref, has = eq:getPreferEquivalentFor({ name = "mod:item", tags = {} })
+
+    fs = oldFs
+
+    assertEq(cls, "tool_pickaxe")
+    assertEq(pref, true)
+    assertEq(has, true)
+  end
+  },
+  { "mapping_v2_carrega_regras_por_tag", function()
+    local Equivalence = require("modules.equivalence")
+    local oldFs = fs
+    local json = textutils.serializeJSON({
+      version = 2,
+      rules = {
+        { selector = "#forge:tools/pickaxes", kind = "tag", class = "tool_pickaxe" },
+      },
+      items = {},
+      classes = {},
+      tier_overrides = {},
+      gating = { by_building_type = {} }
+    }, { pretty = true })
+
+    fs = {
+      exists = function(path) return path == "data/mappings.json" end,
+      open = function(path, mode)
+        if path ~= "data/mappings.json" or mode ~= "r" then return nil end
+        return {
+          readAll = function() return json end,
+          close = function() end
+        }
+      end,
+      isDir = function() return true end,
+      makeDir = function() end,
+      getDir = function() return "data" end,
+      attributes = function() return { modified = 1 } end,
+    }
+
+    local eq = Equivalence.new({ logger = { warn = function() end, info = function() end } })
+    local cls = eq:getClassFor({ name = "x:y", tags = { "forge:tools/pickaxes" } })
+    local allowed = eq:isAllowedFor({ name = "x:y", tags = { "forge:tools/pickaxes" } })
+
+    fs = oldFs
+
+    assertEq(cls, "tool_pickaxe")
+    assertEq(allowed, true)
+  end
+  },
+  { "prefer_equivalent_default_e_override", function()
+    local Equivalence = require("modules.equivalence")
+    local oldFs = fs
+    local json = textutils.serializeJSON({
+      version = 2,
+      rules = {
+        { selector = "a:b", kind = "item", class = "armor_chestplate" },
+        { selector = "c:d", kind = "item", class = "armor_chestplate", prefer_equivalent = true },
+      },
+      tier_overrides = {},
+      gating = { by_building_type = {} }
+    }, { pretty = true })
+
+    fs = {
+      exists = function(path) return path == "data/mappings.json" end,
+      open = function(path, mode)
+        if path ~= "data/mappings.json" or mode ~= "r" then return nil end
+        return {
+          readAll = function() return json end,
+          close = function() end
+        }
+      end,
+      isDir = function() return true end,
+      makeDir = function() end,
+      getDir = function() return "data" end,
+      attributes = function() return { modified = 1 } end,
+    }
+
+    local eq = Equivalence.new({ logger = { warn = function() end, info = function() end } })
+
+    local p1, h1 = eq:getPreferEquivalentFor({ name = "a:b" })
+    assertEq(p1, false)
+    assertEq(h1, true)
+
+    local p2, h2 = eq:getPreferEquivalentFor({ name = "c:d" })
+    assertEq(p2, true)
+    assertEq(h2, true)
+
+    local p3, h3 = eq:getPreferEquivalentFor({ name = "x:y" })
+
+    fs = oldFs
+
+    assertEq(p1, false)
+    assertEq(h1, true)
+    assertEq(p2, true)
+    assertEq(h2, true)
+    assertEq(p3, false)
+    assertEq(h3, false)
   end
   },
 }

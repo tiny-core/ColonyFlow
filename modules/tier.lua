@@ -44,9 +44,6 @@ function Tier:infer(item)
   local override = self.eq and self.eq:getTierOverride(name) or nil
   if override then return override, "override" end
 
-  local meta = self.eq and self.eq:getItemMeta(name) or nil
-  if meta and meta.tier then return meta.tier, "db" end
-
   local t1 = tierFromTags(item.tags)
   if t1 then return t1, "tags" end
 
@@ -58,7 +55,7 @@ end
 
 function Tier:isTierAllowed(className, tier, maxTier)
   if not tier or not maxTier then return false end
-  if type(className) == "string" and className:match("^ARMOR_") then
+  if type(className) == "string" and className:match("^armor_") then
     return (TIERS_ARMOR[tier] or 0) <= (TIERS_ARMOR[maxTier] or 0)
   end
   return (TIERS_TOOL[tier] or 0) <= (TIERS_TOOL[maxTier] or 0)

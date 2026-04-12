@@ -21,9 +21,17 @@ end
 local function guessClass(name)
   if not name then return nil end
   local n = name:lower()
-  if n:find("chestplate", 1, true) or n:find("jetpack", 1, true) then return "ARMOR_CHEST" end
-  if n:find("helmet", 1, true) or n:find("leggings", 1, true) or n:find("boots", 1, true) then return "ARMOR_CHEST" end
-  if n:find("pickaxe", 1, true) then return "TOOL_PICKAXE" end
+  if n:find("helmet", 1, true) then return "armor_helmet" end
+  if n:find("chestplate", 1, true) or n:find("jetpack", 1, true) then return "armor_chestplate" end
+  if n:find("leggings", 1, true) then return "armor_leggings" end
+  if n:find("boots", 1, true) then return "armor_boots" end
+  if n:find("pickaxe", 1, true) then return "tool_pickaxe" end
+  if n:find("shovel", 1, true) then return "tool_shovel" end
+  if n:find("axe", 1, true) then return "tool_axe" end
+  if n:find("hoe", 1, true) then return "tool_hoe" end
+  if n:find("sword", 1, true) then return "tool_sword" end
+  if n:find("bow", 1, true) then return "tool_bow" end
+  if n:find("shield", 1, true) then return "tool_shield" end
   return nil
 end
 
@@ -42,7 +50,7 @@ local function tierRank(eq, className, tierName)
   if idx then return idx end
   local tool = { wood = 1, stone = 2, iron = 3, diamond = 4, netherite = 5 }
   local armor = { leather = 1, iron = 2, diamond = 3, netherite = 4 }
-  if type(className) == "string" and className:match("^ARMOR_") then return armor[tierName] end
+  if type(className) == "string" and className:match("^armor_") then return armor[tierName] end
   return tool[tierName]
 end
 
@@ -228,7 +236,7 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
   local blocked = {}
   for _, it in ipairs(accepted) do
     if it and it.name then
-      local allowed = allowUnmapped or eq:isAllowed(it.name)
+      local allowed = allowUnmapped or (eq.isAllowedFor and eq:isAllowedFor(it) or eq:isAllowed(it.name))
       if allowed then
         table.insert(eligible, it)
       else
@@ -250,10 +258,9 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
         seen[it.name] = true
         table.insert(expanded, it)
 
-        local className = eq:getClass(it.name) or guessClass(it.name)
-        if className == "ARMOR_CHEST" then
-          local tierPrefix, piece = tostring(it.name):match(
-            "^minecraft:(leather|iron|diamond|netherite)_(helmet|chestplate|leggings|boots)$")
+        local className = (eq.getClassFor and eq:getClassFor(it) or eq:getClass(it.name)) or guessClass(it.name)
+        if type(className) == "string" and className:match("^armor_") then
+          local _, piece = tostring(it.name):match("^minecraft:(leather|iron|diamond|netherite)_(helmet|chestplate|leggings|boots)$")
           if piece then
             local tiers = { "leather", "iron", "diamond", "netherite" }
             for _, tName in ipairs(tiers) do
@@ -274,7 +281,7 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
   local blockedByCraft = {}
   local best, bestWhy, bestScore = nil, nil, -math.huge
   for idx, it in ipairs(eligible) do
-    local className = eq:getClass(it.name) or guessClass(it.name)
+    local className = (eq.getClassFor and eq:getClassFor(it) or eq:getClass(it.name)) or guessClass(it.name)
     local t, tierWhy = tier:infer({ name = it.name, tags = it.tags })
     local maxTier, maxTierResolved, maxTierSource = getMaxTier(eq, className, building, buildingResolved)
     if t then
@@ -301,7 +308,13 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
     if craftable == false then score = score - 5000 end
 
     local isVanilla = eq:isVanilla(it.name)
-    if vanillaFirst then
+    local preferEq, hasPrefer = false, false
+    if eq.getPreferEquivalentFor then
+      preferEq, hasPrefer = eq:getPreferEquivalentFor(it)
+    end
+    local vanillaFirstEff = vanillaFirst
+    if hasPrefer then vanillaFirstEff = not preferEq end
+    if vanillaFirstEff then
       if isVanilla then score = score + 100 end
     else
       if not isVanilla then score = score + 100 end
@@ -333,7 +346,13 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
       bestScore = score
       best = it
       bestWhy = {
-        policy = { vanilla_first = vanillaFirst, tier_preference = tierPref, allow_unmapped_mods = allowUnmapped },
+        policy = {
+          vanilla_first_cfg = vanillaFirst,
+          vanilla_first_effective = vanillaFirstEff,
+          prefer_equivalent = hasPrefer and preferEq or nil,
+          tier_preference = tierPref,
+          allow_unmapped_mods = allowUnmapped
+        },
         class = className,
         tier = t,
         tier_reason = tierWhy,

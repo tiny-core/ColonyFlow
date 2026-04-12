@@ -1,12 +1,17 @@
 {
-  "version": 1,
-  "classes": {},
-  "items": {},
-  "tier_overrides": {},
-  "gating": {
-    "by_building_type": {}
-  },
-  "notes": {
-    "warning": "Este arquivo é editável e será mesclado com regras internas. Use a CLI (startup map) para atualizar com segurança."
-  }
+    "tier_overrides": {
+        "mekanism:jetpack_armored": "iron"
+    },
+    "rules": [
+        {
+            "kind": "item",
+            "prefer_equivalent": true,
+            "class": "armor_chestplate",
+            "selector": "mekanism:jetpack_armored"
+        }
+    ],
+    "version": 2,
+    "gating": {
+        "by_building_type": {}
+    }
 }

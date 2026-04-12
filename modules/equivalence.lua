@@ -5,14 +5,92 @@ local DB_PATH = "data/mappings.json"
 local Equivalence = {}
 Equivalence.__index = Equivalence
 
+local CLASS_SET = {
+  armor_helmet = true,
+  armor_chestplate = true,
+  armor_leggings = true,
+  armor_boots = true,
+  tool_pickaxe = true,
+  tool_shovel = true,
+  tool_axe = true,
+  tool_hoe = true,
+  tool_sword = true,
+  tool_bow = true,
+  tool_shield = true,
+}
+
+local function normalizeClass(v)
+  if type(v) ~= "string" then return nil end
+  local s = tostring(v):lower()
+  s = s:gsub("[%s%-]+", "_")
+  if CLASS_SET[s] then return s end
+  return nil
+end
+
+local function normalizeTagKey(s)
+  if not s then return nil end
+  local t = tostring(s)
+  if t:sub(1, 1) == "#" then t = t:sub(2) end
+  return t
+end
+
+local function skeletonV2()
+  return {
+    version = 2,
+    rules = {},
+    tier_overrides = {},
+    gating = { by_building_type = {} }
+  }
+end
+
+local function normalizeDbShape(db)
+  if type(db) ~= "table" then db = {} end
+  local out = {
+    version = 2,
+    rules = {},
+    tier_overrides = type(db.tier_overrides) == "table" and db.tier_overrides or {},
+    gating = type(db.gating) == "table" and db.gating or { by_building_type = {} },
+  }
+  if type(out.gating.by_building_type) ~= "table" then out.gating.by_building_type = {} end
+  if type(db.rules) == "table" then
+    for i, v in ipairs(db.rules) do
+      out.rules[i] = v
+    end
+  end
+  return out
+end
+
+local function indexV2Rules(db)
+  db._rules_by_item = {}
+  db._rules_by_tag = {}
+  if type(db.rules) ~= "table" then return end
+  for _, r in ipairs(db.rules) do
+    if type(r) == "table" and type(r.selector) == "string" then
+      local selector = r.selector
+      local isTag = selector:sub(1, 1) == "#"
+      local kind = r.kind
+      if kind ~= "item" and kind ~= "tag" then
+        kind = isTag and "tag" or "item"
+        r.kind = kind
+      end
+      r.class = normalizeClass(r.class)
+      if kind == "tag" then
+        local key = normalizeTagKey(selector)
+        if key and key ~= "" then
+          db._rules_by_tag[key] = r
+        end
+      else
+        if selector ~= "" then
+          db._rules_by_item[selector] = r
+        end
+      end
+    end
+  end
+end
+
 local function loadDb(state)
   if not fs.exists(DB_PATH) then
-    local skeleton = {
-      items = {},
-      classes = {},
-      tier_overrides = {},
-      gating = { by_building_type = {} }
-    }
+    local skeleton = skeletonV2()
     pcall(function()
       Util.writeFile(DB_PATH, Util.jsonEncode(skeleton))
     end)
@@ -23,12 +101,18 @@ local function loadDb(state)
   end
 
   local txt = Util.readFile(DB_PATH)
-  local db = Util.jsonDecode(txt) or {}
-  db.items = db.items or {}
-  db.classes = db.classes or {}
-  db.tier_overrides = db.tier_overrides or {}
-  db.gating = db.gating or {}
-  db.gating.by_building_type = db.gating.by_building_type or {}
+  local ok, decoded = pcall(function()
+    return Util.jsonDecode(txt)
+  end)
+  local db = ok and decoded or nil
+  if type(db) ~= "table" then
+    if state and state.logger then
+      state.logger:warn("Falha ao ler data/mappings.json; usando defaults em memória", { err = tostring(decoded) })
+    end
+    db = skeletonV2()
+  end
+  db = normalizeDbShape(db)
+  indexV2Rules(db)
   return db
 end
 
@@ -59,7 +143,7 @@ function Equivalence:reload()
 end
 
 function Equivalence:getItemMeta(name)
-  return self.db.items[name]
+  return nil
 end
 
 function Equivalence:getTierOverride(name)
@@ -75,30 +159,68 @@ end
 function Equivalence:isAllowed(name)
   if not name then return false end
   if self:isVanilla(name) then return true end
-  return self.db.items[name] ~= nil
+  return self.db._rules_by_item and self.db._rules_by_item[name] ~= nil
 end
 
 function Equivalence:getClass(name)
-  local meta = self.db.items[name]
-  return meta and meta.class or nil
+  if not name then return nil end
+  return self:getClassFor({ name = name })
+end
+
+function Equivalence:getRuleForItem(name)
+  if not name then return nil end
+  return self.db._rules_by_item and self.db._rules_by_item[name] or nil
+end
+
+function Equivalence:getRuleForTags(tags)
+  if type(tags) ~= "table" then return nil end
+  if not self.db._rules_by_tag then return nil end
+  for _, t in ipairs(tags) do
+    if type(t) == "string" then
+      local key = normalizeTagKey(t)
+      local r = self.db._rules_by_tag[key]
+      if r then return r end
+    end
+  end
+  return nil
+end
+
+function Equivalence:getRuleFor(item)
+  if type(item) ~= "table" then return nil end
+  local r = item.name and self:getRuleForItem(item.name) or nil
+  if r then return r end
+  return self:getRuleForTags(item.tags)
+end
+
+function Equivalence:getClassFor(item)
+  if type(item) ~= "table" then return nil end
+  local r = self:getRuleFor(item)
+  return r and r.class or nil
+end
+
+function Equivalence:getPreferEquivalentFor(item)
+  local r = self:getRuleFor(item)
+  if not r then return false, false end
+  if r.prefer_equivalent == nil then return false, true end
+  return r.prefer_equivalent == true, true
+end
+
+function Equivalence:isAllowedFor(item)
+  if type(item) ~= "table" then return false end
+  local name = item.name
+  if not name then return false end
+  if self:isVanilla(name) then return true end
+  if self:getRuleForItem(name) then return true end
+  if self:getRuleForTags(item.tags) then return true end
+  return false
 end
 
 function Equivalence:getClassTiers(className)
-  local c = className and self.db.classes[className] or nil
-  local tiers = c and c.tiers or nil
-  if type(tiers) ~= "table" then return nil end
-  return tiers
+  return nil
 end
 
 function Equivalence:getEquivalents(name)
-  local meta = self.db.items[name]
-  local out = { name }
-  if meta and type(meta.equivalents) == "table" then
-    for _, eq in ipairs(meta.equivalents) do
-      if eq and eq ~= name then table.insert(out, eq) end
-    end
-  end
-  return out
+  return { name }
 end
 
 function Equivalence:getGatingMaxTier(buildingType, className)
