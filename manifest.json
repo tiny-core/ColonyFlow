@@ -1,0 +1,32 @@
+{
+  "manifest_version": 1,
+  "generated_utc": "2026-04-12T00:00:00Z",
+  "files": [
+    { "path": "startup.lua" },
+    { "path": "config.ini", "preserve": true },
+
+    { "path": "lib/bootstrap.lua" },
+    { "path": "lib/cache.lua" },
+    { "path": "lib/config.lua" },
+    { "path": "lib/logger.lua" },
+    { "path": "lib/util.lua" },
+
+    { "path": "components/ui.lua" },
+
+    { "path": "modules/engine.lua" },
+    { "path": "modules/equivalence.lua" },
+    { "path": "modules/inventory.lua" },
+    { "path": "modules/mapping_cli.lua" },
+    { "path": "modules/me.lua" },
+    { "path": "modules/minecolonies.lua" },
+    { "path": "modules/peripherals.lua" },
+    { "path": "modules/scheduler.lua" },
+    { "path": "modules/tier.lua" },
+
+    { "path": "tests/run.lua" },
+
+    { "path": "tools/install.lua" },
+
+    { "path": "data/mappings.json", "preserve": true }
+  ]
+}
