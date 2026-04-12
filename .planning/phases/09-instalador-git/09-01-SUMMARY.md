@@ -56,6 +56,7 @@ Each task was committed atomically:
 
 1. **Task 1: Definir manifesto remoto e política de arquivos gerenciados/preservados** - `95d0d4d` (feat)
 2. **Task 2: Implementar tools/install.lua (doctor/install/update) com update seguro e rollback** - `f527833` (feat)
+   - **Ajuste pós-task (bootstrap via args)** - `6d96962` (fix)
 3. **Task 3: Atualizar checklist de verificação da Fase 09** - `c9392dc` (docs)
 
 ## Files Created/Modified
@@ -68,7 +69,20 @@ Each task was committed atomically:
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+### Auto-fixed Issues
+
+**1. [Rule 2 - Missing Critical] Bootstrap configurável sem editar arquivos**
+- **Found during:** Pós-execução (revisão de sucesso do bootstrap)
+- **Issue:** Em computador limpo, `install/update` dependiam de `data/install.json` previamente editado; isso quebra o “1-liner” de bootstrap.
+- **Fix:** Suporte a flags `--repo/--ref/--base-url/--manifest` (persistidas em `data/install.json`) e bloqueio explícito quando `base_url` está no placeholder.
+- **Files modified:** tools/install.lua
+- **Verification:** Revisão de fluxo; o comando agora fornece instruções acionáveis quando faltar configuração.
+- **Committed in:** 6d96962
+
+---
+
+**Total deviations:** 1 auto-fixed (1 missing critical)
+**Impact on plan:** Ajuste necessário para viabilizar o success criteria de bootstrap; sem aumento de escopo.
 
 ## Issues Encountered
 
