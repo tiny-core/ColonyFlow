@@ -1,0 +1,8 @@
+{
+    "tier_overrides": {},
+    "rules": [],
+    "version": 2,
+    "gating": {
+        "by_building_type": {}
+    }
+}
