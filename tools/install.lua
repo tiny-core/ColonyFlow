@@ -70,8 +70,8 @@ local function doctor(cfg)
   print("")
 
   if not httpAvailable() then
-    print("ERRO: HTTP API indisponível (http.get não existe).")
-    print("Ação: habilite HTTP no CC: Tweaked (config do mod/servidor) e tente novamente.")
+    print("ERRO: HTTP API indisponivel (http.get nao existe).")
+    print("Acao: habilite HTTP no CC: Tweaked (config do mod/servidor) e tente novamente.")
     return false
   end
 
@@ -83,16 +83,16 @@ local function doctor(cfg)
   if http.checkURL then
     local ok, err = http.checkURL(manifestUrl)
     if not ok then
-      print("ERRO: URL bloqueada/inválida: " .. tostring(manifestUrl))
+      print("ERRO: URL bloqueada/invalida: " .. tostring(manifestUrl))
       print("Detalhe: " .. tostring(err))
       return false
     end
   end
 
   local free = fs.getFreeSpace("/")
-  print("OK: HTTP disponível")
+  print("OK: HTTP disponivel")
   print("Manifest URL: " .. manifestUrl)
-  print("Espaço livre: " .. tostring(free))
+  print("Espaco livre: " .. tostring(free))
   return true
 end
 
@@ -143,35 +143,35 @@ end
 
 local function validateManifest(manifest)
   if type(manifest) ~= "table" then
-    return nil, "Manifesto inválido: objeto ausente."
+    return nil, "Manifesto invalido: objeto ausente."
   end
   if type(manifest.manifest_version) ~= "number" then
-    return nil, "Manifesto inválido: 'manifest_version' deve ser número."
+    return nil, "Manifesto invalido: 'manifest_version' deve ser numero."
   end
   if type(manifest.files) ~= "table" then
-    return nil, "Manifesto inválido: campo 'files' ausente."
+    return nil, "Manifesto invalido: campo 'files' ausente."
   end
 
   local files = {}
   for i, f in ipairs(manifest.files) do
     if type(f) ~= "table" then
-      return nil, "Manifesto inválido: files[" .. tostring(i) .. "] não é objeto."
+      return nil, "Manifesto invalido: files[" .. tostring(i) .. "] nao e objeto."
     end
     if type(f.path) ~= "string" then
-      return nil, "Manifesto inválido: files[" .. tostring(i) .. "].path não é string."
+      return nil, "Manifesto invalido: files[" .. tostring(i) .. "].path nao e string."
     end
     local p = trim(f.path)
     if p == "" then
-      return nil, "Manifesto inválido: files[" .. tostring(i) .. "].path vazio."
+      return nil, "Manifesto invalido: files[" .. tostring(i) .. "].path vazio."
     end
     if p:match("^/") or p:match("^%a:[/\\]") or p:find("%.%.", 1, true) then
-      return nil, "Manifesto inválido: caminho inseguro em files[" .. tostring(i) .. "]: " .. p
+      return nil, "Manifesto invalido: caminho inseguro em files[" .. tostring(i) .. "]: " .. p
     end
     if f.size ~= nil and type(f.size) ~= "number" then
-      return nil, "Manifesto inválido: files[" .. tostring(i) .. "].size deve ser número."
+      return nil, "Manifesto invalido: files[" .. tostring(i) .. "].size deve ser numero."
     end
     if f.preserve ~= nil and type(f.preserve) ~= "boolean" then
-      return nil, "Manifesto inválido: files[" .. tostring(i) .. "].preserve deve ser boolean."
+      return nil, "Manifesto invalido: files[" .. tostring(i) .. "].preserve deve ser boolean."
     end
     files[#files + 1] = { path = p, size = f.size, preserve = f.preserve == true }
   end
@@ -186,12 +186,12 @@ local function loadManifest(cfg)
 
   local body, err = httpGetTextWithRetry(url, 3)
   if not body then
-    return nil, "Não foi possível baixar o manifesto: " .. tostring(err) .. " (" .. url .. ")"
+    return nil, "Nao foi possivel baixar o manifesto: " .. tostring(err) .. " (" .. url .. ")"
   end
 
   local ok, parsed = pcall(textutils.unserializeJSON, body)
   if not ok or type(parsed) ~= "table" then
-    return nil, "Manifesto inválido (JSON)."
+    return nil, "Manifesto invalido (JSON)."
   end
   local normalized, vErr = validateManifest(parsed)
   if not normalized then
@@ -347,8 +347,8 @@ local function installOrUpdate(mode)
   end
 
   if not httpAvailable() then
-    print("ERRO: HTTP API indisponível (http.get não existe).")
-    print("Ação: habilite HTTP no CC: Tweaked (config do mod/servidor) e tente novamente.")
+    print("ERRO: HTTP API indisponivel (http.get nao existe).")
+    print("Acao: habilite HTTP no CC: Tweaked (config do mod/servidor) e tente novamente.")
     setExitCode(1)
     return 1
   end
@@ -423,7 +423,7 @@ local function installOrUpdate(mode)
 
   if not appliedOk then
     print("ERRO: Falha ao aplicar update: " .. tostring(applyErr))
-    print("Rollback automático...")
+    print("Rollback automatico...")
     rollback(backupRoot, meta)
     setExitCode(1)
     return 1
@@ -447,7 +447,7 @@ local function installOrUpdate(mode)
   end)
   if not finalOk then
     print("ERRO: Falha ao finalizar update: " .. tostring(finalErr))
-    print("Rollback automático...")
+    print("Rollback automatico...")
     rollback(backupRoot, meta)
     setExitCode(1)
     return 1
@@ -456,7 +456,7 @@ local function installOrUpdate(mode)
   print("")
   print("Resumo:")
   print("- Aplicados: " .. tostring(#applied))
-  print("- Órfãos removidos: " .. tostring(#orphans))
+  print("- Orfaos removidos: " .. tostring(#orphans))
   print("- Preservados: config.ini, data/mappings.json, data/install.json, data/version.json")
   print("OK.")
   setExitCode(0)
