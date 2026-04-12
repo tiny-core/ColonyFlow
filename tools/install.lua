@@ -1,7 +1,7 @@
 local args = { ... }
 
 local DEFAULT_BASE_URL = "https://raw.githubusercontent.com/tiny-core/ColonyFlow/"
-local DEFAULT_REF = "main"
+local DEFAULT_REF = "master"
 local DEFAULT_MANIFEST_PATH = "manifest.json"
 
 local function setExitCode(code)

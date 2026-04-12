@@ -55,10 +55,10 @@ O instalador suporta `doctor`, `install` e `update`. Ele baixa os arquivos defin
 No computador vazio:
 
 ```bash
-wget run https://raw.githubusercontent.com/tiny-core/ColonyFlow/main/tools/install.lua install
+wget run https://raw.githubusercontent.com/tiny-core/ColonyFlow/refs/heads/master/tools/install.lua install
 ```
 
-O instalador sempre baixa do repositório oficial `tiny-core/ColonyFlow` no branch `main`.
+O instalador sempre baixa do repositório oficial `tiny-core/ColonyFlow` no branch `master`.
 
 ### 2) Configuração do instalador (persistida)
 
