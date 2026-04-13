@@ -42,6 +42,7 @@ function Logger.new(cfg)
 
   local o = setmetatable({
     level = cfg:get("core", "log_level", "INFO"),
+    toTerminal = cfg:getBool("core", "log_to_terminal", false),
     dir = logDir,
     maxFiles = cfg:getNumber("core", "log_max_files", 10),
     maxBytes = cfg:getNumber("core", "log_max_kb", 256) * 1024,
@@ -122,7 +123,9 @@ function Logger:emit(level, msg, ctx)
     line = line .. " | ctx=" .. safeToString(ctx)
   end
 
-  print(line)
+  if self.toTerminal then
+    print(line)
+  end
   if self.file then
     self.file.writeLine(line)
     self.file.flush()

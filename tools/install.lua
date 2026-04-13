@@ -337,6 +337,33 @@ local function deleteOrphans(paths)
   end
 end
 
+local function pruneVersionBackups(keep)
+  keep = tonumber(keep or 2) or 2
+  if keep < 0 then return end
+  local root = "data/backups"
+  if not fs.exists(root) or not fs.isDir(root) then return end
+
+  local dirs = {}
+  for _, name in ipairs(fs.list(root)) do
+    local p = fs.combine(root, name)
+    if fs.isDir(p) then
+      local n = tonumber(name)
+      if n then
+        dirs[#dirs + 1] = { name = name, n = n }
+      end
+    end
+  end
+
+  table.sort(dirs, function(a, b) return a.n < b.n end)
+  while #dirs > keep do
+    local del = table.remove(dirs, 1)
+    local p = fs.combine(root, del.name)
+    if fs.exists(p) then
+      fs.delete(p)
+    end
+  end
+end
+
 local function installOrUpdate(mode)
   local cfg = loadOrCreateInstallConfig()
 
@@ -452,6 +479,8 @@ local function installOrUpdate(mode)
     setExitCode(1)
     return 1
   end
+
+  pcall(pruneVersionBackups, 2)
 
   print("")
   print("Resumo:")

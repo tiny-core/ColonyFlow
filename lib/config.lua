@@ -306,6 +306,7 @@ end
 function Config.patchIniFileAtomic(path, updatesBySection, opts)
   opts = type(opts) == "table" and opts or {}
   local backupDir = tostring(opts.backup_dir or "data/backups")
+  local keepBackups = tonumber(opts.keep_backups or 2) or 2
   Util.ensureDir(backupDir)
 
   local src = Util.readFile(path) or ""
@@ -321,6 +322,29 @@ function Config.patchIniFileAtomic(path, updatesBySection, opts)
   end)
   if not ok then
     return { ok = false, err = tostring(err) }
+  end
+
+  if keepBackups >= 0 then
+    local ok2 = pcall(function()
+      if fs.exists(backupDir) and fs.isDir(backupDir) then
+        local prefix = baseName .. "."
+        local all = fs.list(backupDir)
+        local matches = {}
+        for _, name in ipairs(all) do
+          if name:sub(1, #prefix) == prefix and name:sub(-4) == ".bak" then
+            table.insert(matches, name)
+          end
+        end
+        table.sort(matches)
+        while #matches > keepBackups do
+          local del = table.remove(matches, 1)
+          fs.delete(fs.combine(backupDir, del))
+        end
+      end
+    end)
+    if not ok2 then
+      -- ignore prune errors
+    end
   end
 
   return { ok = true, changes = patched.changes, backup_path = backupPath }

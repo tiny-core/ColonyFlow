@@ -180,6 +180,25 @@ local tests = {
       exists = function(path) return existsSet[path] == true end,
       isDir = function(path) return path == "data" or path == "data/backups" end,
       makeDir = function(path) existsSet[path] = true end,
+      list = function(dir)
+        dir = tostring(dir)
+        local prefix = dir
+        if prefix ~= "" and prefix:sub(-1) ~= "/" then prefix = prefix .. "/" end
+        local out = {}
+        local seen = {}
+        for p, ok in pairs(existsSet) do
+          if ok == true and tostring(p):sub(1, #prefix) == prefix then
+            local rest = tostring(p):sub(#prefix + 1)
+            local first = rest:match("^([^/]+)")
+            if first and not seen[first] then
+              seen[first] = true
+              table.insert(out, first)
+            end
+          end
+        end
+        table.sort(out)
+        return out
+      end,
       getDir = function(path)
         local i = string.match(path, "^.*()/")
         if not i then return "" end

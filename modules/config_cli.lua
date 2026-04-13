@@ -346,7 +346,7 @@ local function saveIni(cfg, updates)
     return false
   end
 
-  local res = Config.patchIniFileAtomic(PATH, changedOnly, { backup_dir = "data/backups" })
+  local res = Config.patchIniFileAtomic(PATH, changedOnly, { backup_dir = "data/backups", keep_backups = 2 })
   if not res.ok then
     showLines("Erro ao salvar", { tostring(res.err or "erro") })
     return false
@@ -668,4 +668,3 @@ local function main()
 end
 
 main()
-
