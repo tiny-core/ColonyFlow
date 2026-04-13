@@ -118,6 +118,133 @@ local tests = {
     assertEq(string.match(writtenContent, "%[core%]") ~= nil, true, "deveria conter a secao core")
     assertEq(string.match(writtenContent, "log_level=INFO") ~= nil, true, "deveria conter log_level=INFO")
   end },
+  { "config_ini_patch_preserva_comentarios_e_insere_chaves", function()
+    local Config = require("lib.config")
+
+    local txt = table.concat({
+      "[core]",
+      "; comentario 1",
+      "log_level=INFO",
+      "unknown_key=keep",
+      "",
+      "[delivery]",
+      "export_mode=auto",
+      "; comentario 2",
+      "",
+    }, "\n")
+
+    local res = Config.patchIniText(txt, {
+      core = { log_level = "DEBUG", new_key = "x" },
+      delivery = { export_mode = "buffer" },
+    })
+
+    assertEq(type(res), "table")
+    assertEq(type(res.text), "string")
+    assertEq(string.match(res.text, "; comentario 1") ~= nil, true, "deveria preservar comentarios")
+    assertEq(string.match(res.text, "unknown_key=keep") ~= nil, true, "deveria preservar chaves desconhecidas")
+    assertEq(string.match(res.text, "log_level=DEBUG") ~= nil, true, "deveria atualizar log_level")
+    assertEq(string.match(res.text, "new_key=x") ~= nil, true, "deveria inserir chave ausente")
+    assertEq(string.match(res.text, "export_mode=buffer") ~= nil, true, "deveria atualizar export_mode")
+  end },
+  { "config_ini_patch_cria_secao_ausente", function()
+    local Config = require("lib.config")
+
+    local txt = table.concat({
+      "[core]",
+      "log_level=INFO",
+      "",
+    }, "\n")
+
+    local res = Config.patchIniText(txt, {
+      delivery = { export_direction = "west" },
+    })
+
+    assertEq(string.match(res.text, "%[delivery%]") ~= nil, true, "deveria criar secao delivery")
+    assertEq(string.match(res.text, "export_direction=west") ~= nil, true, "deveria inserir chave em secao criada")
+  end },
+  { "config_ini_patch_file_atomic_cria_backup_e_move", function()
+    local Config = require("lib.config")
+
+    local oldFs = fs
+    local files = {}
+    local existsSet = {}
+
+    local function setFile(path, content)
+      files[path] = content
+      existsSet[path] = true
+    end
+
+    setFile("config.ini", table.concat({ "[core]", "log_level=INFO", "" }, "\n"))
+
+    fs = {
+      exists = function(path) return existsSet[path] == true end,
+      isDir = function(path) return path == "data" or path == "data/backups" end,
+      makeDir = function(path) existsSet[path] = true end,
+      getDir = function(path)
+        local i = string.match(path, "^.*()/")
+        if not i then return "" end
+        return string.sub(path, 1, i - 1)
+      end,
+      getName = function(path)
+        local i = string.match(path, "^.*()/")
+        if not i then return path end
+        return string.sub(path, i + 1)
+      end,
+      combine = function(a, b) return tostring(a) .. "/" .. tostring(b) end,
+      open = function(path, mode)
+        if mode == "r" then
+          return {
+            readAll = function() return files[path] end,
+            close = function() end,
+          }
+        end
+        if mode == "w" then
+          local buf = ""
+          return {
+            write = function(s) buf = buf .. tostring(s or "") end,
+            writeLine = function(s) buf = buf .. tostring(s or "") .. "\n" end,
+            flush = function() end,
+            close = function() files[path] = buf; existsSet[path] = true end,
+          }
+        end
+        return nil
+      end,
+      delete = function(path) files[path] = nil; existsSet[path] = false end,
+      move = function(src, dst)
+        files[dst] = files[src]
+        existsSet[dst] = true
+        files[src] = nil
+        existsSet[src] = false
+      end,
+    }
+
+    local res = Config.patchIniFileAtomic("config.ini", { core = { log_level = "DEBUG" } }, { backup_dir = "data/backups" })
+
+    local backupPath = tostring(res.backup_path or "")
+    local okSaved = res.ok == true
+    local newTxt = files["config.ini"]
+    local backupTxt = files[backupPath]
+    local tmpStillThere = existsSet["config.ini.tmp"] == true
+
+    fs = oldFs
+
+    assertEq(okSaved, true, "deveria salvar com sucesso")
+    assertEq(string.match(newTxt or "", "log_level=DEBUG") ~= nil, true, "deveria ter atualizado o arquivo")
+    assertEq(backupPath ~= "", true, "deveria retornar backup_path")
+    assertEq(type(backupTxt) == "string", true, "deveria escrever backup")
+    assertEq(string.match(backupTxt or "", "log_level=INFO") ~= nil, true, "backup deveria conter o conteudo antigo")
+    assertEq(tmpStillThere, false, "tmp nao deveria permanecer")
+  end },
+  { "config_schema_rejeita_valores_invalidos", function()
+    local Schema = require("lib.config_schema")
+    local res = Schema.validateUpdates({
+      core = { poll_interval_seconds = "0", ui_refresh_seconds = "1", log_level = "INFO", log_max_files = "1", log_max_kb = "1" },
+      delivery = { export_mode = "x", export_direction = "up", destination_cache_ttl_seconds = "-1" },
+      peripherals = { monitor_requests = "m", monitor_status = "m" },
+    })
+    assertEq(res.ok, false)
+    assertEq(#res.errors >= 3, true, "deveria reportar erros suficientes")
+  end },
   { "mappings_json_skeleton_quando_ausente", function()
     local Equivalence = require("modules.equivalence")
     
