@@ -68,6 +68,8 @@ None yet.
 ### Roadmap Evolution
 
 - Phase 10 added: Config CLI (editar config.ini e perifericos)
+- Phase 11 added: Versionamento robusto: versao real + script Node para regenerar manifest
+- Phase 12 added: Update check leve no startup + mostrar versao atual vs disponivel na UI
 
 ## Session Continuity
 

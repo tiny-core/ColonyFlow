@@ -270,3 +270,23 @@ Plans:
 
 Plans:
 - [ ] TBD (run /gsd-plan-phase 10 to break down)
+
+### Phase 11: Versionamento robusto: versao real + script Node para regenerar manifest
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 10
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 11 to break down)
+
+### Phase 12: Update check leve no startup + mostrar versao atual vs disponivel na UI
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 11
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 12 to break down)
