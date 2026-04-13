@@ -153,4 +153,177 @@ function Config:getList(section, key, default, sep)
   return out
 end
 
+local function splitIniTextPreserveEmpty(text)
+  local lines = {}
+  text = tostring(text or "")
+  if text == "" then return lines, false end
+  local i = 1
+  while true do
+    local j = text:find("\n", i, true)
+    if not j then
+      local last = text:sub(i)
+      if last:sub(-1) == "\r" then last = last:sub(1, -2) end
+      table.insert(lines, last)
+      break
+    end
+    local line = text:sub(i, j - 1)
+    if line:sub(-1) == "\r" then line = line:sub(1, -2) end
+    table.insert(lines, line)
+    i = j + 1
+    if i > #text then
+      table.insert(lines, "")
+      break
+    end
+  end
+  return lines, text:sub(-1) == "\n"
+end
+
+local function isSectionHeader(line)
+  local t = Util.trim(line or "")
+  local s = t:match("^%[([^%]]+)%]$")
+  if not s then return nil end
+  return Util.trim(s)
+end
+
+function Config.patchIniText(linesOrText, updatesBySection)
+  if type(updatesBySection) ~= "table" then updatesBySection = {} end
+
+  local originalText = nil
+  local originalEndsWithNl = false
+  local inputLines = nil
+  if type(linesOrText) == "table" then
+    inputLines = {}
+    for i, v in ipairs(linesOrText) do inputLines[i] = tostring(v or "") end
+  else
+    originalText = tostring(linesOrText or "")
+    inputLines, originalEndsWithNl = splitIniTextPreserveEmpty(originalText)
+  end
+
+  local blocks = {}
+  local current = { name = nil, header = nil, lines = {} }
+  for _, line in ipairs(inputLines) do
+    local name = isSectionHeader(line)
+    if name then
+      table.insert(blocks, current)
+      current = { name = name, header = line, lines = {} }
+    else
+      table.insert(current.lines, line)
+    end
+  end
+  table.insert(blocks, current)
+
+  local seenSections = {}
+  local changes = {}
+
+  for _, b in ipairs(blocks) do
+    if b.name then seenSections[b.name] = true end
+    local updates = b.name and updatesBySection[b.name] or nil
+    if type(updates) == "table" then
+      local applied = {}
+      for i, raw in ipairs(b.lines) do
+        local t = Util.trim(raw)
+        if t ~= "" and not t:match("^;") and not t:match("^#") then
+          local k, v = t:match("^([^=]+)=(.*)$")
+          if k then
+            k = Util.trim(k)
+            if updates[k] ~= nil then
+              local newVal = tostring(updates[k])
+              local oldVal = Util.trim(v)
+              b.lines[i] = k .. "=" .. newVal
+              applied[k] = true
+              table.insert(changes, { section = b.name, key = k, old = oldVal, new = newVal, op = "update" })
+            end
+          end
+        end
+      end
+
+      local missing = {}
+      for k, _ in pairs(updates) do
+        if not applied[k] then table.insert(missing, tostring(k)) end
+      end
+      table.sort(missing, function(a, b2) return tostring(a) < tostring(b2) end)
+
+      if #missing > 0 then
+        local lastNonBlank = #b.lines
+        while lastNonBlank >= 1 and Util.trim(b.lines[lastNonBlank]) == "" do
+          lastNonBlank = lastNonBlank - 1
+        end
+        local pos = lastNonBlank + 1
+        for _, k in ipairs(missing) do
+          local newVal = tostring(updates[k])
+          table.insert(b.lines, pos, k .. "=" .. newVal)
+          pos = pos + 1
+          table.insert(changes, { section = b.name, key = k, old = nil, new = newVal, op = "insert" })
+        end
+      end
+    end
+  end
+
+  local extraSections = {}
+  for sec, _ in pairs(updatesBySection) do
+    if not seenSections[sec] then
+      table.insert(extraSections, tostring(sec))
+    end
+  end
+  table.sort(extraSections, function(a, b2) return tostring(a) < tostring(b2) end)
+
+  if #extraSections > 0 then
+    local last = blocks[#blocks]
+    if last and not last.header then
+      local lastLine = last.lines[#last.lines]
+      if lastLine ~= nil and Util.trim(lastLine) ~= "" then
+        table.insert(last.lines, "")
+      end
+    end
+    for _, sec in ipairs(extraSections) do
+      local keys = {}
+      local u = updatesBySection[sec]
+      for k, _ in pairs(u or {}) do table.insert(keys, tostring(k)) end
+      table.sort(keys, function(a, b2) return tostring(a) < tostring(b2) end)
+      local newBlock = { name = sec, header = "[" .. sec .. "]", lines = {} }
+      for _, k in ipairs(keys) do
+        local newVal = tostring(u[k])
+        table.insert(newBlock.lines, k .. "=" .. newVal)
+        table.insert(changes, { section = sec, key = k, old = nil, new = newVal, op = "insert" })
+      end
+      table.insert(blocks, newBlock)
+    end
+  end
+
+  local outLines = {}
+  for _, b in ipairs(blocks) do
+    if b.header then table.insert(outLines, b.header) end
+    for _, l in ipairs(b.lines) do table.insert(outLines, l) end
+  end
+
+  if originalEndsWithNl and (#outLines == 0 or outLines[#outLines] ~= "") then
+    table.insert(outLines, "")
+  end
+
+  return { text = table.concat(outLines, "\n"), changes = changes }
+end
+
+function Config.patchIniFileAtomic(path, updatesBySection, opts)
+  opts = type(opts) == "table" and opts or {}
+  local backupDir = tostring(opts.backup_dir or "data/backups")
+  Util.ensureDir(backupDir)
+
+  local src = Util.readFile(path) or ""
+  local patched = Config.patchIniText(src, updatesBySection)
+
+  local ts = Util.isoTimestampUtc()
+  local baseName = (fs.getName and fs.getName(path)) and fs.getName(path) or tostring(path)
+  local backupPath = fs.combine(backupDir, baseName .. "." .. ts .. ".bak")
+
+  local ok, err = pcall(function()
+    Util.writeFile(backupPath, src)
+    Util.writeFileAtomic(path, patched.text)
+  end)
+  if not ok then
+    return { ok = false, err = tostring(err) }
+  end
+
+  return { ok = true, changes = patched.changes, backup_path = backupPath }
+end
+
 return Config

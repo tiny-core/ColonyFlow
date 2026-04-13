@@ -50,4 +50,25 @@ function M.jsonEncode(tbl)
   return textutils.serializeJSON(tbl, { pretty = true })
 end
 
+function M.copyFile(src, dst)
+  local txt = M.readFile(src)
+  if txt == nil then return false, "src_nao_existe" end
+  M.writeFile(dst, txt)
+  return true
+end
+
+function M.writeFileAtomic(path, content)
+  local tmp = tostring(path) .. ".tmp"
+  M.writeFile(tmp, content)
+  if fs.exists(path) then
+    fs.delete(path)
+  end
+  fs.move(tmp, path)
+  return true
+end
+
+function M.isoTimestampUtc()
+  return os.date("!%Y-%m-%dT%H%M%SZ")
+end
+
 return M
