@@ -16,6 +16,14 @@ local function runMappingCli()
   print("CLI de mapeamentos não encontrada.")
 end
 
+local function runConfigCli()
+  if fs.exists("modules/config_cli.lua") then
+    shell.run("modules/config_cli.lua")
+    return
+  end
+  print("CLI de config nao encontrado.")
+end
+
 local mode = args[1]
 if mode == "test" then
   runTests()
@@ -24,6 +32,11 @@ end
 
 if mode == "map" then
   runMappingCli()
+  return
+end
+
+if mode == "config" then
+  runConfigCli()
   return
 end
 
