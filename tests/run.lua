@@ -1680,7 +1680,7 @@ for _, t in ipairs(tests) do
 end
 
 logLine(string.format("Tests: %d/%d OK", passed, total))
-logLine("Relatório: " .. reportPath)
+logLine("Relatorio: " .. reportPath)
 if passed ~= total then
   if #failures > 0 then
     logLine("")

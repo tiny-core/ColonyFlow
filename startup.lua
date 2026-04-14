@@ -46,4 +46,5 @@ if not ok then
   return
 end
 
+print("Sistema iniciado: rodando.")
 bootstrap.run()

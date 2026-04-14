@@ -63,10 +63,34 @@ function statSize(relPath) {
   return Buffer.byteLength(text.replace(/\r\n/g, "\n"), "utf8");
 }
 
+function printUsage() {
+  console.log("Uso:");
+  console.log("  node tools/gen_manifest.js X.Y.Z");
+  console.log("  node tools/gen_manifest.js --version X.Y.Z");
+  console.log("  node tools/gen_manifest.js --help");
+  console.log("");
+  console.log("Gera manifest.json (ordenado + size + preserve).");
+}
+
 function main() {
-  const version = readText("VERSION").trim();
+  const args = process.argv.slice(2);
+  if (args.includes("--help") || args.includes("-h")) {
+    printUsage();
+    return;
+  }
+
+  let version = null;
+  if (args.length >= 2 && args[0] === "--version") {
+    version = String(args[1] || "").trim();
+  } else if (args.length >= 1 && args[0] && !args[0].startsWith("-")) {
+    version = String(args[0] || "").trim();
+  } else {
+    console.error("Versao nao informada. Use: node tools/gen_manifest.js X.Y.Z");
+    process.exit(1);
+  }
+
   if (!isValidSemverSimple(version)) {
-    console.error("VERSION invalido: esperado X.Y.Z (somente numeros) sem zeros a esquerda");
+    console.error("Versao invalida: esperado X.Y.Z (somente numeros) sem zeros a esquerda");
     process.exit(1);
   }
 

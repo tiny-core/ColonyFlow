@@ -7,8 +7,7 @@
 ## Manual (offline + in-world)
 
 1. Offline (repo):
-   - Atualizar `VERSION` (ex.: `0.11.0`)
-   - Rodar `node tools/gen_manifest.js`
+   - Rodar `node tools/gen_manifest.js 0.11.0` (ou a versao desejada)
    - Confirmar que `manifest.json` contem:
      - `"manifest_version": 2`
      - `"version": "X.Y.Z"`
