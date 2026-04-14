@@ -148,6 +148,13 @@ local function validateManifest(manifest)
   if type(manifest.manifest_version) ~= "number" then
     return nil, "Manifesto invalido: 'manifest_version' deve ser numero."
   end
+  if type(manifest.version) ~= "string" then
+    return nil, "Manifesto invalido: 'version' deve ser string."
+  end
+  local version = trim(manifest.version)
+  if version == "" or not version:match("^%d+%.%d+%.%d+$") then
+    return nil, "Manifesto invalido: 'version' invalida."
+  end
   if type(manifest.files) ~= "table" then
     return nil, "Manifesto invalido: campo 'files' ausente."
   end
@@ -175,7 +182,8 @@ local function validateManifest(manifest)
     end
     files[#files + 1] = { path = p, size = f.size, preserve = f.preserve == true }
   end
-  return { manifest_version = manifest.manifest_version, generated_utc = manifest.generated_utc, files = files }
+  return { manifest_version = manifest.manifest_version, version = version, generated_utc = manifest.generated_utc, files =
+  files }
 end
 
 local function loadManifest(cfg)
@@ -289,7 +297,9 @@ local function downloadToTemp(bundle, files, tempRoot)
       return nil, "Falha ao baixar " .. f.path .. ": " .. tostring(err)
     end
     if f.size and tonumber(f.size) and #body ~= tonumber(f.size) then
-      return nil, "Tamanho divergente em " .. f.path .. " (esperado " .. tostring(f.size) .. ", obtido " .. tostring(#body) .. ")"
+      return nil,
+          "Tamanho divergente em " ..
+          f.path .. " (esperado " .. tostring(f.size) .. ", obtido " .. tostring(#body) .. ")"
     end
     local out = fs.combine(tempRoot, f.path)
     writeFile(out, body)
@@ -399,6 +409,9 @@ local function installOrUpdate(mode)
   print("Modo: " .. mode)
   print("Ref: " .. bundle.ref)
   print("Manifest: " .. bundle.url)
+  if type(bundle.manifest.version) == "string" and bundle.manifest.version ~= "" then
+    print("Versao: " .. bundle.manifest.version)
+  end
   print("")
 
   local ok, downloadedOrErr = pcall(downloadToTemp, bundle, files, tempRoot)
@@ -466,6 +479,8 @@ local function installOrUpdate(mode)
       ref = bundle.ref,
       manifest_url = bundle.url,
       manifest_version = bundle.manifest.manifest_version,
+      version = bundle.manifest.version,
+      manifest_generated_utc = bundle.manifest.generated_utc,
       managed_files = managedFiles,
     })
     if fs.exists(tempRoot) then
