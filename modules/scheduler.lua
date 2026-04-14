@@ -93,7 +93,7 @@ function M.run(state, engine, ui)
             state.logger:info("Update check indisponivel (HTTP off)", { manifest_url = upd.manifest_url })
           elseif st == "error" then
             state.logger:info("Update check falhou",
-              { err = upd.err, manifest_url = upd.manifest_url, stale = upd.stale == true })
+            { err = upd.err, manifest_url = upd.manifest_url, stale = upd.stale == true })
           end
         end
 

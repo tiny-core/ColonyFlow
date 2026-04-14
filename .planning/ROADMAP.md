@@ -257,19 +257,22 @@ Plans:
 | 4. UI + Configuração Operacional          | 1/1            | Complete    | 2026-04-10 |
 | 5. Testes + Endurecimento                 | 1/1            | Complete    | 2026-04-10 |
 | 6. Cache + Robustez Operacional           | 1/1            | Complete    | 2026-04-11 |
-| 7. Auto-Setup + Compatibilidade MP        | 0/1            | Not started | -          |
+| 7. Auto-Setup + Compatibilidade MP        | 1/1            | Complete    | 2026-04-11 |
 | 8. Mapping v2 (Estrutura + Comportamento) | 1/1            | Complete    | 2026-04-12 |
-| 9. Instalador In-Game (Git)               | 0/1            | Not started | -          |
+| 9. Instalador In-Game (Git)               | 1/1            | Complete    | 2026-04-12 |
+| 10. Config CLI (editar config.ini e perifericos) | 1/1      | Complete    | 2026-04-13 |
+| 11. Versionamento robusto (SemVer + tooling manifest) | 1/1  | Complete    | 2026-04-14 |
+| 12. Update check + UI (versao instalada vs disponivel) | 1/1 | Complete    | 2026-04-14 |
 
 ### Phase 10: Config CLI (editar config.ini e perifericos)
 
-**Goal:** [To be planned]
+**Goal:** Permitir editar `config.ini` e perifericos via CLI in-game, com validacao e escrita atomica.
 **Requirements**: TBD
 **Depends on:** Phase 9
-**Plans:** 0 plans
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 10 to break down)
+- [x] 10-01 Config CLI (editar config.ini e perifericos)
 
 ### Phase 11: Versionamento robusto: versao real + script Node para regenerar manifest
 
@@ -283,10 +286,10 @@ Plans:
 
 ### Phase 12: Update check leve no startup + mostrar versao atual vs disponivel na UI
 
-**Goal:** [To be planned]
+**Goal:** Adicionar update-check leve, nao-bloqueante, comparando versao instalada vs manifesto remoto, exibindo status discretamente na UI.
 **Requirements**: TBD
 **Depends on:** Phase 11
-**Plans:** 0 plans
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 12 to break down)
+- [x] 12-01 Update check leve + UI de versao instalada vs disponivel
