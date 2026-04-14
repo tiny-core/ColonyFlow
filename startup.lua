@@ -46,5 +46,5 @@ if not ok then
   return
 end
 
-print("Sistema iniciado: rodando.")
+print("Sistema iniciado com sucesso.")
 bootstrap.run()

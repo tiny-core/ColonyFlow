@@ -1,7 +1,9 @@
 local Config = require("lib.config")
 local Logger = require("lib.logger")
 local Cache = require("lib.cache")
+local Version = require("lib.version")
 local Peripherals = require("modules.peripherals")
+local UpdateCheck = require("modules.update_check")
 local Scheduler = require("modules.scheduler")
 local Engine = require("modules.engine")
 local UI = require("components.ui")
@@ -53,6 +55,22 @@ function M.run()
       errors = 0,
     },
   }
+
+  state.installed = Version.readInstalled()
+  state.update = UpdateCheck.defaultState(state.installed)
+  do
+    local cached = UpdateCheck.loadCache()
+    if cached then
+      for k, v in pairs(cached) do
+        state.update[k] = v
+      end
+      if state.installed and state.installed.version then
+        state.update.installed_version = state.installed.version
+      else
+        state.update.installed_version = nil
+      end
+    end
+  end
 
   local engine = Engine.new(state)
   state.work = engine.work

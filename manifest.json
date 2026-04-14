@@ -1,11 +1,11 @@
 {
   "manifest_version": 2,
   "version": "0.2.0",
-  "generated_utc": "2026-04-14T19:28:58Z",
+  "generated_utc": "2026-04-14T20:39:25Z",
   "files": [
     {
       "path": "components/ui.lua",
-      "size": 18484
+      "size": 19577
     },
     {
       "path": "config.ini",
@@ -19,7 +19,7 @@
     },
     {
       "path": "lib/bootstrap.lua",
-      "size": 1645
+      "size": 2183
     },
     {
       "path": "lib/cache.lua",
@@ -79,19 +79,23 @@
     },
     {
       "path": "modules/scheduler.lua",
-      "size": 1560
+      "size": 3261
     },
     {
       "path": "modules/tier.lua",
       "size": 2167
     },
     {
+      "path": "modules/update_check.lua",
+      "size": 10715
+    },
+    {
       "path": "startup.lua",
-      "size": 926
+      "size": 929
     },
     {
       "path": "tests/run.lua",
-      "size": 60842
+      "size": 62675
     },
     {
       "path": "tools/install.lua",

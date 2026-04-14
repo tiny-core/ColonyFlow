@@ -1,4 +1,5 @@
 local Util = require("lib.util")
+local UpdateCheck = require("modules.update_check")
 
 local M = {}
 
@@ -59,7 +60,49 @@ function M.run(state, engine, ui)
     end
   end
 
-  parallel.waitForAny(loopEngine, loopUI, loopEvents)
+  local function loopUpdateCheck()
+    local lastKey = nil
+    while true do
+      local ok, sleepSecOrErr = pcall(UpdateCheck.tick, state, { tries = 2 })
+      if not ok then
+        state.logger:info("Update check falhou", { err = tostring(sleepSecOrErr) })
+        sleepSeconds(60)
+      else
+        local upd = type(state.update) == "table" and state.update or {}
+        local key = table.concat({
+          tostring(upd.status or ""),
+          tostring(upd.installed_version or ""),
+          tostring(upd.available_version or ""),
+          upd.stale == true and "1" or "0",
+          tostring(upd.err or ""),
+        }, "|")
+
+        if key ~= lastKey then
+          lastKey = key
+          local st = tostring(upd.status or "")
+          if st == "update_available" then
+            state.logger:info("Update disponivel", {
+              installed = upd.installed_version,
+              available = upd.available_version,
+              cmd = "tools/install.lua update",
+              stale = upd.stale == true
+            })
+          elseif st == "no_installed" then
+            state.logger:info("Versao instalada ausente", { cmd = "tools/install.lua install" })
+          elseif st == "http_off" or st == "http_blocked" then
+            state.logger:info("Update check indisponivel (HTTP off)", { manifest_url = upd.manifest_url })
+          elseif st == "error" then
+            state.logger:info("Update check falhou",
+              { err = upd.err, manifest_url = upd.manifest_url, stale = upd.stale == true })
+          end
+        end
+
+        sleepSeconds(tonumber(sleepSecOrErr) or 60)
+      end
+    end
+  end
+
+  parallel.waitForAny(loopEngine, loopUI, loopEvents, loopUpdateCheck)
 end
 
 return M

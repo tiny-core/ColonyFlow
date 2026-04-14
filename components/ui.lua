@@ -1,7 +1,7 @@
 local UI = {}
 UI.__index = UI
 
-local VERSION = "v1"
+local UpdateCheck = require("modules.update_check")
 
 local function shorten(s, maxLen)
   s = tostring(s or "")
@@ -197,7 +197,7 @@ function UI:renderNoCraft(state, mon)
   local list = self:collectNoCraftItems(state)
 
   self:drawText("status", mon, 1, 1, padRight(centerText("ITENS SEM CRAFT", w), w))
-  local right = os.date("!%H:%M:%SZ") .. " " .. VERSION
+  local right = UpdateCheck.formatHeaderRight(state, w)
   self:drawText("status", mon, math.max(1, w - #right + 1), 1, right, colors.gray)
   self:drawText("status", mon, 1, 2, string.rep("-", math.max(0, w)))
 
@@ -304,7 +304,7 @@ function UI:renderRequests(state, mon)
   end
 
   self:drawText("requests", mon, 1, 1, padRight("Requisicoes (MineColonies)", w))
-  local right = os.date("!%H:%M:%SZ") .. " " .. VERSION
+  local right = UpdateCheck.formatHeaderRight(state, w)
   self:drawText("requests", mon, math.max(1, w - #right + 1), 1, right, colors.gray)
   self:drawText("requests", mon, 1, 2, string.rep("-", math.max(0, w)))
 
@@ -455,11 +455,30 @@ function UI:renderStatus(state, mon)
   end
 
   self:drawText("status", mon, 1, 1, padRight(centerText("STATUS", w), w))
-  local right = os.date("!%H:%M:%SZ") .. " " .. VERSION
+  local right = UpdateCheck.formatHeaderRight(state, w)
   self:drawText("status", mon, math.max(1, w - #right + 1), 1, right, colors.gray)
   self:drawText("status", mon, 1, 2, string.rep("-", math.max(0, w)))
 
   local y = 3
+  if UpdateCheck.isUpdateAvailable(state) then
+    local upd = type(state.update) == "table" and state.update or {}
+    local inst = tostring(upd.installed_version or "NO-VERSION")
+    local avail = tostring(upd.available_version or "?")
+    local staleMark = upd.stale == true and "*" or ""
+    local line = "UPDATE: " .. inst .. "->" .. avail .. staleMark .. "  Run: tools/install.lua update"
+    self:drawText("status", mon, 1, y, padRight(shorten(line, w), w), colors.yellow, colors.black)
+    y = y + 1
+  elseif not (type(state.installed) == "table" and type(state.installed.version) == "string") then
+    local upd = type(state.update) == "table" and state.update or {}
+    local avail = (type(upd.available_version) == "string") and upd.available_version or nil
+    local line = "NO VERSION  Run: tools/install.lua install"
+    if avail then
+      line = "NO VERSION  Avail: " .. avail .. "  Run: tools/install.lua install"
+    end
+    self:drawText("status", mon, 1, y, padRight(shorten(line, w), w), colors.lightGray, colors.black)
+    y = y + 1
+  end
+
   local cs = state.colonyStats or {}
   self:drawText("status", mon, 1, y, centerText("COLONIA", w), colors.cyan); y = y + 1
   self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1

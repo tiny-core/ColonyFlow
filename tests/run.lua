@@ -287,6 +287,45 @@ local tests = {
     assertEq(lt, -1)
     assertEq(eq, 0)
   end },
+  { "update_check_build_manifest_url_defaults", function()
+    local UpdateCheck = require("modules.update_check")
+    local url = UpdateCheck.buildManifestUrl({})
+    assertEq(url, "https://raw.githubusercontent.com/tiny-core/ColonyFlow/master/manifest.json")
+  end },
+  { "update_check_build_manifest_url_custom", function()
+    local UpdateCheck = require("modules.update_check")
+    local url = UpdateCheck.buildManifestUrl({
+      base_url = "https://example.com/repo",
+      ref = "main",
+      manifest_path = "/m.json",
+    })
+    assertEq(url, "https://example.com/repo/main/m.json")
+  end },
+  { "update_check_should_refresh", function()
+    local UpdateCheck = require("modules.update_check")
+    assertEq(UpdateCheck.shouldRefresh(nil, 1000), true)
+    assertEq(UpdateCheck.shouldRefresh({ checked_at_ms = 1000, ttl_ms = 6000 }, 5000), false)
+    assertEq(UpdateCheck.shouldRefresh({ checked_at_ms = 1000, ttl_ms = 6000 }, 8000), true)
+  end },
+  { "update_check_format_header_right", function()
+    local UpdateCheck = require("modules.update_check")
+    local state = {
+      installed = { version = "1.2.3" },
+      update = { status = "update_available", installed_version = "1.2.3", available_version = "1.2.4", stale = false }
+    }
+    local out = UpdateCheck.formatHeaderRight(state, 200)
+    assertEq(string.match(out, "1%.2%.3%-%>1%.2%.4") ~= nil, true)
+
+    state.update.status = "http_off"
+    local out2 = UpdateCheck.formatHeaderRight(state, 200)
+    assertEq(string.match(out2, "UPD:OFF") ~= nil, true)
+
+    local out3 = UpdateCheck.formatHeaderRight({ installed = nil, update = { status = "no_installed" } }, 200)
+    assertEq(string.match(out3, "NO%-VERSION") ~= nil, true)
+
+    local out4 = UpdateCheck.formatHeaderRight(state, 10)
+    assertEq(#out4 <= 10, true, "deveria truncar pelo width")
+  end },
   { "mappings_json_skeleton_quando_ausente", function()
     local Equivalence = require("modules.equivalence")
 

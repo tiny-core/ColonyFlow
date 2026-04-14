@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.4
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 12 context gathered
-last_updated: "2026-04-14T20:23:54.198Z"
+status: planning
+stopped_at: Phase 12 implemented (awaiting in-world verification)
+last_updated: "2026-04-14T20:41:00.000Z"
 last_activity: 2026-04-14
 progress:
   total_phases: 12
-  completed_phases: 11
-  total_plans: 11
-  completed_plans: 11
+  completed_phases: 12
+  total_plans: 12
+  completed_plans: 12
   percent: 100
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColonies e entrega do item correto, craftando somente o necessário.
-**Current focus:** Phase 11 — versionamento-robusto-versao-real-script-node-para-regenerar
+**Current focus:** Phase 12 — update-check-leve-no-startup-mostrar-versao-atual-vs-disponi
 
 ## Current Position
 
 Phase: 12
-Plan: Not started
-Status: Phase complete — ready for verification
+Plan: 01 (complete)
+Status: Awaiting verification
 Last activity: 2026-04-14
 
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -76,5 +76,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-14T20:23:54.191Z
-Stopped at: Phase 12 context gathered
+Stopped at: Phase 12 plan created
 Resume file: .planning/phases/12-update-check-leve-no-startup-mostrar-versao-atual-vs-disponi/12-CONTEXT.md
