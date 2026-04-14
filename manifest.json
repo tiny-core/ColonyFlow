@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
-  "version": "0.2.0",
-  "generated_utc": "2026-04-14T20:39:25Z",
+  "version": "0.9.0",
+  "generated_utc": "2026-04-14T20:55:58Z",
   "files": [
     {
       "path": "components/ui.lua",
@@ -79,7 +79,7 @@
     },
     {
       "path": "modules/scheduler.lua",
-      "size": 3261
+      "size": 3259
     },
     {
       "path": "modules/tier.lua",
