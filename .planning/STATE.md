@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v6.4
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-04-14T18:48:16.978Z"
+stopped_at: Phase 12 context gathered
+last_updated: "2026-04-14T20:23:54.198Z"
 last_activity: 2026-04-14
 progress:
   total_phases: 12
@@ -75,6 +75,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T18:45:34.337Z
-Stopped at: Completed 11-01-PLAN.md
-Resume file: None
+Last session: 2026-04-14T20:23:54.191Z
+Stopped at: Phase 12 context gathered
+Resume file: .planning/phases/12-update-check-leve-no-startup-mostrar-versao-atual-vs-disponi/12-CONTEXT.md
