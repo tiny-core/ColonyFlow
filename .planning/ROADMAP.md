@@ -273,13 +273,13 @@ Plans:
 
 ### Phase 11: Versionamento robusto: versao real + script Node para regenerar manifest
 
-**Goal:** [To be planned]
+**Goal:** Introduzir versao real (SemVer) no manifesto e tooling deterministico para regenerar `manifest.json`, preparando update-check confiavel.
 **Requirements**: TBD
 **Depends on:** Phase 10
-**Plans:** 0 plans
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 11 to break down)
+- [x] 11-01 Versao real + gerador de manifesto (manifest version + installer + tooling)
 
 ### Phase 12: Update check leve no startup + mostrar versao atual vs disponivel na UI
 
