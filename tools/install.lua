@@ -182,8 +182,13 @@ local function validateManifest(manifest)
     end
     files[#files + 1] = { path = p, size = f.size, preserve = f.preserve == true }
   end
-  return { manifest_version = manifest.manifest_version, version = version, generated_utc = manifest.generated_utc, files =
-  files }
+  return {
+    manifest_version = manifest.manifest_version,
+    version = version,
+    generated_utc = manifest.generated_utc,
+    files =
+        files
+  }
 end
 
 local function loadManifest(cfg)
@@ -414,17 +419,14 @@ local function installOrUpdate(mode)
   end
   print("")
 
-  local ok, downloadedOrErr = pcall(downloadToTemp, bundle, files, tempRoot)
+  local ok, downloaded, dlErr = pcall(downloadToTemp, bundle, files, tempRoot)
   if not ok then
-    print("ERRO: Falha durante download: " .. tostring(downloadedOrErr))
+    print("ERRO: Falha durante download: " .. tostring(downloaded))
+    setExitCode(1)
     return 1
   end
-  local downloaded, dlErr = downloadedOrErr, nil
   if type(downloaded) ~= "table" then
-    dlErr = tostring(downloaded)
-  end
-  if dlErr then
-    print("ERRO: " .. dlErr)
+    print("ERRO: " .. tostring(dlErr or downloaded or "erro desconhecido no download"))
     setExitCode(1)
     return 1
   end
