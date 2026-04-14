@@ -129,3 +129,11 @@ Os testes manuais do instalador estão em:
 - Preferir mudanças pequenas e commits atômicos.
 - Manter mensagens e logs em português.
 - Rodar `startup test` após mudanças em módulos críticos.
+
+### Versionamento e manifesto
+
+Para bump de versão e atualização do manifesto:
+
+1. Atualize `VERSION` (formato `X.Y.Z`)
+2. Rode `node tools/gen_manifest.js` (regenera `manifest.json` com lista ordenada e `size`)
+3. Suba commit com `VERSION` + `manifest.json` atualizados
