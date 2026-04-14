@@ -54,7 +54,13 @@ function listLuaFilesUnder(dir) {
 
 function statSize(relPath) {
   const abs = path.join(process.cwd(), relPath);
-  return fs.statSync(abs).size;
+  const raw = fs.readFileSync(abs);
+  // GitHub raw serves text files with LF bytes from git blob. On Windows
+  // working tree may be CRLF, so normalize before counting to avoid mismatch.
+  if (raw.includes(0)) return raw.length;
+  const text = raw.toString("utf8");
+  if (Buffer.byteLength(text, "utf8") !== raw.length) return raw.length;
+  return Buffer.byteLength(text.replace(/\r\n/g, "\n"), "utf8");
 }
 
 function main() {

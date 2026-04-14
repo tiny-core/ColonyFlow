@@ -10,6 +10,24 @@ local function setExitCode(code)
   end
 end
 
+local function printError(msg)
+  local line = "ERRO: " .. tostring(msg)
+  if type(term) == "table"
+      and type(term.isColor) == "function"
+      and term.isColor()
+      and type(term.getTextColor) == "function"
+      and type(term.setTextColor) == "function"
+      and type(colors) == "table"
+      and colors.red then
+    local prev = term.getTextColor()
+    term.setTextColor(colors.red)
+    print(line)
+    term.setTextColor(prev)
+    return
+  end
+  print(line)
+end
+
 local function nowUtc()
   local t = os.date("!*t")
   return string.format(
@@ -70,7 +88,7 @@ local function doctor(cfg)
   print("")
 
   if not httpAvailable() then
-    print("ERRO: HTTP API indisponivel (http.get nao existe).")
+    printError("HTTP API indisponivel (http.get nao existe).")
     print("Acao: habilite HTTP no CC: Tweaked (config do mod/servidor) e tente novamente.")
     return false
   end
@@ -83,7 +101,7 @@ local function doctor(cfg)
   if http.checkURL then
     local ok, err = http.checkURL(manifestUrl)
     if not ok then
-      print("ERRO: URL bloqueada/invalida: " .. tostring(manifestUrl))
+      printError("URL bloqueada/invalida: " .. tostring(manifestUrl))
       print("Detalhe: " .. tostring(err))
       return false
     end
@@ -389,7 +407,7 @@ local function installOrUpdate(mode)
   end
 
   if not httpAvailable() then
-    print("ERRO: HTTP API indisponivel (http.get nao existe).")
+    printError("HTTP API indisponivel (http.get nao existe).")
     print("Acao: habilite HTTP no CC: Tweaked (config do mod/servidor) e tente novamente.")
     setExitCode(1)
     return 1
@@ -397,7 +415,7 @@ local function installOrUpdate(mode)
 
   local bundle, err = loadManifest(cfg)
   if not bundle then
-    print("ERRO: " .. tostring(err))
+    printError(tostring(err))
     setExitCode(1)
     return 1
   end
@@ -421,12 +439,12 @@ local function installOrUpdate(mode)
 
   local ok, downloaded, dlErr = pcall(downloadToTemp, bundle, files, tempRoot)
   if not ok then
-    print("ERRO: Falha durante download: " .. tostring(downloaded))
+    printError("Falha durante download: " .. tostring(downloaded))
     setExitCode(1)
     return 1
   end
   if type(downloaded) ~= "table" then
-    print("ERRO: " .. tostring(dlErr or downloaded or "erro desconhecido no download"))
+    printError(tostring(dlErr or downloaded or "erro desconhecido no download"))
     setExitCode(1)
     return 1
   end
@@ -443,7 +461,7 @@ local function installOrUpdate(mode)
   end
   local metaOk, metaOrErr = pcall(snapshotBackup, toBackup, backupRoot)
   if not metaOk then
-    print("ERRO: Falha ao criar snapshot: " .. tostring(metaOrErr))
+    printError("Falha ao criar snapshot: " .. tostring(metaOrErr))
     setExitCode(1)
     return 1
   end
@@ -464,7 +482,7 @@ local function installOrUpdate(mode)
   end
 
   if not appliedOk then
-    print("ERRO: Falha ao aplicar update: " .. tostring(applyErr))
+    printError("Falha ao aplicar update: " .. tostring(applyErr))
     print("Rollback automatico...")
     rollback(backupRoot, meta)
     setExitCode(1)
@@ -490,7 +508,7 @@ local function installOrUpdate(mode)
     end
   end)
   if not finalOk then
-    print("ERRO: Falha ao finalizar update: " .. tostring(finalErr))
+    printError("Falha ao finalizar update: " .. tostring(finalErr))
     print("Rollback automatico...")
     rollback(backupRoot, meta)
     setExitCode(1)
