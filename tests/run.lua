@@ -223,12 +223,16 @@ local tests = {
             write = function(s) buf = buf .. tostring(s or "") end,
             writeLine = function(s) buf = buf .. tostring(s or "") .. "\n" end,
             flush = function() end,
-            close = function() files[path] = buf; existsSet[path] = true end,
+            close = function()
+              files[path] = buf; existsSet[path] = true
+            end,
           }
         end
         return nil
       end,
-      delete = function(path) files[path] = nil; existsSet[path] = false end,
+      delete = function(path)
+        files[path] = nil; existsSet[path] = false
+      end,
       move = function(src, dst)
         files[dst] = files[src]
         existsSet[dst] = true
@@ -237,7 +241,8 @@ local tests = {
       end,
     }
 
-    local res = Config.patchIniFileAtomic("config.ini", { core = { log_level = "DEBUG" } }, { backup_dir = "data/backups" })
+    local res = Config.patchIniFileAtomic("config.ini", { core = { log_level = "DEBUG" } },
+      { backup_dir = "data/backups" })
 
     local backupPath = tostring(res.backup_path or "")
     local okSaved = res.ok == true
@@ -264,9 +269,27 @@ local tests = {
     assertEq(res.ok, false)
     assertEq(#res.errors >= 3, true, "deveria reportar erros suficientes")
   end },
+  { "semver_is_valid", function()
+    local Version = require("lib.version")
+    assertEq(Version.isValid("0.0.0"), true)
+    assertEq(Version.isValid("1.2.3"), true)
+    assertEq(Version.isValid("1.2"), false)
+    assertEq(Version.isValid("1.2.3.4"), false)
+    assertEq(Version.isValid("a.b.c"), false)
+    assertEq(Version.isValid("01.2.3"), false)
+  end },
+  { "semver_compare", function()
+    local Version = require("lib.version")
+    local gt = Version.compare("1.0.0", "0.9.9")
+    local lt = Version.compare("1.2.0", "1.2.1")
+    local eq = Version.compare("1.2.3", "1.2.3")
+    assertEq(gt, 1)
+    assertEq(lt, -1)
+    assertEq(eq, 0)
+  end },
   { "mappings_json_skeleton_quando_ausente", function()
     local Equivalence = require("modules.equivalence")
-    
+
     local oldFsExists = fs.exists
     local oldFsOpen = fs.open
     local oldFsMakeDir = fs.makeDir
