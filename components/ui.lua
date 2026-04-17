@@ -303,7 +303,7 @@ function UI:renderRequests(state, mon)
     term.redirect(old)
   end
 
-  self:drawText("requests", mon, 1, 1, padRight("Requisicoes (MineColonies)", w))
+  self:drawText("requests", mon, 1, 1, padRight("Requisicoes (ColonyFlow)", w))
   local right = UpdateCheck.formatHeaderRight(state, w)
   self:drawText("requests", mon, math.max(1, w - #right + 1), 1, right, colors.gray)
   self:drawText("requests", mon, 1, 2, string.rep("-", math.max(0, w)))

@@ -1,4 +1,4 @@
-# Requisitos: MineColonies ME Automation
+# Requisitos: ColonyFlow
 
 **Definidos:** 2026-04-05
 **Core Value:** Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColonies e entrega do item correto, craftando somente o necessário.
@@ -127,4 +127,4 @@
 
 ---
 *Requisitos definidos: 2026-04-05*
-*Last updated: 2026-04-11*
+*Last updated: 2026-04-14*

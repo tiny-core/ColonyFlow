@@ -1,4 +1,4 @@
-# Roadmap: MineColonies ME Automation
+# Roadmap: ColonyFlow
 
 ## Overview
 
@@ -12,9 +12,19 @@ Objetivo: entregar um sistema autônomo em Lua (CC: Tweaked) que lê requisiçõ
 - [x] **Phase 4: UI + Configuração Operacional** - UI dual-monitor, paginação, status misto e editor de mapeamentos com logs de substituição
 - [x] **Phase 5: Testes + Endurecimento** - Harness de testes, cobertura de mapeamentos e ajustes de performance/estabilidade
 - [x] **Phase 6: Cache + Robustez Operacional** - Cache TTL para consultas do ME e endurecimento para operação longa
-- [ ] **Phase 7: Auto-Setup + Compatibilidade MP** - Auto-geração de config.ini, validação/diagnóstico de periféricos e endurecimento para multiplayer
-- [ ] **Phase 8: Mapping v2 (Estrutura + Comportamento)** - Evoluir estrutura do mappings.json e o comportamento de equivalências/tiers
-- [ ] **Phase 9: Instalador In-Game (Git)** - Script de instalação/atualização que baixa os arquivos do sistema do repositório direto no CC
+- [x] **Phase 7: Auto-Setup + Compatibilidade MP** - Auto-geração de config.ini, validação/diagnóstico de periféricos e endurecimento para multiplayer
+- [x] **Phase 8: Mapping v2 (Estrutura + Comportamento)** - Evoluir estrutura do mappings.json e o comportamento de equivalências/tiers
+- [x] **Phase 9: Instalador In-Game (Git)** - Script de instalação/atualização que baixa os arquivos do sistema do repositório direto no CC
+- [x] **Phase 10: Config CLI (editar config.ini e perifericos)** - CLI in-game com validação e escrita atômica
+- [x] **Phase 11: Versionamento robusto (SemVer + tooling manifest)** - Versão real no manifesto + gerador determinístico + persistência em data/version.json
+- [x] **Phase 12: Update check + UI (versao instalada vs disponivel)** - Checagem leve no boot, cache TTL e indicação discreta na UI
+- [ ] **Phase 13: Operabilidade do update-check (config + backoff + detalhes)** - Tornar update-check configuravel, com backoff e tela de detalhes (sem poluir UI)
+- [ ] **Phase 14: UI Status - Saude de perifericos (coluna alinhada)** - Exibir status dos perifericos essenciais no Monitor 2 em coluna ao lado dos contadores
+- [ ] **Phase 15: Operabilidade + Resiliencia (doctor + persistencia + circuit breaker)** - Modo doctor, persistencia de jobs e resiliencia a oscilacao do ME
+- [ ] **Phase 16: Observabilidade de Performance (metricas + contadores)** - Medir custo por tick e chamadas a perifericos, com exibicao discreta e logs
+- [ ] **Phase 17: Scheduler com Budget (limites por tick)** - Limitar trabalho por ciclo (requests/IO) para reduzir picos e travamentos
+- [ ] **Phase 18: Refactor por Snapshots (reduzir acoplamento/IO)** - Padronizar snapshots de estado para UI/engine e reduzir complexidade
+- [ ] **Phase 19: Documentacao Didatica + Comentarios (PT)** - Guia de estudo e comentarios explicativos em portugues (identificadores em ingles)
 
 ## Phase Details
 
@@ -249,20 +259,27 @@ Plans:
 
 ## Progress
 
-| Phase                                     | Plans Complete | Status      | Completed  |
-| ----------------------------------------- | -------------- | ----------- | ---------- |
-| 1. Fundação Operacional                   | 1/1            | Complete    | 2026-04-05 |
-| 2. Núcleo de Requisições + Filtros        | 1/1            | Complete    | 2026-04-10 |
-| 3. Craft + Entrega com Progressão         | 1/1            | Complete    | 2026-04-10 |
-| 4. UI + Configuração Operacional          | 1/1            | Complete    | 2026-04-10 |
-| 5. Testes + Endurecimento                 | 1/1            | Complete    | 2026-04-10 |
-| 6. Cache + Robustez Operacional           | 1/1            | Complete    | 2026-04-11 |
-| 7. Auto-Setup + Compatibilidade MP        | 1/1            | Complete    | 2026-04-11 |
-| 8. Mapping v2 (Estrutura + Comportamento) | 1/1            | Complete    | 2026-04-12 |
-| 9. Instalador In-Game (Git)               | 1/1            | Complete    | 2026-04-12 |
-| 10. Config CLI (editar config.ini e perifericos) | 1/1      | Complete    | 2026-04-13 |
-| 11. Versionamento robusto (SemVer + tooling manifest) | 1/1  | Complete    | 2026-04-14 |
-| 12. Update check + UI (versao instalada vs disponivel) | 1/1 | Complete    | 2026-04-14 |
+| Phase                                                  | Plans Complete | Status   | Completed  |
+| ------------------------------------------------------ | -------------- | -------- | ---------- |
+| 1. Fundação Operacional                                | 1/1            | Complete | 2026-04-05 |
+| 2. Núcleo de Requisições + Filtros                     | 1/1            | Complete | 2026-04-10 |
+| 3. Craft + Entrega com Progressão                      | 1/1            | Complete | 2026-04-10 |
+| 4. UI + Configuração Operacional                       | 1/1            | Complete | 2026-04-10 |
+| 5. Testes + Endurecimento                              | 1/1            | Complete | 2026-04-10 |
+| 6. Cache + Robustez Operacional                        | 1/1            | Complete | 2026-04-11 |
+| 7. Auto-Setup + Compatibilidade MP                     | 1/1            | Complete | 2026-04-11 |
+| 8. Mapping v2 (Estrutura + Comportamento)              | 1/1            | Complete | 2026-04-12 |
+| 9. Instalador In-Game (Git)                            | 1/1            | Complete | 2026-04-12 |
+| 10. Config CLI (editar config.ini e perifericos)       | 1/1            | Complete | 2026-04-13 |
+| 11. Versionamento robusto (SemVer + tooling manifest)  | 1/1            | Complete | 2026-04-14 |
+| 12. Update check + UI (versao instalada vs disponivel) | 1/1            | Complete | 2026-04-14 |
+| 13. Operabilidade do update-check                      | 0/1            | Not started | -        |
+| 14. UI Status - Saude de perifericos                   | 0/1            | Not started | -        |
+| 15. Operabilidade + Resiliencia                        | 0/1            | Not started | -        |
+| 16. Observabilidade de Performance                      | 0/1            | Not started | -        |
+| 17. Scheduler com Budget                               | 0/1            | Not started | -        |
+| 18. Refactor por Snapshots                             | 0/1            | Not started | -        |
+| 19. Documentacao Didatica + Comentarios                | 0/1            | Not started | -        |
 
 ### Phase 10: Config CLI (editar config.ini e perifericos)
 
@@ -272,6 +289,7 @@ Plans:
 **Plans:** 1/1 plans complete
 
 Plans:
+
 - [x] 10-01 Config CLI (editar config.ini e perifericos)
 
 ### Phase 11: Versionamento robusto: versao real + script Node para regenerar manifest
@@ -282,6 +300,7 @@ Plans:
 **Plans:** 1/1 plans complete
 
 Plans:
+
 - [x] 11-01 Versao real + gerador de manifesto (manifest version + installer + tooling)
 
 ### Phase 12: Update check leve no startup + mostrar versao atual vs disponivel na UI
@@ -292,4 +311,75 @@ Plans:
 **Plans:** 1/1 plans complete
 
 Plans:
+
 - [x] 12-01 Update check leve + UI de versao instalada vs disponivel
+
+### Phase 13: Operabilidade do update-check (config + backoff + detalhes)
+
+**Goal:** Tornar o update-check mais operavel em servidores/modpacks variados: configuravel via `config.ini`, com backoff em falhas e uma forma de ver detalhes (ultima checagem/erro/url) sem poluir a UI principal.
+**Depends on:** Phase 12
+**Requirements**: TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 13 to break down)
+
+### Phase 14: UI Status - Saude de perifericos (coluna alinhada)
+
+**Goal:** Exibir no Monitor 2 (Status) uma coluna alinhada com os perifericos essenciais (ex.: ME Bridge/Colony/Modem/Monitores) com status e cor (verde online, vermelho offline), lado a lado com os contadores existentes.
+**Depends on:** Phase 12
+**Requirements**: TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 14 to break down)
+
+### Phase 15: Operabilidade + Resiliencia (doctor + persistencia + circuit breaker)
+
+**Goal:** Melhorar operacao e resiliencia: adicionar `startup doctor` (checklist rapido), persistir jobs em disco para retomar apos reboot e adicionar circuit breaker/backoff para ME instavel.
+**Depends on:** Phase 12
+**Requirements**: TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 15 to break down)
+
+### Phase 16: Observabilidade de Performance (metricas + contadores)
+
+**Goal:** Medir e tornar visivel o custo do sistema (tick/IO) com metricas e contadores (ex.: tempo de tick, chamadas ME, cache hit/miss), para guiar otimizacao sem chute.
+**Depends on:** Phase 12
+**Requirements**: TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 16 to break down)
+
+### Phase 17: Scheduler com Budget (limites por tick)
+
+**Goal:** Reduzir picos e travamentos com limites por tick (quantidade de requests processadas, chamadas a perifericos) e escalonamento de tarefas pesadas.
+**Depends on:** Phase 16
+**Requirements**: TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 17 to break down)
+
+### Phase 18: Refactor por Snapshots (reduzir acoplamento/IO)
+
+**Goal:** Simplificar arquitetura e reduzir IO: engine produz snapshots (requests/status/health/metrics) e UI consome snapshots, com funcoes puras testaveis para decisoes.
+**Depends on:** Phase 17
+**Requirements**: TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 18 to break down)
+
+### Phase 19: Documentacao Didatica + Comentarios (PT)
+
+**Goal:** Facilitar aprendizado: guia de leitura do projeto + documentacao e comentarios explicativos em portugues, mantendo nomes de funcoes/variaveis em ingles.
+**Depends on:** Phase 18
+**Requirements**: TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 19 to break down)

@@ -1,4 +1,4 @@
-# MineColonies ME Automation
+# ColonyFlow
 
 ## What This Is
 
@@ -25,15 +25,25 @@ Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColo
 - Exibir requisições e status operacional em dois Advanced Monitors com layout ASCII responsivo (Validated in Phase 04)
 - Registrar logs estruturados em português com rotação e níveis de severidade (Validated in Phase 01)
 - Operar em loop autônomo com fila, retentativas e recuperação segura de falhas (Validated in Phase 01)
+- Gerar `config.ini` automaticamente com defaults quando ausente e registrar defaults aplicados (Validated in Phase 07)
+- Mesclar mapeamentos do JSON com regras embutidas opcionais (sem impor equivalências padrão) (Validated in Phase 08)
+- Garantir compatibilidade de operação em singleplayer e multiplayer (Validated in Phase 07)
+- Evoluir estrutura e comportamento do sistema de mapeamentos (mappings v2 + migração + editor) (Validated in Phase 08)
+- Criar instalador in-game que baixa e atualiza os arquivos do sistema direto do repositório Git (Validated in Phase 09)
+- Configurar `config.ini` e perifericos via CLI in-game, com validacao e escrita atomica (Validated in Phase 10)
+- Versionamento robusto: versao real (SemVer) + tooling deterministico de manifesto (Validated in Phase 11)
+- Update-check leve em background + UI com versao instalada vs disponivel (Validated in Phase 12)
 
 ### Active
 
-- [ ] Gerar `config.ini` automaticamente com defaults quando ausente e registrar defaults aplicados
-- [ ] Mesclar mapeamentos do JSON com regras embutidas opcionais (sem impor equivalências padrão)
-- [ ] Garantir compatibilidade de operação em singleplayer e multiplayer
 - [ ] Consolidar dataset opcional de testes para mapeamentos (ATM10/mods populares) sem obrigatoriedade
-- [ ] Evoluir estrutura e comportamento do sistema de mapeamentos (mappings v2 + migração + editor)
-- [ ] Criar instalador in-game que baixa e atualiza os arquivos do sistema direto do repositório Git
+- [ ] Operabilidade do update-check: config + backoff + tela de detalhes (fase 13)
+- [ ] UI Status: mostrar saude de perifericos essenciais em coluna alinhada (fase 14)
+- [ ] Operabilidade + resiliencia: startup doctor + persistencia de jobs + circuit breaker ME (fase 15)
+- [ ] Observabilidade de performance: metricas + contadores de chamadas (fase 16)
+- [ ] Scheduler com budget: limites por tick e escalonamento (fase 17)
+- [ ] Refactor por snapshots: reduzir acoplamento e IO (fase 18)
+- [ ] Documentacao didatica + comentarios em portugues (fase 19)
 
 ### Out of Scope
 
@@ -91,4 +101,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-09 after phase 4*
+*Last updated: 2026-04-14 after phase 12*
