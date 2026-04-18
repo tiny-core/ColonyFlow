@@ -467,6 +467,33 @@ local function buildPeripheralHealth(state, me)
     return present == true
   end
 
+  local function wrapByName(name)
+    if type(name) ~= "string" or name == "" then return nil end
+    if type(peripheral) ~= "table" or type(peripheral.wrap) ~= "function" then return nil end
+    local ok, dev = pcall(peripheral.wrap, name)
+    if not ok then return nil end
+    return dev
+  end
+
+  local function refreshDeviceFromConfig(deviceKey, nameKey, cfgKey)
+    if not devices then return nil, nil end
+    local name = trim(devices[nameKey] or "")
+    if name == "" and cfg and type(cfg.get) == "function" then
+      name = trim(cfg:get("peripherals", cfgKey, ""))
+    end
+    if name == "" then return devices[deviceKey], nil end
+
+    local resolved = resolvePeripheralName(name)
+    local present = presentByName(resolved)
+    devices[nameKey] = resolved
+    if present == true then
+      devices[deviceKey] = wrapByName(resolved) or devices[deviceKey]
+    else
+      devices[deviceKey] = nil
+    end
+    return devices[deviceKey], resolved
+  end
+
   local function deviceStatus(dev, name)
     local present = presentByName(name)
     if present == true then return "Online", "ok" end
@@ -479,6 +506,12 @@ local function buildPeripheralHealth(state, me)
   end
 
   local meValue, meLevel = "NA", "unknown"
+  local meDev, _ = refreshDeviceFromConfig("meBridge", "meName", "me_bridge")
+  if meDev then
+    meValue, meLevel = "Online", "ok"
+  else
+    meValue, meLevel = "Offline", "bad"
+  end
   if me and type(me.isOnline) == "function" then
     local ok = me:isOnline()
     if ok == true then
@@ -509,7 +542,8 @@ local function buildPeripheralHealth(state, me)
     end
   end
 
-  local colonyValue, colonyLevel = deviceStatus(devices and devices.colonyIntegrator, devices and devices.colonyName)
+  local colonyDev, colonyName = refreshDeviceFromConfig("colonyIntegrator", "colonyName", "colony_integrator")
+  local colonyValue, colonyLevel = deviceStatus(colonyDev, colonyName)
 
   return {
     { label = "ME Bridge", value = meValue,     level = meLevel },
