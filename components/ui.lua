@@ -10,6 +10,21 @@ local function shorten(s, maxLen)
   return s:sub(1, maxLen - 2) .. ".."
 end
 
+local function cleanAscii(s)
+  s = tostring(s or "")
+  s = s:gsub("[%c]", "")
+  s = s:gsub("[^\x20-\x7E]", "?")
+  return s
+end
+
+local function formatTs(ms)
+  local n = tonumber(ms)
+  if not n then return "-" end
+  local sec = math.floor(n / 1000)
+  if sec <= 0 then return "-" end
+  return os.date("!%Y-%m-%d %H:%M:%SZ", sec)
+end
+
 function UI.new(state)
   return setmetatable({
     state = state,
@@ -516,10 +531,51 @@ function UI:renderStatus(state, mon)
   end
 
   local noCraft = self:collectNoCraftItems(state)
-  local btn = "SEM CRAFT: " .. tostring(#noCraft) .. "  (TOQUE)"
+  local btn = "SEM CRAFT: " .. tostring(#noCraft)
   local btnFg = (#noCraft > 0) and colors.red or colors.gray
+  local updBtn = "[UPD]"
+  local updFg = UpdateCheck.isUpdateAvailable(state) and colors.yellow or colors.gray
   self:drawText("status", mon, 1, h - 1, string.rep("-", math.max(0, w)), colors.gray, colors.black)
   self:drawText("status", mon, 1, h, padRight(btn, w), btnFg, colors.black)
+  self:drawText("status", mon, math.max(1, w - #updBtn + 1), h, updBtn, updFg, colors.black)
+end
+
+function UI:renderUpdateDetails(state, mon)
+  if not mon then return end
+  local w, h = mon.getSize()
+
+  self:drawText("status", mon, 1, 1, padRight(centerText("UPDATE CHECK", w), w))
+  local right = UpdateCheck.formatHeaderRight(state, w)
+  self:drawText("status", mon, math.max(1, w - #right + 1), 1, right, colors.gray)
+  self:drawText("status", mon, 1, 2, string.rep("-", math.max(0, w)))
+
+  local upd = type(state.update) == "table" and state.update or {}
+  local installed = cleanAscii(upd.installed_version or (state.installed and state.installed.version) or "NO-VERSION")
+  local available = cleanAscii(upd.available_version or "-")
+  local status = cleanAscii(upd.status or "-")
+  local stale = upd.stale == true and "SIM" or "NAO"
+
+  local lastChecked = formatTs(upd.last_attempt_at_ms or upd.checked_at_ms)
+  local lastSuccess = formatTs(upd.last_success_at_ms)
+  local lastErr = shorten(cleanAscii(upd.err or "-"), math.max(0, w - #"Last err: "))
+  local manifestUrl = shorten(cleanAscii(upd.manifest_url or "-"), math.max(0, w - #"Manifest: "))
+
+  local y = 3
+  self:drawText("status", mon, 1, y, padRight("Installed: " .. installed, w)); y = y + 1
+  self:drawText("status", mon, 1, y, padRight("Available: " .. available, w)); y = y + 1
+  self:drawText("status", mon, 1, y, padRight("Status: " .. status, w)); y = y + 1
+  self:drawText("status", mon, 1, y, padRight("Stale: " .. stale, w)); y = y + 1
+  self:drawText("status", mon, 1, y, padRight("Last checked: " .. lastChecked, w)); y = y + 1
+  self:drawText("status", mon, 1, y, padRight("Last success: " .. lastSuccess, w)); y = y + 1
+  self:drawText("status", mon, 1, y, padRight("Last err: " .. lastErr, w)); y = y + 1
+  self:drawText("status", mon, 1, y, padRight("Manifest: " .. manifestUrl, w)); y = y + 1
+
+  for i = y, h - 2 do
+    self:drawText("status", mon, 1, i, padRight("", w))
+  end
+
+  self:drawText("status", mon, 1, h - 1, string.rep("-", math.max(0, w)), colors.gray, colors.black)
+  self:drawText("status", mon, 1, h, padRight("[VOLTAR]", w), colors.lightGray, colors.black)
 end
 
 function UI:handleEvent(event, side, x, y)
@@ -555,13 +611,25 @@ function UI:handleEvent(event, side, x, y)
           end
         end
         self:tick()
+      elseif self.statusView == "update" then
+        if y == h and x <= (#"[VOLTAR]" + 2) then
+          self.statusView = "main"
+          self:tick()
+        end
       else
         if y == h then
-          local list = self:collectNoCraftItems(self.state)
-          if #list > 0 then
-            self.statusView = "nocraft"
-            self.noCraftPage = 1
+          local updBtn = "[UPD]"
+          local updStart = math.max(1, w - #updBtn + 1)
+          if x >= updStart then
+            self.statusView = "update"
             self:tick()
+          else
+            local list = self:collectNoCraftItems(self.state)
+            if #list > 0 then
+              self.statusView = "nocraft"
+              self.noCraftPage = 1
+              self:tick()
+            end
           end
         end
       end
@@ -574,6 +642,8 @@ function UI:tick()
   self:renderRequests(state, state.devices.monitorRequests)
   if self.statusView == "nocraft" then
     self:renderNoCraft(state, state.devices.monitorStatus)
+  elseif self.statusView == "update" then
+    self:renderUpdateDetails(state, state.devices.monitorStatus)
   else
     self:renderStatus(state, state.devices.monitorStatus)
   end
