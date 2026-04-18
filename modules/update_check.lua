@@ -201,6 +201,22 @@ local function computeSleepSeconds(stateUpdate, cfg, nowMs)
     return math.max(1, math.floor((dueAt - nowMs) / 1000))
 end
 
+local function isErrorLikeStatus(status)
+    status = tostring(status or "")
+    return status == "error" or status == "http_off" or status == "http_blocked"
+end
+
+local function ensureRetryScheduled(stateUpdate, cfg, nowMs)
+    if type(stateUpdate) ~= "table" then return end
+    if not isErrorLikeStatus(stateUpdate.status) then return end
+    if tonumber(stateUpdate.next_retry_at_ms) then return end
+
+    local failCount = tonumber(stateUpdate.fail_count) or 0
+    if failCount < 0 then failCount = 0 end
+    local delay = math.min(cfg.retry_seconds * (2 ^ failCount), cfg.error_backoff_max_seconds)
+    stateUpdate.next_retry_at_ms = (tonumber(nowMs) or Util.nowUtcMs()) + math.floor(delay * 1000)
+end
+
 local function httpGetText(url)
     local resp, err = http.get(url)
     if not resp then
@@ -379,6 +395,7 @@ function M.tick(state, opts)
     end
 
     M.refresh(state, { tries = tonumber(opts.tries) or 2 })
+    ensureRetryScheduled(state.update, cfg, Util.nowUtcMs())
     sleep = computeSleepSeconds(state.update, cfg, Util.nowUtcMs())
     if sleep > 0 then return sleep end
     return math.max(10, math.floor((tonumber(state.update.ttl_ms) or DEFAULT_TTL_MS) / 1000))

@@ -372,31 +372,34 @@ local tests = {
       end,
     }
 
-    local cfg = makeCfg({ update = { enabled = "true", ttl_hours = "6", retry_seconds = "120", error_backoff_max_seconds = "900" } })
-    local state = { cfg = cfg, installed = { version = "1.0.0" }, update = UpdateCheck.defaultState({ version = "1.0.0" }) }
-    state.update.available_version = "1.2.3"
+    local ok, err = pcall(function()
+      local cfg = makeCfg({ update = { enabled = "true", ttl_hours = "6", retry_seconds = "120", error_backoff_max_seconds = "900" } })
+      local state = { cfg = cfg, installed = { version = "1.0.0" }, update = UpdateCheck.defaultState({ version = "1.0.0" }) }
+      state.update.available_version = "1.2.3"
 
-    local s1 = UpdateCheck.tick(state, { tries = 1 })
-    assertEq(s1, 120)
-    assertEq(state.update.status, "http_off")
-    assertEq(state.update.stale, true)
-    assertEq(state.update.fail_count, 1)
-    assertEq(state.update.next_retry_at_ms, 1000000 + 120 * 1000)
+      local s1 = UpdateCheck.tick(state, { tries = 1 })
+      assertEq(s1, 120)
+      assertEq(state.update.status, "http_off")
+      assertEq(state.update.stale, true)
+      assertEq(state.update.fail_count, 1)
+      assertEq(state.update.next_retry_at_ms, 1000000 + 120 * 1000)
 
-    os.epoch = function() return 1000000 + 120 * 1000 end
-    local s2 = UpdateCheck.tick(state, { tries = 1 })
-    assertEq(s2, 240)
-    assertEq(state.update.fail_count, 2)
+      os.epoch = function() return 1000000 + 120 * 1000 end
+      local s2 = UpdateCheck.tick(state, { tries = 1 })
+      assertEq(s2, 240)
+      assertEq(state.update.fail_count, 2)
 
-    state.update.fail_count = 10
-    state.update.next_retry_at_ms = nil
-    os.epoch = function() return 2000000 end
-    local s3 = UpdateCheck.tick(state, { tries = 1 })
-    assertEq(s3, 900)
+      state.update.fail_count = 10
+      state.update.next_retry_at_ms = nil
+      os.epoch = function() return 2000000 end
+      local s3 = UpdateCheck.tick(state, { tries = 1 })
+      assertEq(s3, 900)
+    end)
 
     fs = oldFs
     http = oldHttp
     os.epoch = oldEpoch
+    if not ok then error(err, 0) end
   end },
   { "update_check_success_uses_ttl", function()
     local UpdateCheck = require("modules.update_check")
@@ -534,18 +537,21 @@ local tests = {
       end,
     }
 
-    local cfg = makeCfg({ update = { enabled = "true", ttl_hours = "6", retry_seconds = "120", error_backoff_max_seconds = "900" } })
-    local state = { cfg = cfg, installed = { version = "1.0.0" }, update = UpdateCheck.defaultState({ version = "1.0.0" }) }
-    state.update.last_success_at_ms = 3999000
-    state.update.next_retry_at_ms = 4000000
+    local ok, err = pcall(function()
+      local cfg = makeCfg({ update = { enabled = "true", ttl_hours = "6", retry_seconds = "120", error_backoff_max_seconds = "900" } })
+      local state = { cfg = cfg, installed = { version = "1.0.0" }, update = UpdateCheck.defaultState({ version = "1.0.0" }) }
+      state.update.last_success_at_ms = 3999000
+      state.update.next_retry_at_ms = 4000000
 
-    local s1 = UpdateCheck.tick(state, { tries = 1 })
-    assertEq(s1, 120)
-    assertEq(state.update.status, "http_off")
+      local s1 = UpdateCheck.tick(state, { tries = 1 })
+      assertEq(s1, 120)
+      assertEq(state.update.status, "http_off")
+    end)
 
     fs = oldFs
     http = oldHttp
     os.epoch = oldEpoch
+    if not ok then error(err, 0) end
   end },
   { "update_check_format_header_right", function()
     local UpdateCheck = require("modules.update_check")
