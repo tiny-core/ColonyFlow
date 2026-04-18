@@ -70,7 +70,7 @@ Cada tarefa foi commitada de forma atomica:
 3. **Task 3: Scheduler enabled/log sem spam** - `d121d65` (feat)
 4. **Task 4: UI detalhes no Monitor 2** - `64b99d7` (feat)
 5. **Task 5: Testes de cache/backoff/TTL** - `c479f04` (test)
-6. **Task 6: Checklist de verificacao** - pendente (docs)
+6. **Task 6: Checklist de verificacao + tracking** - (docs)
 
 ## Files Created/Modified
 - `lib/config.lua` - defaults do config.ini com secao [update]
