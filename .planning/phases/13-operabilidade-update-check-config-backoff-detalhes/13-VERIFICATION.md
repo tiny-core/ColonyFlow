@@ -7,7 +7,7 @@
 ## Manual (in-world)
 
 1. Desabilitar update-check:
-   - Em `config.ini`, setar `[update] enabled=false`
+   - Em `config.ini`, setar `[update] enabled=false` (ou `startup config` -> `Update-check` -> `Checagem de update` = NAO)
    - Rodar `startup`
    - Confirmar que a UI sobe normalmente e nao mostra erro
    - No Monitor 2 (status), tocar em `[UPD]` e confirmar `Status: disabled`

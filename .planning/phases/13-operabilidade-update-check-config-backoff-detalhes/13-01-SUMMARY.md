@@ -59,6 +59,7 @@ completed: 2026-04-18
 - Configura `[update]` no config.ini/defaults (enabled, ttl_hours, retry_seconds, error_backoff_max_seconds)
 - Implementa retry/backoff com cap e compatibilidade com cache antigo, sem "travar" por TTL em erro/HTTP off
 - Adiciona view de detalhes no monitor de status com campos operacionais (ASCII-only e truncamento)
+- Atualiza `startup config` (Config CLI) para incluir Update-check e mostrar labels em portugues (sem chaves cruas)
 - Cobre comportamento com testes sem HTTP real (TTL vs erro, cap de backoff, normalizacao de cache)
 
 ## Task Commits

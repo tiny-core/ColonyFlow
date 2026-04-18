@@ -63,8 +63,10 @@ function M.validateUpdates(updatesBySection)
 
   local delivery = updatesBySection.delivery
   if type(delivery) == "table" then
-    validateEnum(errors, "delivery.export_mode", delivery.export_mode, EXPORT_MODES, function(s) return tostring(s):lower() end)
-    validateEnum(errors, "delivery.export_direction", delivery.export_direction, DIRECTIONS, function(s) return tostring(s):lower() end)
+    validateEnum(errors, "delivery.export_mode", delivery.export_mode, EXPORT_MODES,
+      function(s) return tostring(s):lower() end)
+    validateEnum(errors, "delivery.export_direction", delivery.export_direction, DIRECTIONS,
+      function(s) return tostring(s):lower() end)
     validateNumber(errors, "delivery.destination_cache_ttl_seconds", delivery.destination_cache_ttl_seconds, nil, 0)
   end
 
@@ -74,6 +76,28 @@ function M.validateUpdates(updatesBySection)
     local ms = Util.trim(p.monitor_status or "")
     if mr ~= "" and ms ~= "" and mr == ms then
       addErr(errors, "peripherals: monitor_requests e monitor_status nao podem ser iguais")
+    end
+  end
+
+  local upd = updatesBySection.update
+  if type(upd) == "table" then
+    local enabled = upd.enabled
+    if enabled ~= nil and enabled ~= "" then
+      local v = tostring(enabled):lower()
+      local ok = (v == "true" or v == "false" or v == "1" or v == "0" or v == "yes" or v == "no" or v == "y" or v == "n" or v == "on" or v == "off")
+      if not ok then
+        addErr(errors, "update.enabled: deve ser bool (true/false)")
+      end
+    end
+
+    validateNumber(errors, "update.ttl_hours", upd.ttl_hours, 0, nil)
+    validateNumber(errors, "update.retry_seconds", upd.retry_seconds, nil, 1)
+    validateNumber(errors, "update.error_backoff_max_seconds", upd.error_backoff_max_seconds, nil, 1)
+
+    local rs = tonumber(upd.retry_seconds)
+    local mx = tonumber(upd.error_backoff_max_seconds)
+    if rs and mx and mx < rs then
+      addErr(errors, "update.error_backoff_max_seconds: deve ser >= update.retry_seconds")
     end
   end
 

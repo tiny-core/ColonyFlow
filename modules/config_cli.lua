@@ -18,6 +18,45 @@ local function trim(s)
   return Util.trim(tostring(s or ""))
 end
 
+local FIELD_LABELS = {
+  core = {
+    poll_interval_seconds = "Intervalo do loop (s)",
+    ui_refresh_seconds = "Refresh da UI (s)",
+    log_level = "Nivel de log",
+    log_dir = "Pasta de logs",
+    log_max_files = "Max logs (arquivos)",
+    log_max_kb = "Max log (KB)",
+  },
+  peripherals = {
+    colony_integrator = "Colony Integrator",
+    me_bridge = "ME Bridge",
+    modem = "Modem",
+    monitor_requests = "Monitor pedidos",
+    monitor_status = "Monitor status",
+  },
+  delivery = {
+    default_target_container = "Destino padrao (inventario)",
+    export_mode = "Modo de exportacao",
+    export_direction = "Direcao de exportacao",
+    export_buffer_container = "Buffer de exportacao",
+    destination_cache_ttl_seconds = "TTL cache destino (s)",
+  },
+  update = {
+    enabled = "Checagem de update",
+    ttl_hours = "TTL de sucesso (h)",
+    retry_seconds = "Retry base (s)",
+    error_backoff_max_seconds = "Backoff max (s)",
+  }
+}
+
+local function fieldLabel(section, key)
+  local s = FIELD_LABELS[tostring(section or "")]
+  if s and s[tostring(key or "")] then
+    return tostring(s[tostring(key or "")])
+  end
+  return tostring(section or "") .. "." .. tostring(key or "")
+end
+
 local function supportsColor()
   return colors and term and term.isColor and term.isColor()
 end
@@ -285,12 +324,18 @@ local function buildEffective(cfg, updates)
       export_direction = v("delivery", "export_direction"),
       export_buffer_container = v("delivery", "export_buffer_container"),
       destination_cache_ttl_seconds = v("delivery", "destination_cache_ttl_seconds"),
-    }
+    },
+    update = {
+      enabled = v("update", "enabled"),
+      ttl_hours = v("update", "ttl_hours"),
+      retry_seconds = v("update", "retry_seconds"),
+      error_backoff_max_seconds = v("update", "error_backoff_max_seconds"),
+    },
   }
 end
 
 local function buildChangedOnly(cfg, updates)
-  local out = { peripherals = {}, core = {}, delivery = {} }
+  local out = { peripherals = {}, core = {}, delivery = {}, update = {} }
   for section, kv in pairs(updates) do
     for k, newVal in pairs(kv) do
       local cur = cfg:get(section, k, "")
@@ -302,6 +347,7 @@ local function buildChangedOnly(cfg, updates)
   if next(out.peripherals) == nil then out.peripherals = nil end
   if next(out.core) == nil then out.core = nil end
   if next(out.delivery) == nil then out.delivery = nil end
+  if next(out.update) == nil then out.update = nil end
   return out
 end
 
@@ -311,7 +357,7 @@ local function previewChanges(rawText, updatesBySection)
   for _, c in ipairs(patched.changes or {}) do
     local old = c.old ~= nil and tostring(c.old) or "(vazio)"
     local newV = c.new ~= nil and tostring(c.new) or "(vazio)"
-    table.insert(lines, ("%s.%s: %s -> %s"):format(tostring(c.section), tostring(c.key), old, newV))
+    table.insert(lines, ("%s: %s -> %s"):format(fieldLabel(c.section, c.key), old, newV))
   end
   if #lines == 0 then
     table.insert(lines, "Nenhuma mudanca.")
@@ -336,7 +382,7 @@ local function saveIni(cfg, updates)
   end
 
   local changedOnly = buildChangedOnly(cfg, updates)
-  if changedOnly.peripherals == nil and changedOnly.core == nil and changedOnly.delivery == nil then
+  if changedOnly.peripherals == nil and changedOnly.core == nil and changedOnly.delivery == nil and changedOnly.update == nil then
     showLines("Salvar", { "Nenhuma mudanca para salvar." })
     return false
   end
@@ -373,11 +419,11 @@ local function testPeripherals(effectivePeripherals)
   end
 
   local okAll = true
-  okAll = check("colony_integrator", effectivePeripherals.colony_integrator) and okAll
-  okAll = check("me_bridge", effectivePeripherals.me_bridge) and okAll
-  okAll = check("modem", effectivePeripherals.modem) and okAll
-  okAll = check("monitor_requests", effectivePeripherals.monitor_requests) and okAll
-  okAll = check("monitor_status", effectivePeripherals.monitor_status) and okAll
+  okAll = check(fieldLabel("peripherals", "colony_integrator"), effectivePeripherals.colony_integrator) and okAll
+  okAll = check(fieldLabel("peripherals", "me_bridge"), effectivePeripherals.me_bridge) and okAll
+  okAll = check(fieldLabel("peripherals", "modem"), effectivePeripherals.modem) and okAll
+  okAll = check(fieldLabel("peripherals", "monitor_requests"), effectivePeripherals.monitor_requests) and okAll
+  okAll = check(fieldLabel("peripherals", "monitor_status"), effectivePeripherals.monitor_status) and okAll
 
   showLines("Teste de perifericos", lines)
   return okAll
@@ -386,10 +432,10 @@ end
 local function choosePeripheralValue(label, current, typeNames)
   while true do
     local choices = {
-      { text = "Digitar nome", action = "type" },
+      { text = "Digitar nome",       action = "type" },
       { text = "Listar perifericos", action = "list" },
-      { text = "Sugerir por tipo", action = "suggest" },
-      { text = "Voltar", action = "back" },
+      { text = "Sugerir por tipo",   action = "suggest" },
+      { text = "Voltar",             action = "back" },
     }
     local idx, why = selectList(label, "Enter confirma | <- volta", choices, 1)
     if why ~= "enter" or not idx then return nil, "back" end
@@ -456,25 +502,25 @@ end
 
 local function runPeripheralsMenu(cfg, updates)
   local keys = {
-    { key = "colony_integrator", types = "colonyIntegrator" },
-    { key = "me_bridge", types = { "meBridge", "me_bridge" } },
-    { key = "modem", types = "modem" },
-    { key = "monitor_requests", types = "monitor" },
-    { key = "monitor_status", types = "monitor" },
+    { key = "colony_integrator", label = fieldLabel("peripherals", "colony_integrator"), types = "colonyIntegrator" },
+    { key = "me_bridge",         label = fieldLabel("peripherals", "me_bridge"),         types = { "meBridge", "me_bridge" } },
+    { key = "modem",             label = fieldLabel("peripherals", "modem"),             types = "modem" },
+    { key = "monitor_requests",  label = fieldLabel("peripherals", "monitor_requests"),  types = "monitor" },
+    { key = "monitor_status",    label = fieldLabel("peripherals", "monitor_status"),    types = "monitor" },
   }
 
   while true do
     local effective = buildEffective(cfg, updates).peripherals
     local labels = {
-      { text = "Editar colony_integrator", suffix = "(" .. trim(effective.colony_integrator) .. ")", suffixColor = separatorColor() },
-      { text = "Editar me_bridge", suffix = "(" .. trim(effective.me_bridge) .. ")", suffixColor = separatorColor() },
-      { text = "Editar modem", suffix = "(" .. trim(effective.modem) .. ")", suffixColor = separatorColor() },
-      { text = "Editar monitor_requests", suffix = "(" .. trim(effective.monitor_requests) .. ")", suffixColor = separatorColor() },
-      { text = "Editar monitor_status", suffix = "(" .. trim(effective.monitor_status) .. ")", suffixColor = separatorColor() },
+      { text = keys[1].label,        suffix = "(" .. trim(effective.colony_integrator) .. ")", suffixColor = separatorColor() },
+      { text = keys[2].label,        suffix = "(" .. trim(effective.me_bridge) .. ")",         suffixColor = separatorColor() },
+      { text = keys[3].label,        suffix = "(" .. trim(effective.modem) .. ")",             suffixColor = separatorColor() },
+      { text = keys[4].label,        suffix = "(" .. trim(effective.monitor_requests) .. ")",  suffixColor = separatorColor() },
+      { text = keys[5].label,        suffix = "(" .. trim(effective.monitor_status) .. ")",    suffixColor = separatorColor() },
       { separator = true },
       { text = "Testar perifericos", action = "test" },
-      { text = "Salvar", action = "save" },
-      { text = "Voltar", action = "back" },
+      { text = "Salvar",             action = "save" },
+      { text = "Voltar",             action = "back" },
     }
 
     local idx, why = selectList("Perifericos", "Enter confirma | <- volta", labels, 1)
@@ -513,7 +559,7 @@ local function runPeripheralsMenu(cfg, updates)
       local it = map[idx]
       if it then
         local current = effective[it.key]
-        local v, why2 = choosePeripheralValue(it.key, current, it.types)
+        local v, why2 = choosePeripheralValue(it.label, current, it.types)
         if why2 == "set" and v ~= nil then
           updates.peripherals[it.key] = v
         end
@@ -538,19 +584,31 @@ local function chooseEnum(label, current, options, normalize)
   return labels[idx]
 end
 
+local function chooseBool(label, current, default)
+  local cur = current
+  if cur == nil or cur == "" then cur = default and "true" or "false" end
+  local curBool = tostring(cur):lower()
+  local initial = (curBool == "true" or curBool == "1" or curBool == "yes" or curBool == "y" or curBool == "on") and 1 or
+      2
+  local labels = { "SIM", "NAO" }
+  local idx, why = selectList(label, "Enter confirma | <- volta", labels, initial)
+  if why ~= "enter" or not idx then return nil end
+  return idx == 1 and "true" or "false"
+end
+
 local function runCoreMenu(cfg, updates)
   while true do
     local eff = buildEffective(cfg, updates).core
     local labels = {
-      { text = "poll_interval_seconds", suffix = "(" .. trim(eff.poll_interval_seconds) .. ")", suffixColor = separatorColor() },
-      { text = "ui_refresh_seconds", suffix = "(" .. trim(eff.ui_refresh_seconds) .. ")", suffixColor = separatorColor() },
-      { text = "log_level", suffix = "(" .. trim(eff.log_level) .. ")", suffixColor = separatorColor() },
-      { text = "log_dir", suffix = "(" .. trim(eff.log_dir) .. ")", suffixColor = separatorColor() },
-      { text = "log_max_files", suffix = "(" .. trim(eff.log_max_files) .. ")", suffixColor = separatorColor() },
-      { text = "log_max_kb", suffix = "(" .. trim(eff.log_max_kb) .. ")", suffixColor = separatorColor() },
+      { text = "Intervalo do loop (s)", suffix = "(" .. trim(eff.poll_interval_seconds) .. ")", suffixColor = separatorColor() },
+      { text = "Refresh da UI (s)",     suffix = "(" .. trim(eff.ui_refresh_seconds) .. ")",    suffixColor = separatorColor() },
+      { text = "Nivel de log",          suffix = "(" .. trim(eff.log_level) .. ")",             suffixColor = separatorColor() },
+      { text = "Pasta de logs",         suffix = "(" .. trim(eff.log_dir) .. ")",               suffixColor = separatorColor() },
+      { text = "Max logs (arquivos)",   suffix = "(" .. trim(eff.log_max_files) .. ")",         suffixColor = separatorColor() },
+      { text = "Max log (KB)",          suffix = "(" .. trim(eff.log_max_kb) .. ")",            suffixColor = separatorColor() },
       { separator = true },
-      { text = "Salvar", action = "save" },
-      { text = "Voltar", action = "back" },
+      { text = "Salvar",                action = "save" },
+      { text = "Voltar",                action = "back" },
     }
     local idx, why = selectList("Core+Logs", "Enter confirma | <- volta", labels, 1)
     if why ~= "enter" or not idx then return end
@@ -564,22 +622,23 @@ local function runCoreMenu(cfg, updates)
       cfg = loadCfg()
     else
       if idx == 1 then
-        local v = prompt("core.poll_interval_seconds", eff.poll_interval_seconds)
+        local v = prompt("Intervalo do loop (segundos)", eff.poll_interval_seconds)
         if v ~= nil then updates.core.poll_interval_seconds = v end
       elseif idx == 2 then
-        local v = prompt("core.ui_refresh_seconds", eff.ui_refresh_seconds)
+        local v = prompt("Refresh da UI (segundos)", eff.ui_refresh_seconds)
         if v ~= nil then updates.core.ui_refresh_seconds = v end
       elseif idx == 3 then
-        local v = chooseEnum("log_level", eff.log_level, { "DEBUG", "INFO", "WARN", "ERROR" }, function(s) return tostring(s):upper() end)
+        local v = chooseEnum("Nivel de log", eff.log_level, { "DEBUG", "INFO", "WARN", "ERROR" },
+          function(s) return tostring(s):upper() end)
         if v ~= nil then updates.core.log_level = v end
       elseif idx == 4 then
-        local v = prompt("core.log_dir", eff.log_dir)
+        local v = prompt("Pasta de logs", eff.log_dir)
         if v ~= nil then updates.core.log_dir = trim(v) end
       elseif idx == 5 then
-        local v = prompt("core.log_max_files", eff.log_max_files)
+        local v = prompt("Max logs (arquivos)", eff.log_max_files)
         if v ~= nil then updates.core.log_max_files = v end
       elseif idx == 6 then
-        local v = prompt("core.log_max_kb", eff.log_max_kb)
+        local v = prompt("Max log (KB)", eff.log_max_kb)
         if v ~= nil then updates.core.log_max_kb = v end
       end
     end
@@ -590,14 +649,14 @@ local function runDeliveryMenu(cfg, updates)
   while true do
     local eff = buildEffective(cfg, updates).delivery
     local labels = {
-      { text = "default_target_container", suffix = "(" .. trim(eff.default_target_container) .. ")", suffixColor = separatorColor() },
-      { text = "export_mode", suffix = "(" .. trim(eff.export_mode) .. ")", suffixColor = separatorColor() },
-      { text = "export_direction", suffix = "(" .. trim(eff.export_direction) .. ")", suffixColor = separatorColor() },
-      { text = "export_buffer_container", suffix = "(" .. trim(eff.export_buffer_container) .. ")", suffixColor = separatorColor() },
-      { text = "destination_cache_ttl_seconds", suffix = "(" .. trim(eff.destination_cache_ttl_seconds) .. ")", suffixColor = separatorColor() },
+      { text = "Destino padrao (inventario)", suffix = "(" .. trim(eff.default_target_container) .. ")",      suffixColor = separatorColor() },
+      { text = "Modo de exportacao",          suffix = "(" .. trim(eff.export_mode) .. ")",                   suffixColor = separatorColor() },
+      { text = "Direcao de exportacao",       suffix = "(" .. trim(eff.export_direction) .. ")",              suffixColor = separatorColor() },
+      { text = "Buffer de exportacao",        suffix = "(" .. trim(eff.export_buffer_container) .. ")",       suffixColor = separatorColor() },
+      { text = "TTL cache destino (s)",       suffix = "(" .. trim(eff.destination_cache_ttl_seconds) .. ")", suffixColor = separatorColor() },
       { separator = true },
-      { text = "Salvar", action = "save" },
-      { text = "Voltar", action = "back" },
+      { text = "Salvar",                      action = "save" },
+      { text = "Voltar",                      action = "back" },
     }
     local idx, why = selectList("Delivery", "Enter confirma | <- volta", labels, 1)
     if why ~= "enter" or not idx then return end
@@ -611,20 +670,68 @@ local function runDeliveryMenu(cfg, updates)
       cfg = loadCfg()
     else
       if idx == 1 then
-        local v = prompt("delivery.default_target_container", eff.default_target_container)
+        local v = prompt("Destino padrao (inventario)", eff.default_target_container)
         if v ~= nil then updates.delivery.default_target_container = trim(v) end
       elseif idx == 2 then
-        local v = chooseEnum("export_mode", eff.export_mode, { "auto", "peripheral", "direction", "buffer" }, function(s) return tostring(s):lower() end)
+        local v = chooseEnum("Modo de exportacao", eff.export_mode, { "auto", "peripheral", "direction", "buffer" },
+          function(s) return tostring(s):lower() end)
         if v ~= nil then updates.delivery.export_mode = v end
       elseif idx == 3 then
-        local v = chooseEnum("export_direction", eff.export_direction, { "up", "down", "north", "south", "east", "west" }, function(s) return tostring(s):lower() end)
+        local v = chooseEnum("Direcao de exportacao", eff.export_direction,
+          { "up", "down", "north", "south", "east", "west" }, function(s) return tostring(s):lower() end)
         if v ~= nil then updates.delivery.export_direction = v end
       elseif idx == 4 then
-        local v = prompt("delivery.export_buffer_container", eff.export_buffer_container)
+        local v = prompt("Buffer de exportacao", eff.export_buffer_container)
         if v ~= nil then updates.delivery.export_buffer_container = trim(v) end
       elseif idx == 5 then
-        local v = prompt("delivery.destination_cache_ttl_seconds", eff.destination_cache_ttl_seconds)
+        local v = prompt("TTL cache destino (segundos)", eff.destination_cache_ttl_seconds)
         if v ~= nil then updates.delivery.destination_cache_ttl_seconds = v end
+      end
+    end
+  end
+end
+
+local function runUpdateMenu(cfg, updates)
+  while true do
+    local eff = buildEffective(cfg, updates).update
+
+    local enabledLabel = tostring(eff.enabled or ""):lower()
+    local enabledSuffix = (enabledLabel == "true" or enabledLabel == "1" or enabledLabel == "yes" or enabledLabel == "y" or enabledLabel == "on") and
+        "SIM" or "NAO"
+
+    local labels = {
+      { text = "Checagem de update", suffix = "(" .. enabledSuffix .. ")",                       suffixColor = separatorColor() },
+      { text = "TTL de sucesso (h)", suffix = "(" .. trim(eff.ttl_hours) .. ")",                 suffixColor = separatorColor() },
+      { text = "Retry base (s)",     suffix = "(" .. trim(eff.retry_seconds) .. ")",             suffixColor = separatorColor() },
+      { text = "Backoff max (s)",    suffix = "(" .. trim(eff.error_backoff_max_seconds) .. ")", suffixColor = separatorColor() },
+      { separator = true },
+      { text = "Salvar",             action = "save" },
+      { text = "Voltar",             action = "back" },
+    }
+
+    local idx, why = selectList("Update-check", "Enter confirma | <- volta", labels, 1)
+    if why ~= "enter" or not idx then return end
+    local chosen = labels[idx]
+    if type(chosen) == "table" and chosen.action == "back" then
+      return
+    end
+    if type(chosen) == "table" and chosen.action == "save" then
+      cfg = loadCfg()
+      saveIni(cfg, updates)
+      cfg = loadCfg()
+    else
+      if idx == 1 then
+        local v = chooseBool("Checagem de update habilitada", eff.enabled, true)
+        if v ~= nil then updates.update.enabled = v end
+      elseif idx == 2 then
+        local v = prompt("TTL de sucesso (horas)", eff.ttl_hours)
+        if v ~= nil then updates.update.ttl_hours = v end
+      elseif idx == 3 then
+        local v = prompt("Retry base (segundos)", eff.retry_seconds)
+        if v ~= nil then updates.update.retry_seconds = v end
+      elseif idx == 4 then
+        local v = prompt("Backoff max (segundos)", eff.error_backoff_max_seconds)
+        if v ~= nil then updates.update.error_backoff_max_seconds = v end
       end
     end
   end
@@ -635,6 +742,7 @@ local function main()
     peripherals = {},
     core = {},
     delivery = {},
+    update = {},
   }
 
   local cfg = loadCfg()
@@ -644,6 +752,7 @@ local function main()
       "Perifericos",
       "Core+Logs",
       "Delivery",
+      "Update-check",
       "Sair",
     }
     local idx, why = selectList("Config CLI", "Enter confirma | <- volta", labels, 1)
@@ -659,6 +768,9 @@ local function main()
     elseif choice == "Delivery" then
       cfg = loadCfg()
       runDeliveryMenu(cfg, updates)
+    elseif choice == "Update-check" then
+      cfg = loadCfg()
+      runUpdateMenu(cfg, updates)
     else
       break
     end
