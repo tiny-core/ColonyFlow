@@ -118,6 +118,34 @@ local function printSeparator(w)
   end)
 end
 
+local function truncateEllipsis(s, maxLen)
+  s = tostring(s or "")
+  maxLen = tonumber(maxLen) or 0
+  if maxLen <= 0 then return "" end
+  if #s <= maxLen then return s end
+  if maxLen <= 3 then return s:sub(1, maxLen) end
+  return s:sub(1, maxLen - 3) .. "..."
+end
+
+local function truncateSuffixParen(suffix, maxLen)
+  suffix = tostring(suffix or "")
+  maxLen = tonumber(maxLen) or 0
+  if suffix == "" or maxLen <= 0 then return "" end
+  if #suffix <= maxLen then return suffix end
+
+  if suffix:sub(1, 1) == "(" and suffix:sub(-1) == ")" and maxLen >= 2 then
+    local inner = suffix:sub(2, -2)
+    local innerMax = maxLen - 2
+    if innerMax <= 0 then return "" end
+    if innerMax <= 3 then
+      return "(" .. inner:sub(1, innerMax) .. ")"
+    end
+    return "(" .. truncateEllipsis(inner, innerMax) .. ")"
+  end
+
+  return truncateEllipsis(suffix, maxLen)
+end
+
 local function selectList(title, subtitle, labels, initialIdx)
   local w, h = term.getSize()
   local idx = initialIdx or 1
@@ -193,21 +221,30 @@ local function selectList(title, subtitle, labels, initialIdx)
         local remain = w - #prefix
         if remain < 0 then remain = 0 end
 
-        local suffixWithSpace = suffix ~= "" and (" " .. suffix) or ""
-        local showSuffix = suffixWithSpace ~= "" and remain > #suffixWithSpace
-        local textMax = showSuffix and (remain - #suffixWithSpace) or remain
+        local shownText = text
+        local shownSuffix = ""
+        local shownSuffixWithSpace = ""
 
-        if #text > textMax then text = text:sub(1, textMax) end
-        if not showSuffix then suffixWithSpace = "" end
+        if #shownText > remain then
+          shownText = truncateEllipsis(shownText, remain)
+        else
+          if suffix ~= "" and remain > #shownText + 1 then
+            local suffixMax = remain - #shownText - 1
+            shownSuffix = truncateSuffixParen(suffix, suffixMax)
+            if shownSuffix ~= "" then
+              shownSuffixWithSpace = " " .. shownSuffix
+            end
+          end
+        end
 
         withTextColor(prefixColor(selected), function()
           term.write(prefix)
         end)
         withTextColor(textColor, function()
-          term.write(text)
+          term.write(shownText)
         end)
         withTextColor(suffixColor, function()
-          term.write(suffixWithSpace)
+          term.write(shownSuffixWithSpace)
         end)
       else
         local line = prefix .. tostring(item)
