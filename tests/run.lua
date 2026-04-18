@@ -1928,7 +1928,7 @@ local tests = {
     assertEq(snap[3].value, "Offline")
     assertEq(snap[3].level, "bad")
     assertEq(snap[4].label, "Target")
-    assertEq(snap[4].value, "Offline rack_0")
+    assertEq(snap[4].value, "Offline")
     assertEq(snap[4].level, "bad")
   end
   },

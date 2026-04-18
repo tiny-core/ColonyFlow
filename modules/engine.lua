@@ -480,7 +480,7 @@ local function buildPeripheralHealth(state, me)
 
   local function targetStatus(names)
     if not devices then
-      return "NA", "unknown", ""
+      return "NA", "unknown"
     end
     local labels = {}
     local anyKnown = false
@@ -491,17 +491,16 @@ local function buildPeripheralHealth(state, me)
       if present ~= nil then anyKnown = true end
       if present == true then anyOnline = true end
     end
-    local listText = table.concat(labels, ",")
     if #labels == 0 then
-      return "NA", "unknown", ""
+      return "NA", "unknown"
     end
     if anyOnline then
-      return "Online", "ok", listText
+      return "Online", "ok"
     end
     if anyKnown then
-      return "Offline", "bad", listText
+      return "Offline", "bad"
     end
-    return "Offline", "bad", listText
+    return "Offline", "bad"
   end
 
   local meValue, meLevel = "NA", "unknown"
@@ -521,11 +520,7 @@ local function buildPeripheralHealth(state, me)
   local bufferValue, bufferLevel = deviceStatus(resolveInvByName(bufferName), bufferName)
 
   local targetNames = listFromCfg("delivery", "default_target_container")
-  local targetValue, targetLevel, targetList = targetStatus(targetNames)
-  local targetText = targetValue
-  if targetList ~= "" then
-    targetText = targetText .. " " .. targetList
-  end
+  local targetValue, targetLevel = targetStatus(targetNames)
 
   local colonyValue, colonyLevel = deviceStatus(devices and devices.colonyIntegrator, devices and devices.colonyName)
 
@@ -533,7 +528,7 @@ local function buildPeripheralHealth(state, me)
     { label = "ME Bridge", value = meValue,     level = meLevel },
     { label = "Colony",    value = colonyValue, level = colonyLevel },
     { label = "Buffer",    value = bufferValue, level = bufferLevel },
-    { label = "Target",    value = targetText,  level = targetLevel },
+    { label = "Target",    value = targetValue, level = targetLevel },
   }
 end
 
