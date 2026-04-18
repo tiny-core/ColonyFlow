@@ -1836,6 +1836,78 @@ local tests = {
     assertEq(h3, false)
   end
   },
+  { "ui_status_two_col_format_normal_width", function()
+    local UI = require("components.ui")
+    local t = UI and UI._test or nil
+    assertEq(type(t), "table")
+    assertEq(type(t.formatTwoColLine), "function")
+
+    local line, valueX, valueRendered = t.formatTwoColLine("Requisicoes: 12", "ME Bridge", "Online", 30)
+    assertEq(#line, 30)
+    assertEq(string.find(line, " | ", 1, true) ~= nil, true)
+    assertEq(type(valueX), "number")
+    assertEq(type(valueRendered), "string")
+    assertEq(string.match(valueRendered, "^Online") ~= nil, true)
+  end
+  },
+  { "ui_status_two_col_format_small_width_truncates", function()
+    local UI = require("components.ui")
+    local t = UI and UI._test or nil
+    assertEq(type(t), "table")
+
+    local line = t.formatTwoColLine("Substituicoes: 12345", "Mon Stat", "Offline", 16)
+    assertEq(#line, 16)
+    assertEq(string.find(line, " | ", 1, true) ~= nil, true)
+    assertEq(string.find(line, "..", 1, true) ~= nil, true)
+  end
+  },
+  { "ui_status_health_color_mapping", function()
+    local UI = require("components.ui")
+    local t = UI and UI._test or nil
+    assertEq(t.healthValueColor("ok"), colors.lime)
+    assertEq(t.healthValueColor("bad"), colors.red)
+    assertEq(t.healthValueColor("unknown"), colors.gray)
+  end
+  },
+  { "ui_status_health_fallback_na", function()
+    local UI = require("components.ui")
+    local t = UI and UI._test or nil
+    local list = t.getPeripheralHealth({})
+    assertEq(type(list), "table")
+    assertEq(#list, 5)
+    assertEq(list[1].label, "ME Bridge")
+    assertEq(list[1].value, "NA")
+    assertEq(list[1].level, "unknown")
+  end
+  },
+  { "engine_health_snapshot_me_online_offline", function()
+    local Engine = require("modules.engine")
+    local t = Engine and Engine._test or nil
+    assertEq(type(t), "table")
+
+    local me = { isOnline = function() return true end }
+    local state = {
+      devices = {
+        colonyIntegrator = {},
+        modem = nil,
+        monitorRequests = {},
+        monitorStatus = {},
+      }
+    }
+
+    local snap = t.buildPeripheralHealth(state, me)
+    assertEq(type(snap), "table")
+    assertEq(#snap, 5)
+    assertEq(snap[1].label, "ME Bridge")
+    assertEq(snap[1].value, "Online")
+    assertEq(snap[1].level, "ok")
+    assertEq(snap[2].label, "Colony")
+    assertEq(snap[2].value, "Online")
+    assertEq(snap[3].label, "Modem")
+    assertEq(snap[3].value, "Offline")
+    assertEq(snap[3].level, "bad")
+  end
+  },
 }
 
 for _, t in ipairs(tests) do
