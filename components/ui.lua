@@ -571,6 +571,16 @@ function UI:renderStatus(state, mon)
   self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
 
   local health = getPeripheralHealth(state)
+  local healthLabelW = 0
+  for i = 1, #health do
+    local it = health[i]
+    if type(it) == "table" then
+      local lbl = tostring(it.label or "")
+      if #lbl > healthLabelW then
+        healthLabelW = #lbl
+      end
+    end
+  end
   local reqCount = (type(state.requests) == "table") and #state.requests or 0
   local counters = {
     { label = "Requisicoes",   value = tostring(reqCount) },
@@ -594,11 +604,16 @@ function UI:renderStatus(state, mon)
       hLevel = "unknown"
     end
 
-    local line, valueX, valueRendered, leftW, rightW = formatTwoColLine(left, hLabel, hValue, w)
-    self:drawText("status", mon, 1, y, padRight(line, w))
     local sep = " | "
-    local rightColStart = leftW + #sep + 1
-    local rightPortion = line:sub(rightColStart, rightColStart + rightW - 1)
+    local rightW = math.max(1, math.max(0, (tonumber(w) or 0) - #sep) - math.floor(math.max(0, (tonumber(w) or 0) - #sep) / 2))
+    local maxLabelW = math.max(0, rightW - (#": " + 2))
+    local labelW = math.max(0, math.min(healthLabelW, maxLabelW))
+    local hLabelPadded = (hLabel ~= "" and labelW > 0) and padRight(hLabel, labelW) or hLabel
+
+    local line, valueX, valueRendered, leftW2, rightW2 = formatTwoColLine(left, hLabelPadded, hValue, w)
+    self:drawText("status", mon, 1, y, padRight(line, w))
+    local rightColStart = leftW2 + #sep + 1
+    local rightPortion = line:sub(rightColStart, rightColStart + rightW2 - 1)
     local colonPos = string.find(rightPortion, ": ", 1, true)
     local valueStartInRight = colonPos and (colonPos + 2) or 1
     local valuePortion = rightPortion:sub(valueStartInRight)
