@@ -1842,8 +1842,8 @@ local tests = {
     assertEq(type(t), "table")
     assertEq(type(t.formatTwoColLine), "function")
 
-    local line, valueX, valueRendered = t.formatTwoColLine("Requisicoes: 12", "ME Bridge", "Online", 30)
-    assertEq(#line, 30)
+    local line, valueX, valueRendered = t.formatTwoColLine("Requisicoes: 12", "ME Bridge", "Online", 40)
+    assertEq(#line, 40)
     assertEq(string.find(line, " | ", 1, true) ~= nil, true)
     assertEq(type(valueX), "number")
     assertEq(type(valueRendered), "string")
@@ -1889,13 +1889,28 @@ local tests = {
     local state = {
       devices = {
         colonyIntegrator = {},
+        colonyName = "colony_x",
         modem = nil,
+        modemName = "modem_x",
         monitorRequests = {},
+        monitorRequestsName = "mon_req_x",
         monitorStatus = {},
+        monitorStatusName = "mon_stat_x",
       }
     }
 
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name)
+        if name == "modem_x" then return false end
+        return true
+      end
+    }
+
     local snap = t.buildPeripheralHealth(state, me)
+
+    peripheral = oldPeripheral
+
     assertEq(type(snap), "table")
     assertEq(#snap, 5)
     assertEq(snap[1].label, "ME Bridge")

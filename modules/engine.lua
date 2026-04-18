@@ -393,13 +393,22 @@ end
 local function buildPeripheralHealth(state, me)
   local devices = (type(state) == "table" and type(state.devices) == "table") and state.devices or nil
 
-  local function deviceStatus(dev)
+  local function presentByName(name)
+    if type(name) ~= "string" or name == "" then return nil end
+    if type(peripheral) ~= "table" or type(peripheral.isPresent) ~= "function" then return nil end
+    local ok, present = pcall(peripheral.isPresent, name)
+    if not ok then return nil end
+    return present == true
+  end
+
+  local function deviceStatus(dev, name)
     if not devices then
       return "NA", "unknown"
     end
-    if dev then
-      return "Online", "ok"
-    end
+    local present = presentByName(name)
+    if present == true then return "Online", "ok" end
+    if present == false then return "Offline", "bad" end
+    if dev then return "Online", "ok" end
     return "Offline", "bad"
   end
 
@@ -413,10 +422,12 @@ local function buildPeripheralHealth(state, me)
     end
   end
 
-  local colonyValue, colonyLevel = deviceStatus(devices and devices.colonyIntegrator)
-  local modemValue, modemLevel = deviceStatus(devices and devices.modem)
-  local monReqValue, monReqLevel = deviceStatus(devices and devices.monitorRequests)
-  local monStatValue, monStatLevel = deviceStatus(devices and devices.monitorStatus)
+  local colonyValue, colonyLevel = deviceStatus(devices and devices.colonyIntegrator, devices and devices.colonyName)
+  local modemValue, modemLevel = deviceStatus(devices and devices.modem, devices and devices.modemName)
+  local monReqValue, monReqLevel = deviceStatus(devices and devices.monitorRequests,
+    devices and devices.monitorRequestsName)
+  local monStatValue, monStatLevel = deviceStatus(devices and devices.monitorStatus,
+    devices and devices.monitorStatusName)
 
   return {
     { label = "ME Bridge", value = meValue,      level = meLevel },

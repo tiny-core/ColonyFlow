@@ -54,10 +54,17 @@ end
 function ME:isOnline()
   local b = self.state.devices.meBridge
   if not b then return false, "meBridge ausente" end
-  local connected = call(b, "isConnected")
-  local online = call(b, "isOnline")
+  local connected, connErr = call(b, "isConnected")
+  local online, onlineErr = call(b, "isOnline")
   if connected == nil and online == nil then
-    return true, nil
+    local e1 = tostring(connErr or "")
+    local e2 = tostring(onlineErr or "")
+    local missing1 = e1:match("^M[ée]todo indispon[íi]vel") ~= nil
+    local missing2 = e2:match("^M[ée]todo indispon[íi]vel") ~= nil
+    if missing1 and missing2 then
+      return true, nil
+    end
+    return false, (connErr or onlineErr or "erro_me_bridge")
   end
   if connected == false then return false, "grid desconectado" end
   if online == false then return false, "grid offline" end
