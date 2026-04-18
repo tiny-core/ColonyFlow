@@ -88,15 +88,14 @@ local function defaultPeripheralHealth()
   return {
     { label = "ME Bridge", value = "NA", level = "unknown" },
     { label = "Colony",    value = "NA", level = "unknown" },
-    { label = "Modem",     value = "NA", level = "unknown" },
-    { label = "Mon Req",   value = "NA", level = "unknown" },
-    { label = "Mon Stat",  value = "NA", level = "unknown" },
+    { label = "Buffer",    value = "NA", level = "unknown" },
+    { label = "Target",    value = "NA", level = "unknown" },
   }
 end
 
 local function getPeripheralHealth(state)
   local list = (type(state) == "table" and type(state.health) == "table") and state.health.peripherals or nil
-  if type(list) == "table" and #list == 5 then
+  if type(list) == "table" and #list > 0 then
     return list
   end
   return defaultPeripheralHealth()
@@ -114,7 +113,7 @@ local function formatTwoColLine(leftText, rightLabel, rightValue, w)
   rightLabel = tostring(rightLabel or "")
   rightValue = tostring(rightValue or "")
 
-  local rightPrefix = rightLabel .. ": "
+  local rightPrefix = (rightLabel ~= "") and (rightLabel .. ": ") or ""
   local fullRight = rightPrefix .. rightValue
 
   local leftRendered = padRight(shorten(leftText, leftW), leftW)
@@ -581,12 +580,19 @@ function UI:renderStatus(state, mon)
     { label = "Erros",         value = tostring(state.stats.errors) },
   }
 
-  for i = 1, 5 do
-    local left = counters[i].label .. ": " .. counters[i].value
+  local rows = math.max(#counters, #health)
+  for i = 1, rows do
+    local cIt = counters[i] or { label = "", value = "" }
+    local left = cIt.label ~= "" and (cIt.label .. ": " .. cIt.value) or ""
     local hIt = health[i] or {}
     local hLabel = tostring(hIt.label or "NA")
     local hValue = tostring(hIt.value or "NA")
     local hLevel = tostring(hIt.level or "unknown")
+    if not health[i] then
+      hLabel = ""
+      hValue = ""
+      hLevel = "unknown"
+    end
 
     local line, valueX, valueRendered = formatTwoColLine(left, hLabel, hValue, w)
     self:drawText("status", mon, 1, y, padRight(line, w))

@@ -392,11 +392,77 @@ end
 
 local function buildPeripheralHealth(state, me)
   local devices = (type(state) == "table" and type(state.devices) == "table") and state.devices or nil
+  local cfg = (type(state) == "table" and type(state.cfg) == "table") and state.cfg or nil
+
+  local function trim(s)
+    return tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  end
+
+  local function stripModTag(name)
+    local s = trim(name)
+    local _, suffix = s:match("^([^:]+):(.+)$")
+    return suffix or s
+  end
+
+  local function listFromCfg(section, key)
+    if not cfg then return {} end
+    if type(cfg.getList) == "function" then
+      local out = cfg:getList(section, key, {})
+      if type(out) == "table" and #out > 0 then
+        local cleaned = {}
+        for _, v in ipairs(out) do
+          local t = trim(v)
+          if t ~= "" then
+            table.insert(cleaned, t)
+          end
+        end
+        if #cleaned > 0 then return cleaned end
+      end
+    end
+    if type(cfg.get) == "function" then
+      local raw = trim(cfg:get(section, key, ""))
+      if raw ~= "" then
+        local out = {}
+        for part in raw:gmatch("[^,]+") do
+          local t = trim(part)
+          if t ~= "" then
+            table.insert(out, t)
+          end
+        end
+        return out
+      end
+    end
+    return {}
+  end
+
+  local function resolvePeripheralName(name)
+    name = trim(name)
+    if name == "" then return nil end
+    if name:find(":", 1, true) then
+      return name
+    end
+    if type(peripheral) ~= "table" or type(peripheral.getNames) ~= "function" then
+      return name
+    end
+    local ok, names = pcall(peripheral.getNames)
+    if not ok or type(names) ~= "table" then
+      return name
+    end
+    for _, n in ipairs(names) do
+      n = tostring(n or "")
+      if n == name then return n end
+      if n:sub(-(#name + 1)) == (":" .. name) then
+        return n
+      end
+    end
+    return name
+  end
 
   local function presentByName(name)
     if type(name) ~= "string" or name == "" then return nil end
     if type(peripheral) ~= "table" or type(peripheral.isPresent) ~= "function" then return nil end
-    local ok, present = pcall(peripheral.isPresent, name)
+    local resolved = resolvePeripheralName(name)
+    local ok, present = pcall(peripheral.isPresent, resolved)
     if not ok then return nil end
     return present == true
   end
@@ -412,6 +478,32 @@ local function buildPeripheralHealth(state, me)
     return "Offline", "bad"
   end
 
+  local function targetStatus(names)
+    if not devices then
+      return "NA", "unknown", ""
+    end
+    local labels = {}
+    local anyKnown = false
+    local anyOnline = false
+    for _, n in ipairs(names or {}) do
+      local present = presentByName(n)
+      table.insert(labels, stripModTag(n))
+      if present ~= nil then anyKnown = true end
+      if present == true then anyOnline = true end
+    end
+    local listText = table.concat(labels, ",")
+    if #labels == 0 then
+      return "NA", "unknown", ""
+    end
+    if anyOnline then
+      return "Online", "ok", listText
+    end
+    if anyKnown then
+      return "Offline", "bad", listText
+    end
+    return "Offline", "bad", listText
+  end
+
   local meValue, meLevel = "NA", "unknown"
   if me and type(me.isOnline) == "function" then
     local ok = me:isOnline()
@@ -422,19 +514,26 @@ local function buildPeripheralHealth(state, me)
     end
   end
 
+  local bufferName = ""
+  if cfg and type(cfg.get) == "function" then
+    bufferName = trim(cfg:get("delivery", "export_buffer_container", ""))
+  end
+  local bufferValue, bufferLevel = deviceStatus(resolveInvByName(bufferName), bufferName)
+
+  local targetNames = listFromCfg("delivery", "default_target_container")
+  local targetValue, targetLevel, targetList = targetStatus(targetNames)
+  local targetText = targetValue
+  if targetList ~= "" then
+    targetText = targetText .. " " .. targetList
+  end
+
   local colonyValue, colonyLevel = deviceStatus(devices and devices.colonyIntegrator, devices and devices.colonyName)
-  local modemValue, modemLevel = deviceStatus(devices and devices.modem, devices and devices.modemName)
-  local monReqValue, monReqLevel = deviceStatus(devices and devices.monitorRequests,
-    devices and devices.monitorRequestsName)
-  local monStatValue, monStatLevel = deviceStatus(devices and devices.monitorStatus,
-    devices and devices.monitorStatusName)
 
   return {
-    { label = "ME Bridge", value = meValue,      level = meLevel },
-    { label = "Colony",    value = colonyValue,  level = colonyLevel },
-    { label = "Modem",     value = modemValue,   level = modemLevel },
-    { label = "Mon Req",   value = monReqValue,  level = monReqLevel },
-    { label = "Mon Stat",  value = monStatValue, level = monStatLevel },
+    { label = "ME Bridge", value = meValue,     level = meLevel },
+    { label = "Colony",    value = colonyValue, level = colonyLevel },
+    { label = "Buffer",    value = bufferValue, level = bufferLevel },
+    { label = "Target",    value = targetText,  level = targetLevel },
   }
 end
 
@@ -456,7 +555,11 @@ function Engine:tick()
     if not snap then
       snap = buildPeripheralHealth(state, self.me)
       if state.cache and type(state.cache.set) == "function" then
-        state.cache:set("ui_health", "peripherals", snap, 2)
+        local ttl = 1
+        if state.cfg and type(state.cfg.getNumber) == "function" then
+          ttl = state.cfg:getNumber("ui", "health_ttl_seconds", 1)
+        end
+        state.cache:set("ui_health", "peripherals", snap, ttl)
       end
     end
     state.health.peripherals = snap

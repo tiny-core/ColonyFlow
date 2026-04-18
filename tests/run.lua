@@ -1874,10 +1874,12 @@ local tests = {
     local t = UI and UI._test or nil
     local list = t.getPeripheralHealth({})
     assertEq(type(list), "table")
-    assertEq(#list, 5)
+    assertEq(#list, 4)
     assertEq(list[1].label, "ME Bridge")
     assertEq(list[1].value, "NA")
     assertEq(list[1].level, "unknown")
+    assertEq(list[3].label, "Buffer")
+    assertEq(list[4].label, "Target")
   end
   },
   { "engine_health_snapshot_me_online_offline", function()
@@ -1886,25 +1888,29 @@ local tests = {
     assertEq(type(t), "table")
 
     local me = { isOnline = function() return true end }
+    local cfg = makeCfg({
+      delivery = {
+        export_buffer_container = "chest_1",
+        default_target_container = "rack_0",
+      }
+    })
     local state = {
+      cfg = cfg,
       devices = {
         colonyIntegrator = {},
         colonyName = "colony_x",
-        modem = nil,
-        modemName = "modem_x",
-        monitorRequests = {},
-        monitorRequestsName = "mon_req_x",
-        monitorStatus = {},
-        monitorStatusName = "mon_stat_x",
       }
     }
 
     local oldPeripheral = peripheral
     peripheral = {
+      getNames = function() return { "minecraft:chest_1", "minecolonies:rack_0" } end,
       isPresent = function(name)
-        if name == "modem_x" then return false end
+        if name == "minecraft:chest_1" then return false end
+        if name == "minecolonies:rack_0" then return false end
         return true
-      end
+      end,
+      wrap = function() return {} end,
     }
 
     local snap = t.buildPeripheralHealth(state, me)
@@ -1912,15 +1918,18 @@ local tests = {
     peripheral = oldPeripheral
 
     assertEq(type(snap), "table")
-    assertEq(#snap, 5)
+    assertEq(#snap, 4)
     assertEq(snap[1].label, "ME Bridge")
     assertEq(snap[1].value, "Online")
     assertEq(snap[1].level, "ok")
     assertEq(snap[2].label, "Colony")
     assertEq(snap[2].value, "Online")
-    assertEq(snap[3].label, "Modem")
+    assertEq(snap[3].label, "Buffer")
     assertEq(snap[3].value, "Offline")
     assertEq(snap[3].level, "bad")
+    assertEq(snap[4].label, "Target")
+    assertEq(snap[4].value, "Offline rack_0")
+    assertEq(snap[4].level, "bad")
   end
   },
 }
