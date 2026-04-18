@@ -37,7 +37,7 @@ function UI.new(state)
   }, UI)
 end
 
-function UI:drawText(deviceKey, mon, x, y, text, fg, bg)
+function UI:drawText(deviceKey, mon, x, y, text, fg, bg, force)
   if not mon then return end
   fg = fg or colors.white
   bg = bg or colors.black
@@ -49,7 +49,7 @@ function UI:drawText(deviceKey, mon, x, y, text, fg, bg)
   local rendered = shorten(text, maxLen)
   local current = self.buffers[deviceKey][key]
 
-  if current and current.text == rendered and current.fg == fg and current.bg == bg then
+  if force ~= true and current and current.text == rendered and current.fg == fg and current.bg == bg then
     return -- No change needed
   end
 
@@ -595,7 +595,7 @@ function UI:renderStatus(state, mon)
     self:drawText("status", mon, 1, y, shorten(leftPart, w))
     local startX = #leftPart + 1
     if startX <= w then
-      self:drawText("status", mon, startX, y, shorten(row.value, math.max(0, w - #leftPart)), row.color or colors.white)
+      self:drawText("status", mon, startX, y, shorten(row.value, math.max(0, w - #leftPart)), row.color or colors.white, colors.black, true)
     end
     y = y + 1
   end
@@ -687,13 +687,13 @@ function UI:renderStatus(state, mon)
       local lbl = labelW > 0 and padRight(shorten(hLabel, labelW), labelW) or shorten(hLabel, rightW)
       local labelText = lbl .. ": "
       labelText = shorten(labelText, rightW)
-      self:drawText("status", mon, rightColStart, y, labelText, colors.white, colors.black)
+      self:drawText("status", mon, rightColStart, y, labelText, colors.white, colors.black, true)
 
       local valueStartX = rightColStart + #labelText
       local maxValueLen = math.max(0, w - valueStartX + 1)
       local v = shorten(hValue, maxValueLen)
       if v ~= "" and valueStartX <= w then
-        self:drawText("status", mon, valueStartX, y, v, healthValueColor(hLevel), colors.black)
+        self:drawText("status", mon, valueStartX, y, v, healthValueColor(hLevel), colors.black, true)
       end
     end
     y = y + 1
