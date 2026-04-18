@@ -95,10 +95,36 @@ end
 
 local function getPeripheralHealth(state)
   local list = (type(state) == "table" and type(state.health) == "table") and state.health.peripherals or nil
-  if type(list) == "table" and #list > 0 then
-    return list
+  local fallback = defaultPeripheralHealth()
+  if type(list) ~= "table" then
+    return fallback
   end
-  return defaultPeripheralHealth()
+
+  local byLabel = {}
+  for _, it in pairs(list) do
+    if type(it) == "table" then
+      local lbl = tostring(it.label or "")
+      if lbl ~= "" then
+        byLabel[lbl] = it
+      end
+    end
+  end
+
+  local out = {}
+  for i = 1, #fallback do
+    local base = fallback[i]
+    local src = byLabel[base.label]
+    if src then
+      out[i] = {
+        label = base.label,
+        value = tostring(src.value or base.value),
+        level = tostring(src.level or base.level),
+      }
+    else
+      out[i] = base
+    end
+  end
+  return out
 end
 
 local function formatTwoColLine(leftText, rightLabel, rightValue, w)
@@ -552,19 +578,27 @@ function UI:renderStatus(state, mon)
   self:drawText("status", mon, 1, y, centerText("COLONIA", w), colors.cyan); y = y + 1
   self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
 
-  self:drawText("status", mon, 1, y, shorten("Colonia: " .. tostring(cs.name or "-"), w)); y = y + 1
-  self:drawText("status", mon, 1, y,
-    shorten("Cidadaos: " .. tostring(cs.citizens or "-") .. "/" .. tostring(cs.maxCitizens or "-"), w)); y = y + 1
-
-  do
-    local label = "Felicidade: "
-    self:drawText("status", mon, 1, y, shorten(label, w))
-    local hv = formatDecimal2(cs.happiness)
-    self:drawText("status", mon, #label + 1, y, shorten(hv, math.max(0, w - #label)), happinessColor(cs.happiness))
+  local colonyRows = {
+    { label = "Colonia",    value = tostring(cs.name or "-"),                                               color = colors.white },
+    { label = "Cidadaos",   value = tostring(cs.citizens or "-") .. "/" .. tostring(cs.maxCitizens or "-"), color = colors.white },
+    { label = "Felicidade", value = formatDecimal2(cs.happiness),                                           color = happinessColor(cs.happiness) },
+    { label = "Obras",      value = tostring(cs.constructionSites or "-"),                                  color = colors.white },
+  }
+  local colonyLabelW = 0
+  for i = 1, #colonyRows do
+    local lbl = tostring(colonyRows[i].label or "")
+    if #lbl > colonyLabelW then colonyLabelW = #lbl end
+  end
+  for i = 1, #colonyRows do
+    local row = colonyRows[i]
+    local leftPart = padRight(row.label, colonyLabelW) .. ": "
+    self:drawText("status", mon, 1, y, shorten(leftPart, w))
+    local startX = #leftPart + 1
+    if startX <= w then
+      self:drawText("status", mon, startX, y, shorten(row.value, math.max(0, w - #leftPart)), row.color or colors.white)
+    end
     y = y + 1
   end
-
-  self:drawText("status", mon, 1, y, shorten("Obras: " .. tostring(cs.constructionSites or "-"), w)); y = y + 1
   self:drawText("status", mon, 1, y, padRight("", w)); y = y + 1
 
   self:drawText("status", mon, 1, y, centerText("OPERACAO", w), colors.cyan); y = y + 1
