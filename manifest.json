@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
-  "version": "0.9.1",
-  "generated_utc": "2026-04-18T14:00:03Z",
+  "version": "0.9.2",
+  "generated_utc": "2026-04-18T14:35:50Z",
   "files": [
     {
       "path": "components/ui.lua",
@@ -27,7 +27,7 @@
     },
     {
       "path": "lib/config_schema.lua",
-      "size": 2906
+      "size": 3853
     },
     {
       "path": "lib/config.lua",
@@ -47,7 +47,7 @@
     },
     {
       "path": "modules/config_cli.lua",
-      "size": 22070
+      "size": 28207
     },
     {
       "path": "modules/engine.lua",
