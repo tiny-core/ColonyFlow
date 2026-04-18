@@ -589,11 +589,34 @@ function UI:renderStatus(state, mon)
     { label = "Substituicoes", value = tostring(state.stats.substitutions) },
     { label = "Erros",         value = tostring(state.stats.errors) },
   }
+  local counterLabelW = 0
+  for i = 1, #counters do
+    local it = counters[i]
+    if type(it) == "table" then
+      local lbl = tostring(it.label or "")
+      if #lbl > counterLabelW then
+        counterLabelW = #lbl
+      end
+    end
+  end
+  local sep = " | "
+  local available = math.max(0, (tonumber(w) or 0) - #sep)
+  local leftW = math.floor(available / 2)
+  local rightW = available - leftW
+  if leftW < 1 then leftW = 1 end
+  if rightW < 1 then rightW = 1 end
+  local rightColStart = leftW + #sep + 1
+  local valueW = 7
+  local labelW = math.max(0, math.min(healthLabelW, rightW - (2 + valueW)))
 
   local rows = math.max(#counters, #health)
   for i = 1, rows do
     local cIt = counters[i] or { label = "", value = "" }
-    local left = cIt.label ~= "" and (cIt.label .. ": " .. cIt.value) or ""
+    local left = ""
+    if cIt.label ~= "" then
+      left = padRight(cIt.label, counterLabelW) .. ": " .. tostring(cIt.value or "")
+    end
+    left = padRight(shorten(left, leftW), leftW)
     local hIt = health[i] or {}
     local hLabel = tostring(hIt.label or "NA")
     local hValue = tostring(hIt.value or "NA")
@@ -604,25 +627,21 @@ function UI:renderStatus(state, mon)
       hLevel = "unknown"
     end
 
-    local sep = " | "
-    local rightW = math.max(1, math.max(0, (tonumber(w) or 0) - #sep) - math.floor(math.max(0, (tonumber(w) or 0) - #sep) / 2))
-    local maxLabelW = math.max(0, rightW - (#": " + 2))
-    local labelW = math.max(0, math.min(healthLabelW, maxLabelW))
-    local hLabelPadded = (hLabel ~= "" and labelW > 0) and padRight(hLabel, labelW) or hLabel
+    local base = left .. sep .. padRight("", rightW)
+    self:drawText("status", mon, 1, y, padRight(base, w))
 
-    local line, valueX, valueRendered, leftW2, rightW2 = formatTwoColLine(left, hLabelPadded, hValue, w)
-    self:drawText("status", mon, 1, y, padRight(line, w))
-    local rightColStart = leftW2 + #sep + 1
-    local rightPortion = line:sub(rightColStart, rightColStart + rightW2 - 1)
-    local colonPos = string.find(rightPortion, ": ", 1, true)
-    local valueStartInRight = colonPos and (colonPos + 2) or 1
-    local valuePortion = rightPortion:sub(valueStartInRight)
-    valuePortion = valuePortion:gsub("%s+$", "")
+    if hLabel ~= "" and rightColStart <= w then
+      local lbl = labelW > 0 and padRight(shorten(hLabel, labelW), labelW) or shorten(hLabel, rightW)
+      local labelText = lbl .. ": "
+      labelText = shorten(labelText, rightW)
+      self:drawText("status", mon, rightColStart, y, labelText, colors.white, colors.black)
 
-    local drawX = valuePortion ~= "" and (rightColStart + valueStartInRight - 1) or valueX
-    local drawText = valuePortion ~= "" and valuePortion or valueRendered
-    if drawText ~= "" and drawX <= w then
-      self:drawText("status", mon, drawX, y, drawText, healthValueColor(hLevel), colors.black)
+      local valueStartX = rightColStart + #labelText
+      local maxValueLen = math.max(0, w - valueStartX + 1)
+      local v = shorten(hValue, maxValueLen)
+      if v ~= "" and valueStartX <= w then
+        self:drawText("status", mon, valueStartX, y, v, healthValueColor(hLevel), colors.black)
+      end
     end
     y = y + 1
   end
