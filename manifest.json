@@ -1,11 +1,11 @@
 {
   "manifest_version": 2,
-  "version": "0.9.2",
-  "generated_utc": "2026-04-18T14:35:50Z",
+  "version": "1.0.0",
+  "generated_utc": "2026-04-18T17:01:22Z",
   "files": [
     {
       "path": "components/ui.lua",
-      "size": 22657
+      "size": 28670
     },
     {
       "path": "config.ini",
@@ -51,7 +51,7 @@
     },
     {
       "path": "modules/engine.lua",
-      "size": 27951
+      "size": 34114
     },
     {
       "path": "modules/equivalence.lua",
@@ -67,7 +67,7 @@
     },
     {
       "path": "modules/me.lua",
-      "size": 5152
+      "size": 5495
     },
     {
       "path": "modules/minecolonies.lua",
@@ -79,7 +79,7 @@
     },
     {
       "path": "modules/scheduler.lua",
-      "size": 4210
+      "size": 4572
     },
     {
       "path": "modules/tier.lua",
@@ -95,7 +95,7 @@
     },
     {
       "path": "tests/run.lua",
-      "size": 67026
+      "size": 70208
     },
     {
       "path": "tools/install.lua",
