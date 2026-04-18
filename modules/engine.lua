@@ -260,7 +260,8 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
 
         local className = (eq.getClassFor and eq:getClassFor(it) or eq:getClass(it.name)) or guessClass(it.name)
         if type(className) == "string" and className:match("^armor_") then
-          local _, piece = tostring(it.name):match("^minecraft:(leather|iron|diamond|netherite)_(helmet|chestplate|leggings|boots)$")
+          local _, piece = tostring(it.name):match(
+            "^minecraft:(leather|iron|diamond|netherite)_(helmet|chestplate|leggings|boots)$")
           if piece then
             local tiers = { "leather", "iron", "diamond", "netherite" }
             for _, tName in ipairs(tiers) do
@@ -389,6 +390,43 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
   return best, bestWhy
 end
 
+local function buildPeripheralHealth(state, me)
+  local devices = (type(state) == "table" and type(state.devices) == "table") and state.devices or nil
+
+  local function deviceStatus(dev)
+    if not devices then
+      return "NA", "unknown"
+    end
+    if dev then
+      return "Online", "ok"
+    end
+    return "Offline", "bad"
+  end
+
+  local meValue, meLevel = "NA", "unknown"
+  if me and type(me.isOnline) == "function" then
+    local ok = me:isOnline()
+    if ok == true then
+      meValue, meLevel = "Online", "ok"
+    elseif ok == false then
+      meValue, meLevel = "Offline", "bad"
+    end
+  end
+
+  local colonyValue, colonyLevel = deviceStatus(devices and devices.colonyIntegrator)
+  local modemValue, modemLevel = deviceStatus(devices and devices.modem)
+  local monReqValue, monReqLevel = deviceStatus(devices and devices.monitorRequests)
+  local monStatValue, monStatLevel = deviceStatus(devices and devices.monitorStatus)
+
+  return {
+    { label = "ME Bridge", value = meValue,      level = meLevel },
+    { label = "Colony",    value = colonyValue,  level = colonyLevel },
+    { label = "Modem",     value = modemValue,   level = modemLevel },
+    { label = "Mon Req",   value = monReqValue,  level = monReqLevel },
+    { label = "Mon Stat",  value = monStatValue, level = monStatLevel },
+  }
+end
+
 function Engine:tick()
   local state = self.state
 
@@ -397,6 +435,21 @@ function Engine:tick()
   end
 
   state.stats.processed = state.stats.processed + 1
+
+  state.health = state.health or {}
+  do
+    local snap = nil
+    if state.cache and type(state.cache.get) == "function" then
+      snap = state.cache:get("ui_health", "peripherals")
+    end
+    if not snap then
+      snap = buildPeripheralHealth(state, self.me)
+      if state.cache and type(state.cache.set) == "function" then
+        state.cache:set("ui_health", "peripherals", snap, 2)
+      end
+    end
+    state.health.peripherals = snap
+  end
 
   if not state.devices.colonyIntegrator then
     state.logger:warn("colonyIntegrator indisponível; aguardando...")
@@ -754,4 +807,7 @@ end
 
 return {
   new = Engine.new,
+  _test = {
+    buildPeripheralHealth = buildPeripheralHealth,
+  },
 }
