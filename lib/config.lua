@@ -51,6 +51,12 @@ me_craftable_ttl_seconds=2
 
 [progression]
 enforce_building_gating=true
+
+[update]
+enabled=true
+ttl_hours=6
+retry_seconds=120
+error_backoff_max_seconds=900
 ]]
 
 local function parseIni(text)
