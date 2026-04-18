@@ -18,7 +18,7 @@ Objetivo: entregar um sistema autônomo em Lua (CC: Tweaked) que lê requisiçõ
 - [x] **Phase 10: Config CLI (editar config.ini e perifericos)** - CLI in-game com validação e escrita atômica
 - [x] **Phase 11: Versionamento robusto (SemVer + tooling manifest)** - Versão real no manifesto + gerador determinístico + persistência em data/version.json
 - [x] **Phase 12: Update check + UI (versao instalada vs disponivel)** - Checagem leve no boot, cache TTL e indicação discreta na UI
-- [ ] **Phase 13: Operabilidade do update-check (config + backoff + detalhes)** - Tornar update-check configuravel, com backoff e tela de detalhes (sem poluir UI)
+- [x] **Phase 13: Operabilidade do update-check (config + backoff + detalhes)** - Tornar update-check configuravel, com backoff e tela de detalhes (sem poluir UI) (completed 2026-04-18)
 - [ ] **Phase 14: UI Status - Saude de perifericos (coluna alinhada)** - Exibir status dos perifericos essenciais no Monitor 2 em coluna ao lado dos contadores
 - [ ] **Phase 15: Operabilidade + Resiliencia (doctor + persistencia + circuit breaker)** - Modo doctor, persistencia de jobs e resiliencia a oscilacao do ME
 - [ ] **Phase 16: Observabilidade de Performance (metricas + contadores)** - Medir custo por tick e chamadas a perifericos, com exibicao discreta e logs
@@ -273,7 +273,7 @@ Plans:
 | 10. Config CLI (editar config.ini e perifericos)       | 1/1            | Complete | 2026-04-13 |
 | 11. Versionamento robusto (SemVer + tooling manifest)  | 1/1            | Complete | 2026-04-14 |
 | 12. Update check + UI (versao instalada vs disponivel) | 1/1            | Complete | 2026-04-14 |
-| 13. Operabilidade do update-check                      | 0/1            | Not started | -        |
+| 13. Operabilidade do update-check                      | 1/1 | Complete   | 2026-04-18 |
 | 14. UI Status - Saude de perifericos                   | 0/1            | Not started | -        |
 | 15. Operabilidade + Resiliencia                        | 0/1            | Not started | -        |
 | 16. Observabilidade de Performance                      | 0/1            | Not started | -        |
@@ -319,10 +319,10 @@ Plans:
 **Goal:** Tornar o update-check mais operavel em servidores/modpacks variados: configuravel via `config.ini`, com backoff em falhas e uma forma de ver detalhes (ultima checagem/erro/url) sem poluir a UI principal.
 **Depends on:** Phase 12
 **Requirements**: TBD
-**Plans:** 0 plans
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 13 to break down)
+- [x] 13-01 Operabilidade do update-check (config + backoff + detalhes)
 
 ### Phase 14: UI Status - Saude de perifericos (coluna alinhada)
 
