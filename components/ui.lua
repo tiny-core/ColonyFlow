@@ -594,10 +594,20 @@ function UI:renderStatus(state, mon)
       hLevel = "unknown"
     end
 
-    local line, valueX, valueRendered = formatTwoColLine(left, hLabel, hValue, w)
+    local line, valueX, valueRendered, leftW, rightW = formatTwoColLine(left, hLabel, hValue, w)
     self:drawText("status", mon, 1, y, padRight(line, w))
-    if valueRendered ~= "" and valueX <= w then
-      self:drawText("status", mon, valueX, y, valueRendered, healthValueColor(hLevel), colors.black)
+    local sep = " | "
+    local rightColStart = leftW + #sep + 1
+    local rightPortion = line:sub(rightColStart, rightColStart + rightW - 1)
+    local colonPos = string.find(rightPortion, ": ", 1, true)
+    local valueStartInRight = colonPos and (colonPos + 2) or 1
+    local valuePortion = rightPortion:sub(valueStartInRight)
+    valuePortion = valuePortion:gsub("%s+$", "")
+
+    local drawX = valuePortion ~= "" and (rightColStart + valueStartInRight - 1) or valueX
+    local drawText = valuePortion ~= "" and valuePortion or valueRendered
+    if drawText ~= "" and drawX <= w then
+      self:drawText("status", mon, drawX, y, drawText, healthValueColor(hLevel), colors.black)
     end
     y = y + 1
   end
