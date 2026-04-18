@@ -4,14 +4,14 @@ milestone: v6.4
 milestone_name: milestone
 status: verifying
 stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-04-18T13:28:47.799Z"
+last_updated: "2026-04-18T15:01:26.002Z"
 last_activity: 2026-04-18
 progress:
   total_phases: 19
-  completed_phases: 13
+  completed_phases: 14
   total_plans: 15
-  completed_plans: 13
-  percent: 87
+  completed_plans: 14
+  percent: 93
 ---
 
 # Project State
@@ -21,11 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-17)
 
 **Core value:** Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColonies e entrega do item correto, craftando somente o necessário.
-**Current focus:** Phase 13 — operabilidade-update-check-config-backoff-detalhes
+**Current focus:** Phase 14 — ui-status-saude-perifericos-coluna
 
 ## Current Position
 
-Phase: 13 (operabilidade-update-check-config-backoff-detalhes) — EXECUTING
+Phase: 14 (ui-status-saude-perifericos-coluna) — EXECUTING
 Plan: 1 of 1
 Status: Phase complete — ready for verification
 Last activity: 2026-04-18
