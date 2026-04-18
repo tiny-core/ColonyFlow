@@ -301,11 +301,251 @@ local tests = {
     })
     assertEq(url, "https://example.com/repo/main/m.json")
   end },
-  { "update_check_should_refresh", function()
+  { "update_check_normalize_cache_compat_old", function()
     local UpdateCheck = require("modules.update_check")
-    assertEq(UpdateCheck.shouldRefresh(nil, 1000), true)
-    assertEq(UpdateCheck.shouldRefresh({ checked_at_ms = 1000, ttl_ms = 6000 }, 5000), false)
-    assertEq(UpdateCheck.shouldRefresh({ checked_at_ms = 1000, ttl_ms = 6000 }, 8000), true)
+    local out = UpdateCheck.normalizeCache({
+      status = "no_update",
+      checked_at_ms = 12345,
+      ttl_ms = 6000,
+      available_version = "1.2.3",
+    })
+    assertEq(type(out), "table")
+    assertEq(out.last_attempt_at_ms, 12345)
+    assertEq(out.last_success_at_ms, 12345)
+    assertEq(out.fail_count, 0)
+    assertEq(out.next_retry_at_ms, nil)
+    assertEq(out.available_version, "1.2.3")
+  end },
+  { "update_check_backoff_calculates_next_retry", function()
+    local UpdateCheck = require("modules.update_check")
+
+    local oldEpoch = os.epoch
+    os.epoch = function() return 1000000 end
+
+    local oldHttp = http
+    http = nil
+
+    local oldFs = fs
+    local files = {}
+    local existsSet = {}
+    local dirSet = { ["data"] = true }
+    existsSet["data"] = true
+    fs = {
+      exists = function(path) return existsSet[path] == true end,
+      isDir = function(path) return dirSet[path] == true end,
+      makeDir = function(path)
+        existsSet[path] = true; dirSet[path] = true
+      end,
+      getDir = function(path)
+        local i = string.match(path, "^.*()/")
+        if not i then return "" end
+        return string.sub(path, 1, i - 1)
+      end,
+      open = function(path, mode)
+        if mode == "r" then
+          return {
+            readAll = function() return files[path] end,
+            close = function() end,
+          }
+        end
+        if mode == "w" then
+          local buf = ""
+          return {
+            write = function(s) buf = buf .. tostring(s or "") end,
+            writeLine = function(s) buf = buf .. tostring(s or "") .. "\n" end,
+            flush = function() end,
+            close = function()
+              files[path] = buf; existsSet[path] = true
+            end,
+          }
+        end
+        return nil
+      end,
+      delete = function(path)
+        files[path] = nil; existsSet[path] = false
+      end,
+      move = function(src, dst)
+        files[dst] = files[src]
+        existsSet[dst] = true
+        files[src] = nil
+        existsSet[src] = false
+      end,
+    }
+
+    local cfg = makeCfg({ update = { enabled = "true", ttl_hours = "6", retry_seconds = "120", error_backoff_max_seconds = "900" } })
+    local state = { cfg = cfg, installed = { version = "1.0.0" }, update = UpdateCheck.defaultState({ version = "1.0.0" }) }
+    state.update.available_version = "1.2.3"
+
+    local s1 = UpdateCheck.tick(state, { tries = 1 })
+    assertEq(s1, 120)
+    assertEq(state.update.status, "http_off")
+    assertEq(state.update.stale, true)
+    assertEq(state.update.fail_count, 1)
+    assertEq(state.update.next_retry_at_ms, 1000000 + 120 * 1000)
+
+    os.epoch = function() return 1000000 + 120 * 1000 end
+    local s2 = UpdateCheck.tick(state, { tries = 1 })
+    assertEq(s2, 240)
+    assertEq(state.update.fail_count, 2)
+
+    state.update.fail_count = 10
+    state.update.next_retry_at_ms = nil
+    os.epoch = function() return 2000000 end
+    local s3 = UpdateCheck.tick(state, { tries = 1 })
+    assertEq(s3, 900)
+
+    fs = oldFs
+    http = oldHttp
+    os.epoch = oldEpoch
+  end },
+  { "update_check_success_uses_ttl", function()
+    local UpdateCheck = require("modules.update_check")
+
+    local oldEpoch = os.epoch
+    os.epoch = function() return 3000000 end
+
+    local oldHttp = http
+    http = {
+      checkURL = function() return true end,
+      get = function()
+        return {
+          getResponseCode = function() return 200 end,
+          readAll = function() return '{"version":"1.0.1"}' end,
+          close = function() end,
+        }
+      end,
+    }
+
+    local oldFs = fs
+    local files = {}
+    local existsSet = {}
+    local dirSet = { ["data"] = true }
+    existsSet["data"] = true
+    fs = {
+      exists = function(path) return existsSet[path] == true end,
+      isDir = function(path) return dirSet[path] == true end,
+      makeDir = function(path)
+        existsSet[path] = true; dirSet[path] = true
+      end,
+      getDir = function(path)
+        local i = string.match(path, "^.*()/")
+        if not i then return "" end
+        return string.sub(path, 1, i - 1)
+      end,
+      open = function(path, mode)
+        if mode == "r" then
+          return {
+            readAll = function() return files[path] end,
+            close = function() end,
+          }
+        end
+        if mode == "w" then
+          local buf = ""
+          return {
+            write = function(s) buf = buf .. tostring(s or "") end,
+            writeLine = function(s) buf = buf .. tostring(s or "") .. "\n" end,
+            flush = function() end,
+            close = function()
+              files[path] = buf; existsSet[path] = true
+            end,
+          }
+        end
+        return nil
+      end,
+      delete = function(path)
+        files[path] = nil; existsSet[path] = false
+      end,
+      move = function(src, dst)
+        files[dst] = files[src]
+        existsSet[dst] = true
+        files[src] = nil
+        existsSet[src] = false
+      end,
+    }
+
+    local cfg = makeCfg({ update = { enabled = "true", ttl_hours = "6", retry_seconds = "120", error_backoff_max_seconds = "900" } })
+    local state = { cfg = cfg, installed = { version = "1.0.0" }, update = UpdateCheck.defaultState({ version = "1.0.0" }) }
+
+    local s1 = UpdateCheck.tick(state, { tries = 1 })
+    assertEq(s1, 6 * 60 * 60)
+    assertEq(state.update.status, "update_available")
+    assertEq(state.update.stale, false)
+    assertEq(state.update.fail_count, 0)
+    assertEq(state.update.next_retry_at_ms, nil)
+    assertEq(state.update.last_success_at_ms, 3000000)
+
+    fs = oldFs
+    http = oldHttp
+    os.epoch = oldEpoch
+  end },
+  { "update_check_error_does_not_wait_ttl", function()
+    local UpdateCheck = require("modules.update_check")
+
+    local oldEpoch = os.epoch
+    os.epoch = function() return 4000000 end
+
+    local oldHttp = http
+    http = nil
+
+    local oldFs = fs
+    local files = {}
+    local existsSet = {}
+    local dirSet = { ["data"] = true }
+    existsSet["data"] = true
+    fs = {
+      exists = function(path) return existsSet[path] == true end,
+      isDir = function(path) return dirSet[path] == true end,
+      makeDir = function(path)
+        existsSet[path] = true; dirSet[path] = true
+      end,
+      getDir = function(path)
+        local i = string.match(path, "^.*()/")
+        if not i then return "" end
+        return string.sub(path, 1, i - 1)
+      end,
+      open = function(path, mode)
+        if mode == "r" then
+          return {
+            readAll = function() return files[path] end,
+            close = function() end,
+          }
+        end
+        if mode == "w" then
+          local buf = ""
+          return {
+            write = function(s) buf = buf .. tostring(s or "") end,
+            writeLine = function(s) buf = buf .. tostring(s or "") .. "\n" end,
+            flush = function() end,
+            close = function()
+              files[path] = buf; existsSet[path] = true
+            end,
+          }
+        end
+        return nil
+      end,
+      delete = function(path)
+        files[path] = nil; existsSet[path] = false
+      end,
+      move = function(src, dst)
+        files[dst] = files[src]
+        existsSet[dst] = true
+        files[src] = nil
+        existsSet[src] = false
+      end,
+    }
+
+    local cfg = makeCfg({ update = { enabled = "true", ttl_hours = "6", retry_seconds = "120", error_backoff_max_seconds = "900" } })
+    local state = { cfg = cfg, installed = { version = "1.0.0" }, update = UpdateCheck.defaultState({ version = "1.0.0" }) }
+    state.update.last_success_at_ms = 3999000
+    state.update.next_retry_at_ms = 4000000
+
+    local s1 = UpdateCheck.tick(state, { tries = 1 })
+    assertEq(s1, 120)
+    assertEq(state.update.status, "http_off")
+
+    fs = oldFs
+    http = oldHttp
+    os.epoch = oldEpoch
   end },
   { "update_check_format_header_right", function()
     local UpdateCheck = require("modules.update_check")
