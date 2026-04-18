@@ -605,9 +605,28 @@ function UI:renderStatus(state, mon)
   self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
 
   local health = getPeripheralHealth(state)
+  local healthByLabel = {}
+  for _, it in ipairs(health or {}) do
+    if type(it) == "table" then
+      local lbl = tostring(it.label or "")
+      if lbl ~= "" then
+        healthByLabel[lbl] = {
+          label = lbl,
+          value = tostring(it.value or "NA"),
+          level = tostring(it.level or "unknown"),
+        }
+      end
+    end
+  end
+  local healthRows = {
+    healthByLabel["ME Bridge"] or { label = "ME Bridge", value = "NA", level = "unknown" },
+    healthByLabel["Colony"] or { label = "Colony", value = "NA", level = "unknown" },
+    healthByLabel["Buffer"] or { label = "Buffer", value = "NA", level = "unknown" },
+    healthByLabel["Target"] or { label = "Target", value = "NA", level = "unknown" },
+  }
   local healthLabelW = 0
-  for i = 1, #health do
-    local it = health[i]
+  for i = 1, #healthRows do
+    local it = healthRows[i]
     if type(it) == "table" then
       local lbl = tostring(it.label or "")
       if #lbl > healthLabelW then
@@ -643,7 +662,7 @@ function UI:renderStatus(state, mon)
   local valueW = 7
   local labelW = math.max(0, math.min(healthLabelW, rightW - (2 + valueW)))
 
-  local rows = math.max(#counters, #health)
+  local rows = math.max(#counters, #healthRows)
   for i = 1, rows do
     local cIt = counters[i] or { label = "", value = "" }
     local left = ""
@@ -651,11 +670,11 @@ function UI:renderStatus(state, mon)
       left = padRight(cIt.label, counterLabelW) .. ": " .. tostring(cIt.value or "")
     end
     left = padRight(shorten(left, leftW), leftW)
-    local hIt = health[i] or {}
+    local hIt = healthRows[i] or {}
     local hLabel = tostring(hIt.label or "NA")
     local hValue = tostring(hIt.value or "NA")
     local hLevel = tostring(hIt.level or "unknown")
-    if not health[i] then
+    if not healthRows[i] then
       hLabel = ""
       hValue = ""
       hLevel = "unknown"
