@@ -78,6 +78,61 @@ local function padRight(s, len)
   return s .. string.rep(" ", len - #s)
 end
 
+local function healthValueColor(level)
+  if level == "ok" then return colors.lime end
+  if level == "bad" then return colors.red end
+  return colors.gray
+end
+
+local function defaultPeripheralHealth()
+  return {
+    { label = "ME Bridge", value = "NA", level = "unknown" },
+    { label = "Colony",    value = "NA", level = "unknown" },
+    { label = "Modem",     value = "NA", level = "unknown" },
+    { label = "Mon Req",   value = "NA", level = "unknown" },
+    { label = "Mon Stat",  value = "NA", level = "unknown" },
+  }
+end
+
+local function getPeripheralHealth(state)
+  local list = (type(state) == "table" and type(state.health) == "table") and state.health.peripherals or nil
+  if type(list) == "table" and #list == 5 then
+    return list
+  end
+  return defaultPeripheralHealth()
+end
+
+local function formatTwoColLine(leftText, rightLabel, rightValue, w)
+  local sep = " | "
+  local available = math.max(0, (tonumber(w) or 0) - #sep)
+  local leftW = math.floor(available / 2)
+  local rightW = available - leftW
+  if leftW < 1 then leftW = 1 end
+  if rightW < 1 then rightW = 1 end
+
+  leftText = tostring(leftText or "")
+  rightLabel = tostring(rightLabel or "")
+  rightValue = tostring(rightValue or "")
+
+  local rightPrefix = rightLabel .. ": "
+  local fullRight = rightPrefix .. rightValue
+
+  local leftRendered = padRight(shorten(leftText, leftW), leftW)
+  local fullRightShort = shorten(fullRight, rightW)
+  local rightRendered = padRight(fullRightShort, rightW)
+  local line = leftRendered .. sep .. rightRendered
+
+  local valueStartInRight = #rightPrefix + 1
+  local rightColStart = leftW + #sep + 1
+  local valueX = rightColStart + valueStartInRight - 1
+  local valueRendered = ""
+  if valueStartInRight <= #fullRightShort then
+    valueRendered = fullRightShort:sub(valueStartInRight)
+  end
+
+  return line, valueX, valueRendered, leftW, rightW
+end
+
 local function centerText(s, width)
   s = tostring(s or "")
   if width <= 0 then return "" end
@@ -516,11 +571,30 @@ function UI:renderStatus(state, mon)
   self:drawText("status", mon, 1, y, centerText("OPERACAO", w), colors.cyan); y = y + 1
   self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
 
-  self:drawText("status", mon, 1, y, shorten("Requisicoes: " .. tostring(#state.requests), w)); y = y + 1
-  self:drawText("status", mon, 1, y, shorten("Entregues: " .. tostring(state.stats.delivered), w)); y = y + 1
-  self:drawText("status", mon, 1, y, shorten("Crafts: " .. tostring(state.stats.crafted), w)); y = y + 1
-  self:drawText("status", mon, 1, y, shorten("Substituicoes: " .. tostring(state.stats.substitutions), w)); y = y + 1
-  self:drawText("status", mon, 1, y, shorten("Erros: " .. tostring(state.stats.errors), w)); y = y + 1
+  local health = getPeripheralHealth(state)
+  local reqCount = (type(state.requests) == "table") and #state.requests or 0
+  local counters = {
+    { label = "Requisicoes",   value = tostring(reqCount) },
+    { label = "Entregues",     value = tostring(state.stats.delivered) },
+    { label = "Crafts",        value = tostring(state.stats.crafted) },
+    { label = "Substituicoes", value = tostring(state.stats.substitutions) },
+    { label = "Erros",         value = tostring(state.stats.errors) },
+  }
+
+  for i = 1, 5 do
+    local left = counters[i].label .. ": " .. counters[i].value
+    local hIt = health[i] or {}
+    local hLabel = tostring(hIt.label or "NA")
+    local hValue = tostring(hIt.value or "NA")
+    local hLevel = tostring(hIt.level or "unknown")
+
+    local line, valueX, valueRendered = formatTwoColLine(left, hLabel, hValue, w)
+    self:drawText("status", mon, 1, y, padRight(line, w))
+    if valueRendered ~= "" and valueX <= w then
+      self:drawText("status", mon, valueX, y, valueRendered, healthValueColor(hLevel), colors.black)
+    end
+    y = y + 1
+  end
   self:drawText("status", mon, 1, y, padRight("", w)); y = y + 1
 
   self:drawText("status", mon, 1, y, shorten("Estoque Critico: [heuristica]", w)); y = y + 1
@@ -651,4 +725,10 @@ end
 
 return {
   new = UI.new,
+  _test = {
+    defaultPeripheralHealth = defaultPeripheralHealth,
+    formatTwoColLine = formatTwoColLine,
+    getPeripheralHealth = getPeripheralHealth,
+    healthValueColor = healthValueColor,
+  },
 }
