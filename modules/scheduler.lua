@@ -31,6 +31,13 @@ function M.run(state, engine, ui)
 
   local function loopUI()
     while true do
+      if engine and type(engine.updateHealthSnapshot) == "function" then
+        local okHealth, errHealth = pcall(engine.updateHealthSnapshot, engine, true)
+        if not okHealth then
+          state.stats.errors = state.stats.errors + 1
+          state.logger:error("Erro no engine.updateHealthSnapshot", { err = tostring(errHealth) })
+        end
+      end
       local ok, err = pcall(ui.tick, ui)
       if not ok then
         state.stats.errors = state.stats.errors + 1

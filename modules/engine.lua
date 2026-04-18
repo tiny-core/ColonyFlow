@@ -528,24 +528,7 @@ function Engine:tick()
 
   state.stats.processed = state.stats.processed + 1
 
-  state.health = state.health or {}
-  do
-    local snap = nil
-    if state.cache and type(state.cache.get) == "function" then
-      snap = state.cache:get("ui_health", "peripherals")
-    end
-    if not snap then
-      snap = buildPeripheralHealth(state, self.me)
-      if state.cache and type(state.cache.set) == "function" then
-        local ttl = 1
-        if state.cfg and type(state.cfg.getNumber) == "function" then
-          ttl = state.cfg:getNumber("ui", "health_ttl_seconds", 1)
-        end
-        state.cache:set("ui_health", "peripherals", snap, ttl)
-      end
-    end
-    state.health.peripherals = snap
-  end
+  self:updateHealthSnapshot(false)
 
   if not state.devices.colonyIntegrator then
     state.logger:warn("colonyIntegrator indisponível; aguardando...")
@@ -899,6 +882,30 @@ function Engine:tick()
     end
     ::continue::
   end
+end
+
+function Engine:updateHealthSnapshot(forceRefresh)
+  local state = self.state
+  state.health = state.health or {}
+
+  local snap = nil
+  if forceRefresh ~= true and state.cache and type(state.cache.get) == "function" then
+    snap = state.cache:get("ui_health", "peripherals")
+  end
+
+  if not snap then
+    snap = buildPeripheralHealth(state, self.me)
+    if state.cache and type(state.cache.set) == "function" then
+      local ttl = 1
+      if state.cfg and type(state.cfg.getNumber) == "function" then
+        ttl = state.cfg:getNumber("ui", "health_ttl_seconds", 1)
+      end
+      state.cache:set("ui_health", "peripherals", snap, ttl)
+    end
+  end
+
+  state.health.peripherals = snap
+  return snap
 end
 
 return {
