@@ -247,13 +247,14 @@ local function selectList(title, subtitle, labels, initialIdx)
           term.write(shownSuffixWithSpace)
         end)
       else
-        local line = prefix .. tostring(item)
-        if #line > w then line = line:sub(1, w) end
+        local remain = w - #prefix
+        if remain < 0 then remain = 0 end
+        local shown = truncateEllipsis(tostring(item), remain)
         withTextColor(prefixColor(selected), function()
           term.write(prefix)
         end)
         withTextColor(defaultItemTextColor(selected), function()
-          term.write(line:sub(#prefix + 1))
+          term.write(shown)
         end)
       end
     end
