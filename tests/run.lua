@@ -1891,7 +1891,7 @@ local tests = {
     local cfg = makeCfg({
       delivery = {
         export_buffer_container = "chest_1",
-        default_target_container = "rack_0",
+        default_target_container = "minecolonies:rack_0",
       }
     })
     local state = {

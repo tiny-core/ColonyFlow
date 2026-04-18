@@ -468,38 +468,13 @@ local function buildPeripheralHealth(state, me)
   end
 
   local function deviceStatus(dev, name)
-    if not devices then
-      return "NA", "unknown"
-    end
     local present = presentByName(name)
     if present == true then return "Online", "ok" end
     if present == false then return "Offline", "bad" end
-    if dev then return "Online", "ok" end
-    return "Offline", "bad"
-  end
-
-  local function targetStatus(names)
     if not devices then
       return "NA", "unknown"
     end
-    local labels = {}
-    local anyKnown = false
-    local anyOnline = false
-    for _, n in ipairs(names or {}) do
-      local present = presentByName(n)
-      table.insert(labels, stripModTag(n))
-      if present ~= nil then anyKnown = true end
-      if present == true then anyOnline = true end
-    end
-    if #labels == 0 then
-      return "NA", "unknown"
-    end
-    if anyOnline then
-      return "Online", "ok"
-    end
-    if anyKnown then
-      return "Offline", "bad"
-    end
+    if dev then return "Online", "ok" end
     return "Offline", "bad"
   end
 
@@ -517,10 +492,22 @@ local function buildPeripheralHealth(state, me)
   if cfg and type(cfg.get) == "function" then
     bufferName = trim(cfg:get("delivery", "export_buffer_container", ""))
   end
-  local bufferValue, bufferLevel = deviceStatus(resolveInvByName(bufferName), bufferName)
+  local bufferValue, bufferLevel = deviceStatus(resolveInvByName(resolvePeripheralName(bufferName)), bufferName)
 
-  local targetNames = listFromCfg("delivery", "default_target_container")
-  local targetValue, targetLevel = targetStatus(targetNames)
+  local targetValue, targetLevel = "NA", "unknown"
+  if cfg and type(cfg.getList) == "function" and type(peripheral) == "table" and type(peripheral.isPresent) == "function" then
+    local _, targetInv = resolveTarget(cfg)
+    if targetInv then
+      targetValue, targetLevel = "Online", "ok"
+    else
+      targetValue, targetLevel = "Offline", "bad"
+    end
+  elseif cfg then
+    local raw = trim(type(cfg.get) == "function" and cfg:get("delivery", "default_target_container", "") or "")
+    if raw ~= "" then
+      targetValue, targetLevel = "Offline", "bad"
+    end
+  end
 
   local colonyValue, colonyLevel = deviceStatus(devices and devices.colonyIntegrator, devices and devices.colonyName)
 
