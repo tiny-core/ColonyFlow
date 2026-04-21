@@ -33,6 +33,7 @@ Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColo
 - Configurar `config.ini` e perifericos via CLI in-game, com validacao e escrita atomica (Validated in Phase 10)
 - Versionamento robusto: versao real (SemVer) + tooling deterministico de manifesto (Validated in Phase 11)
 - Update-check leve em background + UI com versao instalada vs disponivel (Validated in Phase 12)
+- Refactor por snapshots: reduzir acoplamento e IO (Validated in Phase 18)
 
 ### Active
 
@@ -42,7 +43,6 @@ Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColo
 - [ ] Operabilidade + resiliencia: startup doctor + persistencia de jobs + circuit breaker ME (fase 15)
 - [ ] Observabilidade de performance: metricas + contadores de chamadas (fase 16)
 - [ ] Scheduler com budget: limites por tick e escalonamento (fase 17)
-- [ ] Refactor por snapshots: reduzir acoplamento e IO (fase 18)
 - [ ] Documentacao didatica + comentarios em portugues (fase 19)
 
 ### Out of Scope
@@ -101,4 +101,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-14 after phase 12*
+*Last updated: 2026-04-21 after phase 18*

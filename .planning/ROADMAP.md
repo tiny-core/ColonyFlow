@@ -278,7 +278,7 @@ Plans:
 | 15. Operabilidade + Resiliencia                        | 1/1            | Complete | 2026-04-21 |
 | 16. Observabilidade de Performance                      | 1/1            | Complete | 2026-04-21 |
 | 17. Scheduler com Budget                               | 1/1            | Complete | 2026-04-21 |
-| 18. Refactor por Snapshots                             | 1/1 | Complete   | 2026-04-21 |
+| 18. Refactor por Snapshots                             | 1/1 | Complete    | 2026-04-21 |
 | 19. Documentacao Didatica + Comentarios                | 0/1            | Not started | -        |
 
 ### Phase 10: Config CLI (editar config.ini e perifericos)
