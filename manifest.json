@@ -1,15 +1,15 @@
 {
   "manifest_version": 2,
-  "version": "1.0.0",
-  "generated_utc": "2026-04-18T17:01:22Z",
+  "version": "1.5.0",
+  "generated_utc": "2026-04-21T22:27:31Z",
   "files": [
     {
       "path": "components/ui.lua",
-      "size": 28670
+      "size": 34013
     },
     {
       "path": "config.ini",
-      "size": 3790,
+      "size": 4361,
       "preserve": true
     },
     {
@@ -19,19 +19,19 @@
     },
     {
       "path": "lib/bootstrap.lua",
-      "size": 2183
+      "size": 3496
     },
     {
       "path": "lib/cache.lua",
-      "size": 1483
+      "size": 2523
     },
     {
       "path": "lib/config_schema.lua",
-      "size": 3853
+      "size": 6005
     },
     {
       "path": "lib/config.lua",
-      "size": 9958
+      "size": 10302
     },
     {
       "path": "lib/logger.lua",
@@ -46,12 +46,20 @@
       "size": 1298
     },
     {
+      "path": "modules/budget.lua",
+      "size": 3993
+    },
+    {
       "path": "modules/config_cli.lua",
       "size": 28207
     },
     {
+      "path": "modules/doctor.lua",
+      "size": 4696
+    },
+    {
       "path": "modules/engine.lua",
-      "size": 34114
+      "size": 43236
     },
     {
       "path": "modules/equivalence.lua",
@@ -59,7 +67,7 @@
     },
     {
       "path": "modules/inventory.lua",
-      "size": 2153
+      "size": 2892
     },
     {
       "path": "modules/mapping_cli.lua",
@@ -67,19 +75,27 @@
     },
     {
       "path": "modules/me.lua",
-      "size": 5495
+      "size": 8504
     },
     {
       "path": "modules/minecolonies.lua",
-      "size": 8458
+      "size": 11442
     },
     {
       "path": "modules/peripherals.lua",
       "size": 4459
     },
     {
+      "path": "modules/persistence.lua",
+      "size": 1012
+    },
+    {
       "path": "modules/scheduler.lua",
-      "size": 4572
+      "size": 7233
+    },
+    {
+      "path": "modules/snapshot.lua",
+      "size": 3236
     },
     {
       "path": "modules/tier.lua",
@@ -91,11 +107,11 @@
     },
     {
       "path": "startup.lua",
-      "size": 929
+      "size": 1901
     },
     {
       "path": "tests/run.lua",
-      "size": 70208
+      "size": 82335
     },
     {
       "path": "tools/install.lua",
