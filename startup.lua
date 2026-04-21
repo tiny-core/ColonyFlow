@@ -24,6 +24,14 @@ local function runConfigCli()
   print("CLI de config nao encontrado.")
 end
 
+local function runDoctor()
+  if fs.exists("modules/doctor.lua") then
+    shell.run("modules/doctor.lua")
+    return
+  end
+  print("Doctor nao encontrado.")
+end
+
 local mode = args[1]
 if mode == "test" then
   runTests()
@@ -37,6 +45,11 @@ end
 
 if mode == "config" then
   runConfigCli()
+  return
+end
+
+if mode == "doctor" then
+  runDoctor()
   return
 end
 

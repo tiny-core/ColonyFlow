@@ -2,3 +2,4 @@ logs/
 .trae/
 temp/
 **/update_check.json
+**/state.json

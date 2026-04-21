@@ -1932,6 +1932,157 @@ local tests = {
     assertEq(snap[4].level, "bad")
   end
   },
+  { "persistence_save_and_load_v1_schema", function()
+    local Persistence = require("modules.persistence")
+    local Util = require("lib.util")
+
+    local oldFs = fs
+    local files = {}
+    local existsSet = { ["data"] = true }
+    local dirSet = { ["data"] = true }
+
+    fs = {
+      exists = function(path) return existsSet[tostring(path)] == true end,
+      isDir = function(path) return dirSet[tostring(path)] == true end,
+      makeDir = function(path)
+        path = tostring(path)
+        existsSet[path] = true
+        dirSet[path] = true
+      end,
+      getDir = function(path)
+        local i = string.match(path, "^.*()/")
+        if not i then return "" end
+        return string.sub(path, 1, i - 1)
+      end,
+      open = function(path, mode)
+        path = tostring(path)
+        if mode == "r" then
+          return {
+            readAll = function() return files[path] end,
+            close = function() end,
+          }
+        end
+        if mode == "w" then
+          local buf = ""
+          return {
+            write = function(s) buf = buf .. tostring(s or "") end,
+            close = function()
+              files[path] = buf
+              existsSet[path] = true
+            end,
+          }
+        end
+        return nil
+      end,
+      delete = function(path)
+        path = tostring(path)
+        files[path] = nil
+        existsSet[path] = false
+      end,
+      move = function(src, dst)
+        src = tostring(src)
+        dst = tostring(dst)
+        files[dst] = files[src]
+        existsSet[dst] = true
+        files[src] = nil
+        existsSet[src] = false
+      end,
+    }
+
+    local okSave, errSave = Persistence.save("data/state.json", {
+      ["req-1"] = {
+        request_id = "req-1",
+        chosen = "minecraft:stone",
+        status = "waiting_retry",
+        missing = 5,
+        started_at_ms = 123,
+        retry_at_ms = 999,
+        last_err = "me_degraded",
+      }
+    })
+
+    local saved = files["data/state.json"] or ""
+    local loaded = Persistence.load("data/state.json")
+
+    local okDecode, decoded = pcall(Util.jsonDecode, saved)
+
+    fs = oldFs
+
+    assertEq(okSave, true, "save deveria retornar ok")
+    assertEq(errSave == nil, true, "save nao deveria retornar erro")
+    assertEq(string.match(saved, "\"v\"") ~= nil, true, "json deve conter v")
+    assertEq(string.match(saved, "\"jobs\"") ~= nil, true, "json deve conter jobs")
+    assertEq(type(loaded), "table", "load deve retornar tabela")
+    assertEq(okDecode, true, "json salvo deve ser valido")
+    assertEq(type(decoded.jobs), "table", "json deve conter jobs como tabela")
+  end },
+  { "persistence_load_invalid_json_returns_nil", function()
+    local Persistence = require("modules.persistence")
+
+    local oldFs = fs
+    local files = { ["data/state.json"] = "{" }
+    local existsSet = { ["data/state.json"] = true }
+
+    fs = {
+      exists = function(path) return existsSet[tostring(path)] == true end,
+      open = function(path, mode)
+        path = tostring(path)
+        if mode == "r" then
+          return {
+            readAll = function() return files[path] end,
+            close = function() end,
+          }
+        end
+        return nil
+      end,
+    }
+
+    local loaded = Persistence.load("data/state.json")
+
+    fs = oldFs
+
+    assertEq(loaded, nil, "invalid json deve retornar nil")
+  end },
+  { "me_circuit_breaker_degraded_short_circuit", function()
+    local ME = require("modules.me")
+    local Util = require("lib.util")
+
+    local oldNow = Util.nowUtcMs
+    local t = 1000
+    Util.nowUtcMs = function() return t end
+
+    local calls = 0
+    local bridge = {
+      isConnected = function() calls = calls + 1; return false end,
+      isOnline = function() calls = calls + 1; return false end,
+    }
+
+    local state = { devices = { meBridge = bridge }, health = {} }
+    local me = ME.new(state)
+
+    local ok1, err1 = me:isOnline()
+    local calls1 = calls
+    local nextAt1 = tonumber(state.health.next_me_retry_at_ms)
+
+    local ok2, err2 = me:isOnline()
+    local calls2 = calls
+
+    t = (nextAt1 or 0) + 1
+    local ok3, err3 = me:isOnline()
+    local calls3 = calls
+
+    Util.nowUtcMs = oldNow
+
+    assertEq(ok1, false)
+    assertEq(err1, "grid desconectado")
+    assertEq(calls1, 2, "primeira chamada deve tocar o peripheral (isConnected + isOnline)")
+    assertEq(ok2, false)
+    assertEq(err2, "degraded")
+    assertEq(calls2, calls1, "degraded deve short-circuit sem tocar o peripheral")
+    assertEq(ok3, false)
+    assertEq(err3, "grid desconectado")
+    assertEq(calls3, calls2 + 2, "apos retry_at, deve tocar o peripheral novamente")
+  end },
 }
 
 for _, t in ipairs(tests) do

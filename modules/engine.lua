@@ -3,12 +3,80 @@ local Inventory = require("modules.inventory")
 local Equivalence = require("modules.equivalence")
 local ME = require("modules.me")
 local Tier = require("modules.tier")
+local Util = require("lib.util")
+local Persistence = require("modules.persistence")
 
 local Engine = {}
 Engine.__index = Engine
 
+local PERSIST_PATH = "data/state.json"
+local PERSIST_INTERVAL_MS = 2000
+local PERSIST_MAX_AGE_MS = 6 * 60 * 60 * 1000
+
+function Engine:_restorePersistedWork()
+  local persisted = Persistence.load(PERSIST_PATH)
+  if not persisted then return end
+
+  local savedAt = tonumber(persisted.saved_at_ms or 0) or 0
+  if savedAt > 0 and (Util.nowUtcMs() - savedAt) > PERSIST_MAX_AGE_MS then
+    return
+  end
+
+  for reqId, job in pairs(persisted.jobs) do
+    local id = tostring(reqId or "")
+    if id ~= "" and type(job) == "table" then
+      local work = self.work[id] or {}
+
+      if job.chosen ~= nil then work.chosen = tostring(job.chosen) end
+      if job.status ~= nil then work.status = tostring(job.status) end
+      if job.missing ~= nil then work.missing = tonumber(job.missing) or work.missing end
+      if job.last_err ~= nil then work.err = tostring(job.last_err) end
+      if job.retry_at_ms ~= nil then work.next_retry = tonumber(job.retry_at_ms) or work.next_retry end
+
+      local startedAt = tonumber(job.started_at_ms)
+      if startedAt then
+        work.craft = work.craft or {}
+        work.craft.started_at = startedAt
+      end
+
+      self.work[id] = work
+    end
+  end
+end
+
+function Engine:_persistWorkMaybe()
+  local now = Util.nowUtcMs()
+  if self._persist_next_at_ms and now < self._persist_next_at_ms then return end
+  self._persist_next_at_ms = now + PERSIST_INTERVAL_MS
+
+  local jobs = {}
+  for reqId, work in pairs(self.work) do
+    local id = tostring(reqId or "")
+    if id ~= "" and type(work) == "table" then
+      local status = work.status and tostring(work.status) or ""
+      if status ~= "" and status ~= "done" then
+        local startedAt = nil
+        if type(work.craft) == "table" and work.craft.started_at ~= nil then
+          startedAt = tonumber(work.craft.started_at)
+        end
+        jobs[id] = {
+          request_id = id,
+          chosen = work.chosen,
+          status = status,
+          missing = tonumber(work.missing),
+          started_at_ms = startedAt,
+          retry_at_ms = tonumber(work.next_retry),
+          last_err = work.err,
+        }
+      end
+    end
+  end
+
+  Persistence.save(PERSIST_PATH, jobs)
+end
+
 function Engine.new(state)
-  return setmetatable({
+  local self = setmetatable({
     state = state,
     mine = MineColonies.new(state),
     eq = Equivalence.new(state),
@@ -16,6 +84,11 @@ function Engine.new(state)
     tier = nil,
     work = {},
   }, Engine)
+
+  self._persist_next_at_ms = Util.nowUtcMs() + PERSIST_INTERVAL_MS
+  self:_restorePersistedWork()
+  self:_persistWorkMaybe()
+  return self
 end
 
 local function guessClass(name)
@@ -566,6 +639,7 @@ function Engine:tick()
 
   if not state.devices.colonyIntegrator then
     state.logger:warn("colonyIntegrator indisponível; aguardando...")
+    self:_persistWorkMaybe()
     return
   end
 
@@ -604,6 +678,7 @@ function Engine:tick()
         self.work[r.id] = work
       end
     end
+    self:_persistWorkMaybe()
     return
   end
 
@@ -714,12 +789,32 @@ function Engine:tick()
       local meOnline, meErr = self.me:isOnline()
       if not meOnline then
         work.status = "waiting_retry"
-        work.err = "me_offline:" .. tostring(meErr or "")
-        work.next_retry = os.epoch("utc") + 5000
+        local errStr = tostring(meErr or "")
+        if errStr == "degraded" then
+          work.err = "me_degraded"
+          local nextAt = state.health and tonumber(state.health.next_me_retry_at_ms) or nil
+          if nextAt and nextAt > os.epoch("utc") then
+            work.next_retry = nextAt
+          else
+            work.next_retry = os.epoch("utc") + 5000
+          end
+          if not work.logged_me_degraded then
+            state.logger:warn("ME degraded; aguardando retry...", {
+              request = r.id,
+              next_retry_at_ms = work.next_retry
+            })
+            work.logged_me_degraded = true
+          end
+        else
+          work.err = "me_offline:" .. errStr
+          work.next_retry = os.epoch("utc") + 5000
+          work.logged_me_degraded = nil
+          state.logger:warn("ME indisponível; aguardando...", { request = r.id, err = errStr })
+        end
         self.work[r.id] = work
-        state.logger:warn("ME indisponível; aguardando...", { request = r.id, err = tostring(meErr) })
         goto continue
       end
+      work.logged_me_degraded = nil
 
       local meAmount = getMeAmount(self.me, candidate.name)
       local missingDest = missing
@@ -916,6 +1011,8 @@ function Engine:tick()
     end
     ::continue::
   end
+
+  self:_persistWorkMaybe()
 end
 
 function Engine:updateHealthSnapshot(forceRefresh)

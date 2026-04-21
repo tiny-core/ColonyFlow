@@ -3,6 +3,41 @@ local Util = require("lib.util")
 local ME = {}
 ME.__index = ME
 
+local function ensureHealth(state)
+  if not state then return {} end
+  state.health = state.health or {}
+  return state.health
+end
+
+local function isDegraded(state)
+  local h = ensureHealth(state)
+  if h.me_degraded ~= true then return false end
+  local nextAt = tonumber(h.next_me_retry_at_ms)
+  if nextAt and Util.nowUtcMs() < nextAt then
+    return true
+  end
+  return false
+end
+
+local function enterDegraded(state)
+  local h = ensureHealth(state)
+  local fail = (tonumber(h.me_fail_count) or 0) + 1
+  h.me_fail_count = fail
+
+  local exp = math.min(fail - 1, 2)
+  local delay = math.min(120000, 30000 * (2 ^ exp))
+
+  h.me_degraded = true
+  h.next_me_retry_at_ms = Util.nowUtcMs() + delay
+end
+
+local function exitDegraded(state)
+  local h = ensureHealth(state)
+  h.me_fail_count = 0
+  h.me_degraded = false
+  h.next_me_retry_at_ms = nil
+end
+
 local function call(bridge, method, ...)
   if not bridge or type(bridge[method]) ~= "function" then
     return nil, "Método indisponível: " .. tostring(method)
@@ -52,6 +87,9 @@ function ME.new(state)
 end
 
 function ME:isOnline()
+  if isDegraded(self.state) then
+    return false, "degraded"
+  end
   local b = self.state.devices.meBridge
   if not b then return false, "meBridge ausente" end
   local connected, connErr = call(b, "isConnected")
@@ -62,16 +100,28 @@ function ME:isOnline()
     local missing1 = e1:match("^M[ée]todo indispon[íi]vel") ~= nil
     local missing2 = e2:match("^M[ée]todo indispon[íi]vel") ~= nil
     if missing1 and missing2 then
+      exitDegraded(self.state)
       return true, nil
     end
+    enterDegraded(self.state)
     return false, (connErr or onlineErr or "erro_me_bridge")
   end
-  if connected == false then return false, "grid desconectado" end
-  if online == false then return false, "grid offline" end
+  if connected == false then
+    enterDegraded(self.state)
+    return false, "grid desconectado"
+  end
+  if online == false then
+    enterDegraded(self.state)
+    return false, "grid offline"
+  end
+  exitDegraded(self.state)
   return true, nil
 end
 
 function ME:getItem(filter)
+  if isDegraded(self.state) then
+    return nil, "me_degraded"
+  end
   local b = self.state.devices.meBridge
   local name = filter and filter.name
   local ttl = cacheTtl(self.state, "me_item_ttl_seconds", 1)
@@ -86,6 +136,9 @@ function ME:getItem(filter)
 end
 
 function ME:listItems(filter)
+  if isDegraded(self.state) then
+    return {}, "me_degraded"
+  end
   local b = self.state.devices.meBridge
   local name = filter and filter.name
   local ttl = cacheTtl(self.state, "me_list_ttl_seconds", 1)
@@ -113,6 +166,9 @@ function ME:listItems(filter)
 end
 
 function ME:isCrafting(filter)
+  if isDegraded(self.state) then
+    return nil, "me_degraded"
+  end
   local b = self.state.devices.meBridge
   local res, err = callAny(b, { "isCrafting", "isItemCrafting" }, filter)
   if res == nil and err then return nil, err end
@@ -120,6 +176,9 @@ function ME:isCrafting(filter)
 end
 
 function ME:isCraftable(filter)
+  if isDegraded(self.state) then
+    return nil, "me_degraded"
+  end
   local b = self.state.devices.meBridge
   local name = filter and filter.name
   local count = filter and filter.count
@@ -136,6 +195,9 @@ function ME:isCraftable(filter)
 end
 
 function ME:craftItem(filter)
+  if isDegraded(self.state) then
+    return nil, "me_degraded"
+  end
   local b = self.state.devices.meBridge
   return call(b, "craftItem", filter)
 end
@@ -146,6 +208,9 @@ function ME:supportsExportToPeripheral()
 end
 
 function ME:exportItem(filter, target)
+  if isDegraded(self.state) then
+    return nil, "me_degraded"
+  end
   local b = self.state.devices.meBridge
   if b and type(b.exportItemToPeripheral) == "function" then
     return call(b, "exportItemToPeripheral", filter, target)
