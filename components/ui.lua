@@ -1,8 +1,8 @@
 -- UI ASCII (2 monitores).
--- Renderiza a operacao em tempo real consumindo o snapshot publicado pelo engine.
+-- Renderiza a operação em tempo real consumindo o snapshot publicado pelo engine.
 -- Invariantes:
--- - UI nao deve fazer IO de perifericos; apenas ler `state.snapshot` (ou fallback) e renderizar
--- - Saida deve ser sanitizada para ASCII (ver cleanAscii) para evitar caracteres invalidos no monitor
+-- - UI não deve fazer IO de periféricos; apenas ler `state.snapshot` (ou fallback) e renderizar
+-- - Saída deve ser sanitizada para ASCII (ver cleanAscii) para evitar caracteres inválidos no monitor
 -- - Render deve minimizar flicker (buffers + diff por linha)
 
 local UI = {}

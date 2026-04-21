@@ -2,8 +2,8 @@
 -- Suporta modos operacionais via argumento:
 -- - `startup test`   -> roda o harness em tests/run.lua
 -- - `startup map`    -> abre o editor de mapeamentos
--- - `startup config` -> abre a CLI de configuracao
--- - `startup doctor` -> diagnostico rapido do ambiente
+-- - `startup config` -> abre a CLI de configuração
+-- - `startup doctor` -> diagnóstico rápido do ambiente
 -- Sem argumento: carrega lib/bootstrap.lua e inicia o loop principal.
 
 local args = { ... }

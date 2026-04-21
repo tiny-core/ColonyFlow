@@ -1,8 +1,8 @@
--- Engine: coracao do sistema.
--- Faz o tick de processamento: le requests (MineColonies), decide acao (tiers/equivalencias),
+-- Engine: coração do sistema.
+-- Faz o tick de processamento: lê requests (MineColonies), decide ação (tiers/equivalências),
 -- calcula faltante real (destino), aciona ME (craft/entrega) e atualiza `state.work`.
--- Publica `state.snapshot` para a UI (UI nao deve tocar perifericos diretamente).
--- Persistencia: salva jobs em disco para retomar apos reboot.
+-- Publica `state.snapshot` para a UI (UI não deve tocar periféricos diretamente).
+-- Persistência: salva jobs em disco para retomar após reboot.
 
 local MineColonies = require("modules.minecolonies")
 local Inventory = require("modules.inventory")

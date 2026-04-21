@@ -1,10 +1,10 @@
--- Integracao com AE2 via Advanced Peripherals (meBridge).
+-- Integração com AE2 via Advanced Peripherals (meBridge).
 -- Responsabilidades:
 -- - Consultar status do grid (online/conectado)
 -- - Consultar estoque/craftabilidade e abrir crafts do faltante real
--- - Exportar itens ao destino e tratar falhas transitorias
+-- - Exportar itens ao destino e tratar falhas transitórias
 -- Invariantes:
--- - Chamar metodos do bridge apenas via wrappers (call/callAny) para budget + safeCall + metricas
+-- - Chamar métodos do bridge apenas via wrappers (call/callAny) para budget + safeCall + métricas
 -- - Respeitar modo degradado (backoff) quando ME oscilar/offline
 
 local Util = require("lib.util")
