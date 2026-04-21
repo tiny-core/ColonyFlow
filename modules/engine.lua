@@ -5,6 +5,7 @@ local ME = require("modules.me")
 local Tier = require("modules.tier")
 local Util = require("lib.util")
 local Persistence = require("modules.persistence")
+local Snapshot = require("modules.snapshot")
 
 local Engine = {}
 Engine.__index = Engine
@@ -15,6 +16,11 @@ local PERSIST_MAX_AGE_MS = 6 * 60 * 60 * 1000
 
 local function isBudgetExceeded(err)
   return type(err) == "string" and err:match("^budget_exceeded:") ~= nil
+end
+
+local function publishSnapshot(state)
+  if type(state) ~= "table" then return end
+  state.snapshot = Snapshot.build(state)
 end
 
 function Engine:_restorePersistedWork()
@@ -90,6 +96,10 @@ function Engine.new(state)
     _rq_cursor = 1,
     _next_requests_refresh_at_ms = 0,
   }, Engine)
+
+  if type(state) == "table" and state.snapshot == nil then
+    publishSnapshot(state)
+  end
 
   self._persist_next_at_ms = Util.nowUtcMs() + PERSIST_INTERVAL_MS
   self:_restorePersistedWork()
@@ -678,6 +688,7 @@ function Engine:tick()
 
   if not state.devices.colonyIntegrator then
     state.logger:warn("colonyIntegrator indisponível; aguardando...")
+    publishSnapshot(state)
     self:_persistWorkMaybe()
     return
   end
@@ -702,6 +713,7 @@ function Engine:tick()
   if shouldRefresh then
     local fresh, freshErr = self.mine:listRequests()
     if fresh == nil and isBudgetExceeded(freshErr) then
+      publishSnapshot(state)
       self:_persistWorkMaybe()
       return
     end
@@ -718,6 +730,7 @@ function Engine:tick()
   if not colonyStats then
     local cs, csErr = self.mine:getColonyStats()
     if cs == nil and isBudgetExceeded(csErr) then
+      publishSnapshot(state)
       self:_persistWorkMaybe()
       return
     end
@@ -749,12 +762,14 @@ function Engine:tick()
         self.work[r.id] = work
       end
     end
+    publishSnapshot(state)
     self:_persistWorkMaybe()
     return
   end
 
   local snap, snapErr = getDestinationSnapshot(state, targetName, targetInv, false)
   if snap == nil and isBudgetExceeded(snapErr) then
+    publishSnapshot(state)
     self:_persistWorkMaybe()
     return
   end
@@ -768,6 +783,7 @@ function Engine:tick()
   if not buildings then
     local b, bErr = self.mine:listBuildings()
     if b == nil and isBudgetExceeded(bErr) then
+      publishSnapshot(state)
       self:_persistWorkMaybe()
       return
     end
@@ -780,6 +796,7 @@ function Engine:tick()
   if not citizens then
     local c, cErr = self.mine:listCitizens()
     if c == nil and isBudgetExceeded(cErr) then
+      publishSnapshot(state)
       self:_persistWorkMaybe()
       return
     end
@@ -1163,6 +1180,7 @@ function Engine:tick()
       local did, budgetErr = processOne(r)
       if did == nil and budgetErr ~= nil then
         self._rq_cursor = currentIdx
+        publishSnapshot(state)
         self:_persistWorkMaybe()
         return
       end
@@ -1175,6 +1193,7 @@ function Engine:tick()
     self._rq_cursor = 1
   end
 
+  publishSnapshot(state)
   self:_persistWorkMaybe()
 end
 
