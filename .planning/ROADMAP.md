@@ -24,7 +24,7 @@ Objetivo: entregar um sistema autônomo em Lua (CC: Tweaked) que lê requisiçõ
 - [x] **Phase 16: Observabilidade de Performance (metricas + contadores)** - Medir custo por tick e chamadas a perifericos, com exibicao discreta e logs
 - [x] **Phase 17: Scheduler com Budget (limites por tick)** - Limitar trabalho por ciclo (requests/IO) para reduzir picos e travamentos
 - [x] **Phase 18: Refactor por Snapshots (reduzir acoplamento/IO)** - Padronizar snapshots de estado para UI/engine e reduzir complexidade (completed 2026-04-21)
-- [ ] **Phase 19: Documentacao Didatica + Comentarios (PT)** - Guia de estudo e comentarios explicativos em portugues (identificadores em ingles)
+- [x] **Phase 19: Documentacao Didatica + Comentarios (PT)** - Guia de estudo e comentarios explicativos em portugues (identificadores em ingles) (completed 2026-04-21)
 
 ## Phase Details
 
@@ -279,7 +279,7 @@ Plans:
 | 16. Observabilidade de Performance                      | 1/1            | Complete | 2026-04-21 |
 | 17. Scheduler com Budget                               | 1/1            | Complete | 2026-04-21 |
 | 18. Refactor por Snapshots                             | 1/1 | Complete    | 2026-04-21 |
-| 19. Documentacao Didatica + Comentarios                | 0/1            | Not started | -        |
+| 19. Documentacao Didatica + Comentarios                | 1/1 | Complete   | 2026-04-21 |
 
 ### Phase 10: Config CLI (editar config.ini e perifericos)
 
@@ -379,7 +379,7 @@ Plans:
 **Goal:** Facilitar aprendizado: guia de leitura do projeto + documentacao e comentarios explicativos em portugues, mantendo nomes de funcoes/variaveis em ingles.
 **Depends on:** Phase 18
 **Requirements**: TBD
-**Plans:** 0 plans
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] TBD (run /gsd-plan-phase 19 to break down)
