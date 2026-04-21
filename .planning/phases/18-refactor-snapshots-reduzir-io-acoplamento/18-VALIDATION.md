@@ -26,9 +26,9 @@ created: 2026-04-21
 
 | Task ID | Plan | Wave | Threat Ref | Test Type | Automated Command | Status |
 |---------|------|------|------------|-----------|-------------------|--------|
-| 18-01-01 | 01 | 1 | T-18-01 | unit | `startup test` | ⬜ pending |
+| 18-01-01 | 01 | 1 | T-18-01 | unit | `startup test` (snapshot_build_has_stable_keys_and_defaults) | ⬜ pending |
 | 18-01-02 | 01 | 1 | T-18-01 | unit | `startup test` | ⬜ pending |
-| 18-01-03 | 01 | 1 | T-18-02 | unit/manual | `startup test` | ⬜ pending |
+| 18-01-03 | 01 | 1 | T-18-02 | unit/manual | `startup test` (ui_tick_prefers_snapshot_view) | ⬜ pending |
 | 18-01-04 | 01 | 1 | T-18-03 | unit/docs | `startup test` | ⬜ pending |
 
 ## Manual-Only Verifications
@@ -41,4 +41,3 @@ created: 2026-04-21
 
 - [ ] All tasks have verify coverage
 - [ ] `nyquist_compliant: true` set in frontmatter
-

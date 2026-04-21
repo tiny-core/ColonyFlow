@@ -1882,6 +1882,74 @@ local tests = {
     assertEq(list[4].label, "Target")
   end
   },
+  { "snapshot_build_has_stable_keys_and_defaults", function()
+    local Snapshot = require("modules.snapshot")
+
+    local oldFs = fs
+    local oldPeripheral = peripheral
+    local oldHttp = http
+
+    fs = setmetatable({}, { __index = function() error("fs access blocked") end })
+    peripheral = setmetatable({}, { __index = function() error("peripheral access blocked") end })
+    http = setmetatable({}, { __index = function() error("http access blocked") end })
+
+    local snap = Snapshot.build({})
+
+    fs = oldFs
+    peripheral = oldPeripheral
+    http = oldHttp
+
+    assertEq(type(snap), "table")
+    assertEq(type(snap.at_ms), "number")
+    assertEq(type(snap.requests), "table")
+    assertEq(type(snap.work), "table")
+    assertEq(type(snap.health), "table")
+    assertEq(type(snap.health.peripherals), "table")
+    assertEq(type(snap.stats), "table")
+    assertEq(type(snap.metrics), "table")
+    assertEq(type(snap.throttle), "table")
+    assertEq(type(snap.throttle.active), "boolean")
+  end
+  },
+  { "ui_tick_prefers_snapshot_view", function()
+    local UI = require("components.ui")
+
+    local state = {
+      devices = {},
+      snapshot = {
+        at_ms = 1,
+        requests = {},
+        work = {},
+        health = { peripherals = {} },
+        stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+        metrics = { enabled = false },
+        throttle = { active = false },
+        installed = { version = "1.0.0" },
+        update = { status = "no_update" },
+      }
+    }
+
+    local ui = UI.new(state)
+    local seen = { req = nil, stat = nil, upd = nil }
+
+    ui.renderRequests = function(_, view) seen.req = view end
+    ui.renderStatus = function(_, view) seen.stat = view end
+    ui.renderUpdateDetails = function(_, view) seen.upd = view end
+
+    ui:tick()
+
+    assertEq(seen.req, state.snapshot)
+    assertEq(seen.stat, state.snapshot)
+    assertEq(seen.upd, nil)
+
+    state.snapshot = nil
+    seen.req, seen.stat = nil, nil
+    ui:tick()
+
+    assertEq(seen.req, state)
+    assertEq(seen.stat, state)
+  end
+  },
   { "engine_health_snapshot_me_online_offline", function()
     local Engine = require("modules.engine")
     local t = Engine and Engine._test or nil
