@@ -33,6 +33,15 @@ local function validateNumber(errors, label, v, minExclusive, minInclusive)
   end
 end
 
+local function validateBool(errors, label, v)
+  if v == nil or v == "" then return end
+  local s = tostring(v):lower()
+  local ok = (s == "true" or s == "false" or s == "1" or s == "0" or s == "yes" or s == "no" or s == "y" or s == "n" or s == "on" or s == "off")
+  if not ok then
+    addErr(errors, label .. ": deve ser bool (true/false)")
+  end
+end
+
 local function validateEnum(errors, label, v, set, normalize)
   if v == nil or v == "" then return end
   local raw = tostring(v)
@@ -81,14 +90,7 @@ function M.validateUpdates(updatesBySection)
 
   local upd = updatesBySection.update
   if type(upd) == "table" then
-    local enabled = upd.enabled
-    if enabled ~= nil and enabled ~= "" then
-      local v = tostring(enabled):lower()
-      local ok = (v == "true" or v == "false" or v == "1" or v == "0" or v == "yes" or v == "no" or v == "y" or v == "n" or v == "on" or v == "off")
-      if not ok then
-        addErr(errors, "update.enabled: deve ser bool (true/false)")
-      end
-    end
+    validateBool(errors, "update.enabled", upd.enabled)
 
     validateNumber(errors, "update.ttl_hours", upd.ttl_hours, 0, nil)
     validateNumber(errors, "update.retry_seconds", upd.retry_seconds, nil, 1)
@@ -99,6 +101,14 @@ function M.validateUpdates(updatesBySection)
     if rs and mx and mx < rs then
       addErr(errors, "update.error_backoff_max_seconds: deve ser >= update.retry_seconds")
     end
+  end
+
+  local obs = updatesBySection.observability
+  if type(obs) == "table" then
+    validateBool(errors, "observability.enabled", obs.enabled)
+    validateBool(errors, "observability.ui_enabled", obs.ui_enabled)
+    validateBool(errors, "observability.debug_log_enabled", obs.debug_log_enabled)
+    validateNumber(errors, "observability.debug_log_interval_seconds", obs.debug_log_interval_seconds, nil, 5)
   end
 
   return { ok = #errors == 0, errors = errors }

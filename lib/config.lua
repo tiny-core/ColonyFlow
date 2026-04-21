@@ -57,6 +57,12 @@ enabled=true
 ttl_hours=6
 retry_seconds=120
 error_backoff_max_seconds=900
+
+[observability]
+enabled=false
+ui_enabled=false
+debug_log_enabled=false
+debug_log_interval_seconds=30
 ]]
 
 local function parseIni(text)

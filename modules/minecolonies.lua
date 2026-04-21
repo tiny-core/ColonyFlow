@@ -7,6 +7,21 @@ function Mine.new(state)
   return setmetatable({ state = state }, Mine)
 end
 
+local function bumpIo(state, method)
+  local m = state and state.metrics
+  if type(m) ~= "table" or m.enabled ~= true then return end
+  local io = m.io
+  if type(io) ~= "table" then return end
+  local g = io.mc
+  if type(g) ~= "table" then return end
+  g.total = (tonumber(g.total) or 0) + 1
+  local methods = g.methods
+  if type(methods) == "table" then
+    local k = tostring(method or "")
+    methods[k] = (tonumber(methods[k]) or 0) + 1
+  end
+end
+
 local function fnv1a32(str)
   local hash = 2166136261
   for i = 1, #str do
@@ -74,6 +89,7 @@ function Mine:listRequests()
   local integrator = self.state.devices.colonyIntegrator
   local out = {}
 
+  bumpIo(self.state, "getRequests")
   local ok, result = Util.safeCall(integrator.getRequests)
   if not ok then
     self.state.logger:error("Falha ao ler requests do MineColonies", { err = tostring(result) })
@@ -87,6 +103,7 @@ function Mine:listRequests()
   local hasWOR = type(integrator.getWorkOrderResources) == "function"
   local hasBR = type(integrator.getBuilderResources) == "function"
   if hasWO and (hasWOR or hasBR) then
+    bumpIo(self.state, "getWorkOrders")
     local okWO, woResult = Util.safeCall(integrator.getWorkOrders)
     if not okWO then
       self.state.logger:warn("Falha ao ler WorkOrders do MineColonies", { err = tostring(woResult) })
@@ -98,6 +115,7 @@ function Mine:listRequests()
         local resources = nil
 
         if hasWOR then
+          bumpIo(self.state, "getWorkOrderResources")
           local okRes, resOrErr = Util.safeCall(integrator.getWorkOrderResources, wo.id)
           if okRes and type(resOrErr) == "table" then
             resources = resOrErr
@@ -107,6 +125,7 @@ function Mine:listRequests()
         end
 
         if (not resources) and hasBR and type(wo.builder) == "table" then
+          bumpIo(self.state, "getBuilderResources")
           local okRes, resOrErr = Util.safeCall(integrator.getBuilderResources, wo.builder)
           if okRes and type(resOrErr) == "table" then
             resources = resOrErr
@@ -197,6 +216,7 @@ end
 
 function Mine:listBuildings()
   local integrator = self.state.devices.colonyIntegrator
+  bumpIo(self.state, "getBuildings")
   local ok, result = Util.safeCall(integrator.getBuildings)
   if not ok then
     self.state.logger:error("Falha ao ler buildings do MineColonies", { err = tostring(result) })
@@ -226,6 +246,7 @@ function Mine:listCitizens()
   local integrator = self.state.devices.colonyIntegrator
   if not integrator or type(integrator.getCitizens) ~= "function" then return {} end
 
+  bumpIo(self.state, "getCitizens")
   local ok, result = Util.safeCall(integrator.getCitizens)
   if not ok then
     self.state.logger:error("Falha ao ler citizens do MineColonies", { err = tostring(result) })
@@ -264,18 +285,23 @@ function Mine:getColonyStats()
   local integrator = self.state.devices.colonyIntegrator
   local stats = {}
 
+  bumpIo(self.state, "getColonyName")
   local okName, name = Util.safeCall(integrator.getColonyName)
   if okName then stats.name = name end
 
+  bumpIo(self.state, "amountOfCitizens")
   local okCit, citizens = Util.safeCall(integrator.amountOfCitizens)
   if okCit then stats.citizens = citizens end
 
+  bumpIo(self.state, "maxOfCitizens")
   local okMax, maxCit = Util.safeCall(integrator.maxOfCitizens)
   if okMax then stats.maxCitizens = maxCit end
 
+  bumpIo(self.state, "getHappiness")
   local okHappy, happiness = Util.safeCall(integrator.getHappiness)
   if okHappy then stats.happiness = happiness end
 
+  bumpIo(self.state, "amountOfConstructionSites")
   local okSites, sites = Util.safeCall(integrator.amountOfConstructionSites)
   if okSites then stats.constructionSites = sites end
 

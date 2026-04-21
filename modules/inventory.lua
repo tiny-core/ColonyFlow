@@ -2,16 +2,32 @@ local Util = require("lib.util")
 
 local M = {}
 
-local function safeList(inv)
+local function bumpIo(state, method)
+  local m = state and state.metrics
+  if type(m) ~= "table" or m.enabled ~= true then return end
+  local io = m.io
+  if type(io) ~= "table" then return end
+  local g = io.inv
+  if type(g) ~= "table" then return end
+  g.total = (tonumber(g.total) or 0) + 1
+  local methods = g.methods
+  if type(methods) == "table" then
+    local k = tostring(method or "")
+    methods[k] = (tonumber(methods[k]) or 0) + 1
+  end
+end
+
+local function safeList(inv, state)
   if not inv then return nil, "inventário ausente" end
   if type(inv.list) ~= "function" then return nil, "inventário sem list()" end
+  bumpIo(state, "list")
   local ok, res = Util.safeCall(inv.list)
   if not ok then return nil, tostring(res) end
   return res, nil
 end
 
-function M.countItem(inv, itemName)
-  local list, err = safeList(inv)
+function M.countItem(inv, itemName, state)
+  local list, err = safeList(inv, state)
   if not list then return nil, err end
   local total = 0
   for _, stack in pairs(list) do
@@ -22,8 +38,8 @@ function M.countItem(inv, itemName)
   return total, nil
 end
 
-function M.countAny(inv, names)
-  local list, err = safeList(inv)
+function M.countAny(inv, names, state)
+  local list, err = safeList(inv, state)
   if not list then return nil, err end
   local set = {}
   for _, n in ipairs(names or {}) do set[n] = true end
@@ -36,8 +52,8 @@ function M.countAny(inv, names)
   return total, nil
 end
 
-function M.snapshot(inv)
-  local list, err = safeList(inv)
+function M.snapshot(inv, state)
+  local list, err = safeList(inv, state)
   if not list then return nil, err end
   local counts = {}
   for _, stack in pairs(list) do
@@ -48,8 +64,8 @@ function M.snapshot(inv)
   return counts, nil
 end
 
-function M.getFreeSpace(inv, itemName, maxStackFallback)
-  local list, err = safeList(inv)
+function M.getFreeSpace(inv, itemName, maxStackFallback, state)
+  local list, err = safeList(inv, state)
   if not list then return nil, err end
   local size = type(inv.size) == "function" and inv.size() or 27
   local freeSpace = 0

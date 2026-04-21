@@ -32,9 +32,22 @@ function UI.new(state)
     sizes = { requests = nil, status = nil },
     page = 1,
     statusView = "main",
+    _lastStatusView = "main",
+    statusPage = 1,
+    _statusPages = 1,
     noCraftPage = 1,
     lastAutoRotation = os.epoch("utc")
   }, UI)
+end
+
+local function clearMonitor(mon)
+  if not mon then return end
+  local old = term.current()
+  term.redirect(mon)
+  term.setBackgroundColor(colors.black)
+  term.setTextColor(colors.white)
+  term.clear()
+  term.redirect(old)
 end
 
 function UI:drawText(deviceKey, mon, x, y, text, fg, bg, force)
@@ -554,55 +567,47 @@ function UI:renderStatus(state, mon)
   self:drawText("status", mon, math.max(1, w - #right + 1), 1, right, colors.gray)
   self:drawText("status", mon, 1, 2, string.rep("-", math.max(0, w)))
 
+  local compact = (tonumber(h) or 0) < 20
+  local pages = 1
+  if compact then
+    pages = 2
+  end
+  self._statusPages = pages
+  if not self.statusPage or self.statusPage < 1 then self.statusPage = 1 end
+  if self.statusPage > pages then self.statusPage = pages end
+
   local y = 3
-  if UpdateCheck.isUpdateAvailable(state) then
-    local upd = type(state.update) == "table" and state.update or {}
-    local inst = tostring(upd.installed_version or "NO-VERSION")
-    local avail = tostring(upd.available_version or "?")
-    local staleMark = upd.stale == true and "*" or ""
-    local line = "UPDATE: " .. inst .. "->" .. avail .. staleMark .. "  Run: tools/install.lua update"
-    self:drawText("status", mon, 1, y, padRight(shorten(line, w), w), colors.yellow, colors.black)
-    y = y + 1
-  elseif not (type(state.installed) == "table" and type(state.installed.version) == "string") then
-    local upd = type(state.update) == "table" and state.update or {}
-    local avail = (type(upd.available_version) == "string") and upd.available_version or nil
-    local line = "NO VERSION  Run: tools/install.lua install"
-    if avail then
-      line = "NO VERSION  Avail: " .. avail .. "  Run: tools/install.lua install"
+  if self.statusPage == 1 then
+    if UpdateCheck.isUpdateAvailable(state) then
+      local upd = type(state.update) == "table" and state.update or {}
+      local inst = tostring(upd.installed_version or "NO-VERSION")
+      local avail = tostring(upd.available_version or "?")
+      local staleMark = upd.stale == true and "*" or ""
+      local line = "UPDATE: " .. inst .. "->" .. avail .. staleMark .. "  Run: tools/install.lua update"
+      self:drawText("status", mon, 1, y, padRight(shorten(line, w), w), colors.yellow, colors.black)
+      y = y + 1
+    elseif not (type(state.installed) == "table" and type(state.installed.version) == "string") then
+      local upd = type(state.update) == "table" and state.update or {}
+      local avail = (type(upd.available_version) == "string") and upd.available_version or nil
+      local line = "NO VERSION  Run: tools/install.lua install"
+      if avail then
+        line = "NO VERSION  Avail: " .. avail .. "  Run: tools/install.lua install"
+      end
+      self:drawText("status", mon, 1, y, padRight(shorten(line, w), w), colors.lightGray, colors.black)
+      y = y + 1
     end
-    self:drawText("status", mon, 1, y, padRight(shorten(line, w), w), colors.lightGray, colors.black)
-    y = y + 1
   end
 
   local cs = state.colonyStats or {}
-  self:drawText("status", mon, 1, y, centerText("COLONIA", w), colors.cyan); y = y + 1
-  self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
+  local m = state.metrics
+  local perfEnabled = type(m) == "table" and m.enabled == true and m.ui_enabled == true
 
-  local colonyRows = {
+  local colonyRowsBase = {
     { label = "Colonia",    value = tostring(cs.name or "-"),                                               color = colors.white },
     { label = "Cidadaos",   value = tostring(cs.citizens or "-") .. "/" .. tostring(cs.maxCitizens or "-"), color = colors.white },
     { label = "Felicidade", value = formatDecimal2(cs.happiness),                                           color = happinessColor(cs.happiness) },
     { label = "Obras",      value = tostring(cs.constructionSites or "-"),                                  color = colors.white },
   }
-  local colonyLabelW = 0
-  for i = 1, #colonyRows do
-    local lbl = tostring(colonyRows[i].label or "")
-    if #lbl > colonyLabelW then colonyLabelW = #lbl end
-  end
-  for i = 1, #colonyRows do
-    local row = colonyRows[i]
-    local leftPart = padRight(row.label, colonyLabelW) .. ": "
-    self:drawText("status", mon, 1, y, shorten(leftPart, w))
-    local startX = #leftPart + 1
-    if startX <= w then
-      self:drawText("status", mon, startX, y, shorten(row.value, math.max(0, w - #leftPart)), row.color or colors.white, colors.black, true)
-    end
-    y = y + 1
-  end
-  self:drawText("status", mon, 1, y, padRight("", w)); y = y + 1
-
-  self:drawText("status", mon, 1, y, centerText("OPERACAO", w), colors.cyan); y = y + 1
-  self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
 
   local health = getPeripheralHealth(state)
   local healthByLabel = {}
@@ -624,83 +629,179 @@ function UI:renderStatus(state, mon)
     healthByLabel["Buffer"] or { label = "Buffer", value = "NA", level = "unknown" },
     healthByLabel["Target"] or { label = "Target", value = "NA", level = "unknown" },
   }
-  local healthLabelW = 0
-  for i = 1, #healthRows do
-    local it = healthRows[i]
-    if type(it) == "table" then
+
+  if self.statusPage == 1 or pages == 1 then
+    self:drawText("status", mon, 1, y, centerText("COLONIA", w), colors.cyan)
+    local perHdr = "PERIF"
+    self:drawText("status", mon, math.max(1, w - #perHdr + 1), y, perHdr, colors.gray, colors.black, true)
+    y = y + 1
+    self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
+
+    local leftLabelW = 0
+    for _, it in ipairs(colonyRowsBase) do
       local lbl = tostring(it.label or "")
-      if #lbl > healthLabelW then
-        healthLabelW = #lbl
+      if #lbl > leftLabelW then leftLabelW = #lbl end
+    end
+    local rightLabelW = 0
+    for _, it in ipairs(healthRows) do
+      local lbl = tostring(it.label or "")
+      if #lbl > rightLabelW then rightLabelW = #lbl end
+    end
+
+    local sep = " | "
+    local available = math.max(0, (tonumber(w) or 0) - #sep)
+    local leftW = math.floor(available / 2)
+    local rightW = available - leftW
+    if leftW < 1 then leftW = 1 end
+    if rightW < 1 then rightW = 1 end
+    local rightColStart = leftW + #sep + 1
+
+    local rows = math.max(#colonyRowsBase, #healthRows)
+    for i = 1, rows do
+      if y > h - 2 then break end
+      local c = colonyRowsBase[i]
+      local hr = healthRows[i]
+
+      local leftPrefix = ""
+      local leftVal = ""
+      local leftColor = colors.white
+      if type(c) == "table" then
+        leftPrefix = padRight(tostring(c.label or ""), leftLabelW) .. ": "
+        leftVal = tostring(c.value or "")
+        leftColor = c.color or colors.white
       end
+      local leftText = leftPrefix .. leftVal
+      local leftRendered = padRight(shorten(leftText, leftW), leftW)
+
+      local rLabel = ""
+      local rVal = ""
+      local rLevel = "unknown"
+      if type(hr) == "table" then
+        rLabel = tostring(hr.label or "")
+        rVal = tostring(hr.value or "")
+        rLevel = tostring(hr.level or "unknown")
+      end
+      local rLabelShort = shorten(rLabel, rightLabelW)
+      local rPrefix = padRight(rLabelShort, rightLabelW) .. ": "
+      local maxRVal = math.max(0, rightW - #rPrefix)
+      local rRendered = rPrefix .. shorten(rVal, maxRVal)
+      rRendered = padRight(shorten(rRendered, rightW), rightW)
+
+      local line = leftRendered .. sep .. rRendered
+      self:drawText("status", mon, 1, y, padRight(line, w))
+
+      if leftVal ~= "" then
+        local maxLeftValueLen = math.max(0, leftW - #leftPrefix)
+        local leftValueRendered = shorten(leftVal, maxLeftValueLen)
+        local leftValueX = #leftPrefix + 1
+        if leftValueRendered ~= "" and leftValueX <= leftW then
+          self:drawText("status", mon, leftValueX, y, leftValueRendered, leftColor, colors.black, true)
+        end
+      end
+
+      local valueX = rightColStart + #rPrefix
+      local rValueRendered = shorten(rVal, maxRVal)
+      if rValueRendered ~= "" and valueX <= w then
+        self:drawText("status", mon, valueX, y, shorten(rValueRendered, math.max(0, w - valueX + 1)), healthValueColor(rLevel),
+          colors.black, true)
+      end
+
+      y = y + 1
+    end
+
+    if y <= h - 2 then
+      self:drawText("status", mon, 1, y, padRight("", w)); y = y + 1
     end
   end
-  local reqCount = (type(state.requests) == "table") and #state.requests or 0
-  local counters = {
-    { label = "Requisicoes",   value = tostring(reqCount) },
-    { label = "Entregues",     value = tostring(state.stats.delivered) },
-    { label = "Crafts",        value = tostring(state.stats.crafted) },
-    { label = "Substituicoes", value = tostring(state.stats.substitutions) },
-    { label = "Erros",         value = tostring(state.stats.errors) },
-  }
-  local counterLabelW = 0
-  for i = 1, #counters do
-    local it = counters[i]
-    if type(it) == "table" then
-      local lbl = tostring(it.label or "")
-      if #lbl > counterLabelW then
-        counterLabelW = #lbl
-      end
-    end
-  end
-  local sep = " | "
-  local available = math.max(0, (tonumber(w) or 0) - #sep)
-  local leftW = math.floor(available / 2)
-  local rightW = available - leftW
-  if leftW < 1 then leftW = 1 end
-  if rightW < 1 then rightW = 1 end
-  local rightColStart = leftW + #sep + 1
-  local valueW = 7
-  local labelW = math.max(0, math.min(healthLabelW, rightW - (2 + valueW)))
 
-  local rows = math.max(#counters, #healthRows)
-  for i = 1, rows do
-    local cIt = counters[i] or { label = "", value = "" }
-    local left = ""
-    if cIt.label ~= "" then
-      left = padRight(cIt.label, counterLabelW) .. ": " .. tostring(cIt.value or "")
-    end
-    left = padRight(shorten(left, leftW), leftW)
-    local hIt = healthRows[i] or {}
-    local hLabel = tostring(hIt.label or "NA")
-    local hValue = tostring(hIt.value or "NA")
-    local hLevel = tostring(hIt.level or "unknown")
-    if not healthRows[i] then
-      hLabel = ""
-      hValue = ""
-      hLevel = "unknown"
+  local opPage = pages
+  if self.statusPage == opPage or pages == 1 then
+    local perfSummary = nil
+    if perfEnabled then
+      local t = type(m.timing) == "table" and m.timing or {}
+      local function round0(v) return math.floor((tonumber(v or 0) or 0) + 0.5) end
+      local engLast = round0(t.engine_tick_ms_last)
+      local uiLast = round0(t.ui_tick_ms_last)
+      perfSummary = "PERF e/u " .. tostring(engLast) .. "/" .. tostring(uiLast) .. "ms"
     end
 
-    local base = left .. sep .. padRight("", rightW)
-    self:drawText("status", mon, 1, y, padRight(base, w))
-
-    if hLabel ~= "" and rightColStart <= w then
-      local lbl = labelW > 0 and padRight(shorten(hLabel, labelW), labelW) or shorten(hLabel, rightW)
-      local labelText = lbl .. ": "
-      labelText = shorten(labelText, rightW)
-      self:drawText("status", mon, rightColStart, y, labelText, colors.white, colors.black, true)
-
-      local valueStartX = rightColStart + #labelText
-      local maxValueLen = math.max(0, w - valueStartX + 1)
-      local v = shorten(hValue, maxValueLen)
-      if v ~= "" and valueStartX <= w then
-        self:drawText("status", mon, valueStartX, y, v, healthValueColor(hLevel), colors.black, true)
-      end
+    self:drawText("status", mon, 1, y, centerText("OPERACAO", w), colors.cyan)
+    if perfSummary then
+      local x = math.max(1, w - #perfSummary + 1)
+      self:drawText("status", mon, x, y, perfSummary, colors.gray, colors.black, true)
     end
     y = y + 1
-  end
-  self:drawText("status", mon, 1, y, padRight("", w)); y = y + 1
+    self:drawText("status", mon, 1, y, string.rep("-", math.max(0, w))); y = y + 1
 
-  self:drawText("status", mon, 1, y, shorten("Estoque Critico: [heuristica]", w)); y = y + 1
+    local reqCount = (type(state.requests) == "table") and #state.requests or 0
+    local counters = {
+      { label = "Requisicoes",   value = tostring(reqCount) },
+      { label = "Entregues",     value = tostring(state.stats.delivered) },
+      { label = "Crafts",        value = tostring(state.stats.crafted) },
+      { label = "Substituicoes", value = tostring(state.stats.substitutions) },
+      { label = "Erros",         value = tostring(state.stats.errors) },
+    }
+    local counterLabelW = 0
+    for i = 1, #counters do
+      local lbl = tostring(counters[i].label or "")
+      if #lbl > counterLabelW then counterLabelW = #lbl end
+    end
+    for i = 1, #counters do
+      if y > h - 2 then break end
+      local it = counters[i]
+      local leftPrefix = padRight(tostring(it.label or ""), counterLabelW) .. ": "
+      local val = tostring(it.value or "")
+      local line = shorten(leftPrefix, w)
+      self:drawText("status", mon, 1, y, padRight(line, w))
+      local startX = #leftPrefix + 1
+      if startX <= w then
+        self:drawText("status", mon, startX, y, shorten(val, math.max(0, w - #leftPrefix)), colors.white, colors.black, true)
+      end
+      y = y + 1
+    end
+
+    if y <= h - 2 then
+      self:drawText("status", mon, 1, y, padRight("", w)); y = y + 1
+    end
+
+    if perfEnabled then
+      local t = type(m.timing) == "table" and m.timing or {}
+      local io = type(m.io) == "table" and m.io or {}
+      local cache = type(m.cache) == "table" and m.cache or {}
+
+      local function round0(v)
+        return math.floor((tonumber(v or 0) or 0) + 0.5)
+      end
+
+      local engLast = round0(t.engine_tick_ms_last)
+      local engAvg = round0(t.engine_tick_ms_avg)
+      local engMax = round0(t.engine_tick_ms_max)
+      local uiLast = round0(t.ui_tick_ms_last)
+      local uiAvg = round0(t.ui_tick_ms_avg)
+      local uiMax = round0(t.ui_tick_ms_max)
+
+      local meTotal = type(io.me) == "table" and (tonumber(io.me.total) or 0) or 0
+      local mcTotal = type(io.mc) == "table" and (tonumber(io.mc.total) or 0) or 0
+      local invTotal = type(io.inv) == "table" and (tonumber(io.inv.total) or 0) or 0
+
+      local hit = tonumber(cache.hit_total) or 0
+      local miss = tonumber(cache.miss_total) or 0
+
+      local line1 = "[PERF] tick_ms eng=" .. engLast .. "/" .. engAvg .. "/" .. engMax .. " ui=" .. uiLast .. "/" .. uiAvg .. "/" .. uiMax
+      local line2 = "[PERF] io me=" .. meTotal .. " mc=" .. mcTotal .. " inv=" .. invTotal .. " cache " .. hit .. "/" .. miss
+
+      if y <= h - 2 then
+        self:drawText("status", mon, 1, y, padRight(shorten(line1, w), w), colors.lightGray, colors.black); y = y + 1
+      end
+      if y <= h - 2 then
+        self:drawText("status", mon, 1, y, padRight(shorten(line2, w), w), colors.lightGray, colors.black); y = y + 1
+      end
+    end
+
+    if y <= h - 2 then
+      self:drawText("status", mon, 1, y, shorten("Estoque Critico: [heuristica]", w)); y = y + 1
+    end
+  end
 
   -- Clear remaining lines until bottom button
   for i = y, h - 2 do
@@ -714,6 +815,12 @@ function UI:renderStatus(state, mon)
   local updFg = UpdateCheck.isUpdateAvailable(state) and colors.yellow or colors.gray
   self:drawText("status", mon, 1, h - 1, string.rep("-", math.max(0, w)), colors.gray, colors.black)
   self:drawText("status", mon, 1, h, padRight(btn, w), btnFg, colors.black)
+  if pages > 1 then
+    local p = tostring(self.statusPage) .. "/" .. tostring(pages)
+    local pg = "[P" .. p .. "]"
+    local xPg = math.max(1, math.floor((w - #pg) / 2) + 1)
+    self:drawText("status", mon, xPg, h, pg, colors.gray, colors.black, true)
+  end
   self:drawText("status", mon, math.max(1, w - #updBtn + 1), h, updBtn, updFg, colors.black)
 end
 
@@ -778,7 +885,7 @@ function UI:handleEvent(event, side, x, y)
     if side == statusMonName then
       local w, h = self.state.devices.monitorStatus.getSize()
       if self.statusView == "nocraft" then
-        if y == h and x <= (#"[VOLTAR]" + 2) then
+        if y == h then
           self.statusView = "main"
         else
           if x < w / 2 then
@@ -789,25 +896,37 @@ function UI:handleEvent(event, side, x, y)
         end
         self:tick()
       elseif self.statusView == "update" then
-        if y == h and x <= (#"[VOLTAR]" + 2) then
+        if y == h then
           self.statusView = "main"
           self:tick()
         end
       else
+        local pages = tonumber(self._statusPages) or 1
         if y == h then
           local updBtn = "[UPD]"
           local updStart = math.max(1, w - #updBtn + 1)
           if x >= updStart then
             self.statusView = "update"
             self:tick()
-          else
-            local list = self:collectNoCraftItems(self.state)
-            if #list > 0 then
-              self.statusView = "nocraft"
-              self.noCraftPage = 1
-              self:tick()
-            end
+            return
           end
+
+          local noCraft = self:collectNoCraftItems(self.state)
+          local btn = "SEM CRAFT: " .. tostring(#noCraft)
+          if x <= #btn + 1 and #noCraft > 0 then
+            self.statusView = "nocraft"
+            self.noCraftPage = 1
+            self:tick()
+            return
+          end
+        end
+
+        if pages > 1 then
+          local p = tonumber(self.statusPage) or 1
+          p = p + 1
+          if p > pages then p = 1 end
+          self.statusPage = p
+          self:tick()
         end
       end
     end
@@ -817,6 +936,12 @@ end
 function UI:tick()
   local state = self.state
   self:renderRequests(state, state.devices.monitorRequests)
+  if self._lastStatusView ~= self.statusView then
+    self.buffers.status = {}
+    self.sizes.status = nil
+    clearMonitor(state.devices.monitorStatus)
+    self._lastStatusView = self.statusView
+  end
   if self.statusView == "nocraft" then
     self:renderNoCraft(state, state.devices.monitorStatus)
   elseif self.statusView == "update" then

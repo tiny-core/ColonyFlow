@@ -2083,6 +2083,61 @@ local tests = {
     assertEq(err3, "grid desconectado")
     assertEq(calls3, calls2 + 2, "apos retry_at, deve tocar o peripheral novamente")
   end },
+  { "observability_cache_hit_miss", function()
+    local Cache = require("lib.cache")
+
+    local metrics = {
+      enabled = true,
+      cache = {
+        hit_total = 0,
+        miss_total = 0,
+        hit_by_namespace = {},
+        miss_by_namespace = {},
+      }
+    }
+
+    local c = Cache.new({ max_entries = 10, default_ttl_seconds = 5, metrics = metrics })
+    c:set("ns", "k1", 123, 5)
+
+    local v1 = c:get("ns", "k1")
+    local v2 = c:get("ns", "k2")
+
+    assertEq(v1, 123)
+    assertEq(v2, nil)
+    assertEq(metrics.cache.hit_total, 1)
+    assertEq(metrics.cache.miss_total, 1)
+    assertEq(metrics.cache.hit_by_namespace["ns"], 1)
+    assertEq(metrics.cache.miss_by_namespace["ns"], 1)
+
+    local c2 = Cache.new({ max_entries = 10, default_ttl_seconds = 5 })
+    assertEq(c2.metrics, nil, "cache sem metrics nao deve instrumentar")
+  end },
+  { "observability_io_counter_me", function()
+    local ME = require("modules.me")
+
+    local state = {
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline = function() return true end,
+        }
+      },
+      health = {},
+      metrics = {
+        enabled = true,
+        io = { me = { total = 0, methods = {} } }
+      }
+    }
+
+    local me = ME.new(state)
+    local ok, err = me:isOnline()
+
+    assertEq(ok, true)
+    assertEq(err, nil)
+    assertEq(state.metrics.io.me.total, 2, "isOnline deve chamar isConnected + isOnline")
+    assertEq(state.metrics.io.me.methods.isConnected, 1)
+    assertEq(state.metrics.io.me.methods.isOnline, 1)
+  end },
 }
 
 for _, t in ipairs(tests) do

@@ -4,11 +4,16 @@ local Cache = {}
 Cache.__index = Cache
 
 function Cache.new(opts)
+  local metrics = nil
+  if opts and type(opts.metrics) == "table" and opts.metrics.enabled == true and type(opts.metrics.cache) == "table" then
+    metrics = opts.metrics.cache
+  end
   return setmetatable({
     max_entries = opts.max_entries or 2000,
     default_ttl_ms = (opts.default_ttl_seconds or 5) * 1000,
     store = {},
     order = {},
+    metrics = metrics,
   }, Cache)
 end
 
@@ -18,13 +23,43 @@ end
 
 function Cache:get(namespace, key)
   local k = makeKey(namespace, key)
+  local now = Util.nowUtcMs()
   local entry = self.store[k]
-  if not entry then return nil end
-  if entry.expires_at and entry.expires_at <= Util.nowUtcMs() then
-    self.store[k] = nil
+  if not entry then
+    local m = self.metrics
+    if m then
+      m.miss_total = (tonumber(m.miss_total) or 0) + 1
+      local ns = tostring(namespace or "")
+      local byNs = m.miss_by_namespace
+      if type(byNs) == "table" then
+        byNs[ns] = (tonumber(byNs[ns]) or 0) + 1
+      end
+    end
     return nil
   end
-  entry.last_access = Util.nowUtcMs()
+  if entry.expires_at and entry.expires_at <= now then
+    self.store[k] = nil
+    local m = self.metrics
+    if m then
+      m.miss_total = (tonumber(m.miss_total) or 0) + 1
+      local ns = tostring(namespace or "")
+      local byNs = m.miss_by_namespace
+      if type(byNs) == "table" then
+        byNs[ns] = (tonumber(byNs[ns]) or 0) + 1
+      end
+    end
+    return nil
+  end
+  local m = self.metrics
+  if m then
+    m.hit_total = (tonumber(m.hit_total) or 0) + 1
+    local ns = tostring(namespace or "")
+    local byNs = m.hit_by_namespace
+    if type(byNs) == "table" then
+      byNs[ns] = (tonumber(byNs[ns]) or 0) + 1
+    end
+  end
+  entry.last_access = now
   return entry.value
 end
 

@@ -1,5 +1,9 @@
 local args = { ... }
 
+if shell and type(shell.setDir) == "function" then
+  shell.setDir("/")
+end
+
 local function runTests()
   if fs.exists("tests/run.lua") then
     shell.run("tests/run.lua")
@@ -51,6 +55,16 @@ end
 if mode == "doctor" then
   runDoctor()
   return
+end
+
+if type(package) == "table" and type(package.loaded) == "table" then
+  for k in pairs(package.loaded) do
+    if type(k) == "string" then
+      if k:sub(1, 4) == "lib." or k:sub(1, 8) == "modules." or k:sub(1, 11) == "components." then
+        package.loaded[k] = nil
+      end
+    end
+  end
 end
 
 local ok, bootstrap = pcall(require, "lib.bootstrap")

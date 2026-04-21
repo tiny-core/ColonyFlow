@@ -190,7 +190,7 @@ local function getDestinationSnapshot(state, targetName, targetInv, forceRefresh
     local cached = state.cache:get("dest", targetName)
     if cached then return cached, nil end
   end
-  local snap, err = Inventory.snapshot(targetInv)
+  local snap, err = Inventory.snapshot(targetInv, state)
   if not snap then return nil, err end
   state.cache:set("dest", targetName, snap, ttl)
   return snap, nil
@@ -822,7 +822,7 @@ function Engine:tick()
       local exportQty = math.min(meAmount, missingDest)
 
       if exportQty > 0 then
-        local freeSpace, freeErr = Inventory.getFreeSpace(targetInv, candidate.name, candidate.maxStackSize)
+        local freeSpace, freeErr = Inventory.getFreeSpace(targetInv, candidate.name, candidate.maxStackSize, state)
         if not freeSpace then
           work.status = "waiting_retry"
           work.err = "erro_capacidade_destino:" .. tostring(freeErr or "")

@@ -28,9 +28,32 @@ function M.run()
 
   logger:info("Inicializando sistema...")
 
+  local obsEnabled = cfg:getBool("observability", "enabled", false)
+  local metrics = {
+    enabled = obsEnabled,
+    ui_enabled = cfg:getBool("observability", "ui_enabled", false),
+    debug_log_enabled = cfg:getBool("observability", "debug_log_enabled", false),
+    debug_log_interval_seconds = cfg:getNumber("observability", "debug_log_interval_seconds", 30),
+  }
+  if obsEnabled then
+    metrics.timing = {}
+    metrics.io = {
+      me = { total = 0, methods = {} },
+      mc = { total = 0, methods = {} },
+      inv = { total = 0, methods = {} },
+    }
+    metrics.cache = {
+      hit_total = 0,
+      miss_total = 0,
+      hit_by_namespace = {},
+      miss_by_namespace = {},
+    }
+  end
+
   local cache = Cache.new({
     max_entries = cfg:getNumber("cache", "max_entries", 2000),
     default_ttl_seconds = cfg:getNumber("cache", "default_ttl_seconds", 5),
+    metrics = obsEnabled and metrics or nil,
   })
 
   local devices, deviceIssues = Peripherals.discover(cfg, logger)
@@ -54,6 +77,7 @@ function M.run()
       substitutions = 0,
       errors = 0,
     },
+    metrics = metrics,
   }
 
   state.installed = Version.readInstalled()

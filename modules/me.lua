@@ -38,19 +38,35 @@ local function exitDegraded(state)
   h.next_me_retry_at_ms = nil
 end
 
-local function call(bridge, method, ...)
+local function bumpIo(state, method)
+  local m = state and state.metrics
+  if type(m) ~= "table" or m.enabled ~= true then return end
+  local io = m.io
+  if type(io) ~= "table" then return end
+  local g = io.me
+  if type(g) ~= "table" then return end
+  g.total = (tonumber(g.total) or 0) + 1
+  local methods = g.methods
+  if type(methods) == "table" then
+    local k = tostring(method or "")
+    methods[k] = (tonumber(methods[k]) or 0) + 1
+  end
+end
+
+local function call(state, bridge, method, ...)
   if not bridge or type(bridge[method]) ~= "function" then
     return nil, "Método indisponível: " .. tostring(method)
   end
+  bumpIo(state, method)
   local ok, res1, res2 = Util.safeCall(bridge[method], ...)
   if not ok then return nil, tostring(res1) end
   return res1, res2
 end
 
-local function callAny(bridge, methods, ...)
+local function callAny(state, bridge, methods, ...)
   local lastErr = nil
   for _, m in ipairs(methods or {}) do
-    local res, err = call(bridge, m, ...)
+    local res, err = call(state, bridge, m, ...)
     if res ~= nil then return res, err end
     lastErr = err
   end
@@ -92,8 +108,8 @@ function ME:isOnline()
   end
   local b = self.state.devices.meBridge
   if not b then return false, "meBridge ausente" end
-  local connected, connErr = call(b, "isConnected")
-  local online, onlineErr = call(b, "isOnline")
+  local connected, connErr = call(self.state, b, "isConnected")
+  local online, onlineErr = call(self.state, b, "isOnline")
   if connected == nil and online == nil then
     local e1 = tostring(connErr or "")
     local e2 = tostring(onlineErr or "")
@@ -128,11 +144,11 @@ function ME:getItem(filter)
   if ttl and ttl > 0 and type(name) == "string" and name ~= "" then
     local cached = cacheGet(self.state, "me_item", name)
     if cached ~= nil then return cached, nil end
-    local res, err = call(b, "getItem", filter)
+    local res, err = call(self.state, b, "getItem", filter)
     if res ~= nil then cacheSet(self.state, "me_item", name, res, ttl) end
     return res, err
   end
-  return call(b, "getItem", filter)
+  return call(self.state, b, "getItem", filter)
 end
 
 function ME:listItems(filter)
@@ -147,9 +163,9 @@ function ME:listItems(filter)
     if cached ~= nil then return cached, nil end
     local res, err = nil, nil
     if b and type(b.getItems) == "function" then
-      res, err = call(b, "getItems", filter or {})
+      res, err = call(self.state, b, "getItems", filter or {})
     elseif b and type(b.listItems) == "function" then
-      res, err = call(b, "listItems", filter or {})
+      res, err = call(self.state, b, "listItems", filter or {})
     else
       res, err = {}, nil
     end
@@ -157,10 +173,10 @@ function ME:listItems(filter)
     return res, err
   end
   if b and type(b.getItems) == "function" then
-    return call(b, "getItems", filter or {})
+    return call(self.state, b, "getItems", filter or {})
   end
   if b and type(b.listItems) == "function" then
-    return call(b, "listItems", filter or {})
+    return call(self.state, b, "listItems", filter or {})
   end
   return {}, nil
 end
@@ -170,7 +186,7 @@ function ME:isCrafting(filter)
     return nil, "me_degraded"
   end
   local b = self.state.devices.meBridge
-  local res, err = callAny(b, { "isCrafting", "isItemCrafting" }, filter)
+  local res, err = callAny(self.state, b, { "isCrafting", "isItemCrafting" }, filter)
   if res == nil and err then return nil, err end
   return res, err
 end
@@ -187,11 +203,11 @@ function ME:isCraftable(filter)
     local key = name .. "|" .. tostring(count or "")
     local cached = cacheGet(self.state, "me_craftable", key)
     if cached ~= nil then return cached, nil end
-    local res, err = callAny(b, { "isCraftable", "isItemCraftable" }, filter)
+    local res, err = callAny(self.state, b, { "isCraftable", "isItemCraftable" }, filter)
     if type(res) == "boolean" then cacheSet(self.state, "me_craftable", key, res, ttl) end
     return res, err
   end
-  return callAny(b, { "isCraftable", "isItemCraftable" }, filter)
+  return callAny(self.state, b, { "isCraftable", "isItemCraftable" }, filter)
 end
 
 function ME:craftItem(filter)
@@ -199,7 +215,7 @@ function ME:craftItem(filter)
     return nil, "me_degraded"
   end
   local b = self.state.devices.meBridge
-  return call(b, "craftItem", filter)
+  return call(self.state, b, "craftItem", filter)
 end
 
 function ME:supportsExportToPeripheral()
@@ -213,10 +229,10 @@ function ME:exportItem(filter, target)
   end
   local b = self.state.devices.meBridge
   if b and type(b.exportItemToPeripheral) == "function" then
-    return call(b, "exportItemToPeripheral", filter, target)
+    return call(self.state, b, "exportItemToPeripheral", filter, target)
   end
   if isDirection(target) then
-    return call(b, "exportItem", filter, target)
+    return call(self.state, b, "exportItem", filter, target)
   end
   return nil, "exportItemToPeripheral indisponível e target não é direção: " .. tostring(target)
 end
