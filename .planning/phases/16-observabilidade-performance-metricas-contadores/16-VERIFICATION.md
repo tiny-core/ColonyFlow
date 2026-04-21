@@ -13,7 +13,7 @@
    - Rodar `startup` (ou reiniciar o programa)
 2. UI (Monitor 2 / Status):
    - Confirmar que aparece um bloco com prefixo `[PERF]`
-   - Confirmar que os numeros mudam ao longo do tempo (tick_ms e contadores)
+   - Confirmar que os numeros mudam ao longo do tempo (tick\_ms e contadores)
 3. Cache hit/miss:
    - Confirmar que `cache <hit>/<miss>` muda durante operacao normal
 4. DEBUG (opcional):
