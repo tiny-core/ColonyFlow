@@ -5,28 +5,28 @@ Este documento descreve a arquitetura do ColonyFlow em camadas e os principais c
 ## Visão geral (camadas)
 
 ```text
-┌───────────────────────────────────────────────────────────────┐
-│                        Apresentação (UI)                       │
-├───────────────────────────────────────────────────────────────┤
-│  components/ui.lua  -> render dual-monitor a partir de snapshot│
-├───────────────────────────────────────────────────────────────┤
-│                       Aplicação / Domínio                      │
-├───────────────────────────────────────────────────────────────┤
-│  modules/scheduler.lua  -> loop + budget                        │
-│  modules/engine.lua     -> tick, fila/work, estado              │
-│  modules/snapshot.lua   -> contrato de snapshot (sem IO)        │
-├───────────────────────────────────────────────────────────────┤
-│                        Integrações / IO                         │
-├───────────────────────────────────────────────────────────────┤
-│  modules/minecolonies.lua -> colonyIntegrator (requests/buildings)│
-│  modules/me.lua           -> meBridge (estoque/craft/export)      │
-│  modules/inventory.lua    -> leitura de slots/destinos            │
-│  modules/peripherals.lua  -> discovery/health                     │
-├───────────────────────────────────────────────────────────────┤
-│                           Infra (lib)                            │
-├───────────────────────────────────────────────────────────────┤
-│  lib/config.lua, lib/logger.lua, lib/cache.lua, lib/util.lua      │
-└───────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                        Apresentação (UI)                           │
+├────────────────────────────────────────────────────────────────────┤
+│  components/ui.lua  -> render dual-monitor a partir de snapshot    │
+├────────────────────────────────────────────────────────────────────┤
+│                       Aplicação / Domínio                          │
+├────────────────────────────────────────────────────────────────────┤
+│  modules/scheduler.lua  -> loop + budget                           │
+│  modules/engine.lua     -> tick, fila/work, estado                 │
+│  modules/snapshot.lua   -> contrato de snapshot (sem IO)           │
+├────────────────────────────────────────────────────────────────────┤
+│                        Integrações / IO                            │
+├────────────────────────────────────────────────────────────────────┤
+│  modules/minecolonies.lua -> colonyIntegrator (requests/buildings) │
+│  modules/me.lua           -> meBridge (estoque/craft/export)       │
+│  modules/inventory.lua    -> leitura de slots/destinos             │
+│  modules/peripherals.lua  -> discovery/health                      │
+├────────────────────────────────────────────────────────────────────┤
+│                           Infra (lib)                              │
+├────────────────────────────────────────────────────────────────────┤
+│  lib/config.lua, lib/logger.lua, lib/cache.lua, lib/util.lua       │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Responsabilidades (resumo)
