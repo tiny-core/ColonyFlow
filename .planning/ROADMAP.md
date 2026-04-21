@@ -23,7 +23,7 @@ Objetivo: entregar um sistema autônomo em Lua (CC: Tweaked) que lê requisiçõ
 - [x] **Phase 15: Operabilidade + Resiliencia (doctor + persistencia + circuit breaker)** - Modo doctor, persistencia de jobs e resiliencia a oscilacao do ME
 - [x] **Phase 16: Observabilidade de Performance (metricas + contadores)** - Medir custo por tick e chamadas a perifericos, com exibicao discreta e logs
 - [x] **Phase 17: Scheduler com Budget (limites por tick)** - Limitar trabalho por ciclo (requests/IO) para reduzir picos e travamentos
-- [ ] **Phase 18: Refactor por Snapshots (reduzir acoplamento/IO)** - Padronizar snapshots de estado para UI/engine e reduzir complexidade
+- [x] **Phase 18: Refactor por Snapshots (reduzir acoplamento/IO)** - Padronizar snapshots de estado para UI/engine e reduzir complexidade (completed 2026-04-21)
 - [ ] **Phase 19: Documentacao Didatica + Comentarios (PT)** - Guia de estudo e comentarios explicativos em portugues (identificadores em ingles)
 
 ## Phase Details
@@ -278,7 +278,7 @@ Plans:
 | 15. Operabilidade + Resiliencia                        | 1/1            | Complete | 2026-04-21 |
 | 16. Observabilidade de Performance                      | 1/1            | Complete | 2026-04-21 |
 | 17. Scheduler com Budget                               | 1/1            | Complete | 2026-04-21 |
-| 18. Refactor por Snapshots                             | 0/1            | Not started | -        |
+| 18. Refactor por Snapshots                             | 1/1 | Complete   | 2026-04-21 |
 | 19. Documentacao Didatica + Comentarios                | 0/1            | Not started | -        |
 
 ### Phase 10: Config CLI (editar config.ini e perifericos)
@@ -369,10 +369,10 @@ Plans:
 **Goal:** Simplificar arquitetura e reduzir IO: engine produz snapshots (requests/status/health/metrics) e UI consome snapshots, com funcoes puras testaveis para decisoes.
 **Depends on:** Phase 17
 **Requirements**: TBD
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 18-01 Refactor por Snapshots (reduzir acoplamento/IO)
+- [x] 18-01 Refactor por Snapshots (reduzir acoplamento/IO)
 
 ### Phase 19: Documentacao Didatica + Comentarios (PT)
 
