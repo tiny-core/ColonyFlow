@@ -83,6 +83,7 @@ No computador (CC: Tweaked):
 
 - Rodar: `startup`
 - Diagnostico: `tools/install.lua doctor` (quando instalado via instalador) ou `startup doctor` (se exposto)
+- Configuracao: `startup config`
 - Testes: `startup test`
 
 Boas praticas:
@@ -105,4 +106,3 @@ Docs de apoio:
 - `docs/SUMMARY.md` (visao rapida do sistema)
 - `docs/ARCHITECTURE.md` (camadas e responsabilidades)
 - `docs/PITFALLS.md` (armadilhas e recuperacao)
-
