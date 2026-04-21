@@ -111,6 +111,39 @@ function M.validateUpdates(updatesBySection)
     validateNumber(errors, "observability.debug_log_interval_seconds", obs.debug_log_interval_seconds, nil, 5)
   end
 
+  local sb = updatesBySection.scheduler_budget
+  if type(sb) == "table" then
+    validateBool(errors, "scheduler_budget.enabled", sb.enabled)
+    validateNumber(errors, "scheduler_budget.requests_per_tick", sb.requests_per_tick, nil, 0)
+    validateNumber(errors, "scheduler_budget.mc_calls_per_tick", sb.mc_calls_per_tick, nil, 0)
+    validateNumber(errors, "scheduler_budget.me_calls_per_tick", sb.me_calls_per_tick, nil, 0)
+    validateNumber(errors, "scheduler_budget.inv_calls_per_tick", sb.inv_calls_per_tick, nil, 0)
+    validateNumber(errors, "scheduler_budget.window_seconds", sb.window_seconds, nil, 0)
+    validateNumber(errors, "scheduler_budget.mc_calls_per_window", sb.mc_calls_per_window, nil, 0)
+    validateNumber(errors, "scheduler_budget.me_calls_per_window", sb.me_calls_per_window, nil, 0)
+    validateNumber(errors, "scheduler_budget.inv_calls_per_window", sb.inv_calls_per_window, nil, 0)
+    validateNumber(errors, "scheduler_budget.requests_refresh_interval_seconds", sb.requests_refresh_interval_seconds, nil, 0)
+
+    local enabled = true
+    if sb.enabled ~= nil and sb.enabled ~= "" then
+      local s = tostring(sb.enabled):lower()
+      if s == "false" or s == "0" or s == "no" or s == "n" or s == "off" then
+        enabled = false
+      end
+    end
+
+    if enabled then
+      local ws = toNumber(sb.window_seconds)
+      if ws ~= nil and ws < 1 then
+        addErr(errors, "scheduler_budget.window_seconds: deve ser >= 1 quando enabled")
+      end
+      local rr = toNumber(sb.requests_refresh_interval_seconds)
+      if rr ~= nil and rr < 1 then
+        addErr(errors, "scheduler_budget.requests_refresh_interval_seconds: deve ser >= 1 quando enabled")
+      end
+    end
+  end
+
   return { ok = #errors == 0, errors = errors }
 end
 

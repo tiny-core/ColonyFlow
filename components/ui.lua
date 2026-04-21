@@ -598,6 +598,14 @@ function UI:renderStatus(state, mon)
     end
   end
 
+  local throttle = type(state.throttle) == "table" and state.throttle or nil
+  if throttle and throttle.active == true and y <= h - 2 then
+    local reason = cleanAscii(throttle.reason or throttle.group or "unknown")
+    local line = "THROTTLED: " .. reason
+    self:drawText("status", mon, 1, y, padRight(shorten(line, w), w), colors.orange, colors.black)
+    y = y + 1
+  end
+
   local cs = state.colonyStats or {}
   local m = state.metrics
   local perfEnabled = type(m) == "table" and m.enabled == true and m.ui_enabled == true

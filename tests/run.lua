@@ -2138,6 +2138,130 @@ local tests = {
     assertEq(state.metrics.io.me.methods.isConnected, 1)
     assertEq(state.metrics.io.me.methods.isOnline, 1)
   end },
+  { "budget_denies_me_calls_per_tick", function()
+    local Budget = require("modules.budget")
+    local ME = require("modules.me")
+
+    local calls = 0
+    local bridge = {
+      getItem = function(filter)
+        calls = calls + 1
+        return { name = filter.name, amount = 1, isCraftable = false }
+      end
+    }
+
+    local cfg = makeCfg({
+      scheduler_budget = {
+        enabled = "true",
+        window_seconds = "2",
+        me_calls_per_tick = "1",
+        me_calls_per_window = "0",
+      }
+    })
+
+    local state = {
+      cfg = cfg,
+      devices = { meBridge = bridge },
+      health = {},
+      throttle = { active = false },
+      budget = Budget.new(cfg),
+    }
+
+    state.budget:beginTick(state)
+
+    local me = ME.new(state)
+    local a1, e1 = me:getItem({ name = "minecraft:dirt" })
+    local a2, e2 = me:getItem({ name = "minecraft:stone" })
+
+    assertEq(type(a1), "table")
+    assertEq(e1, nil)
+    assertEq(a2, nil)
+    assertEq(e2, "budget_exceeded:me")
+    assertEq(calls, 1)
+    assertEq(state.throttle.active, true)
+    assertEq(type(state.throttle.reason), "string")
+  end },
+  { "engine_cursor_respects_requests_per_tick", function()
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local oldFsExists = fs.exists
+    fs.exists = function(path)
+      if tostring(path) == "data/state.json" then return false end
+      return oldFsExists(path)
+    end
+
+    local invReads = 0
+    local inv = {
+      list = function()
+        invReads = invReads + 1
+        return {}
+      end
+    }
+
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "done,completed" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "1", requests_refresh_interval_seconds = "1" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = { isConnected = function() return true end, isOnline = function() return false end },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 1, state = "requested", target = "x", count = 1, items = { { name = "minecraft:dirt", count = 1 } } },
+              { id = 2, state = "requested", target = "x", count = 1, items = { { name = "minecraft:dirt", count = 1 } } },
+              { id = 3, state = "requested", target = "x", count = 1, items = { { name = "minecraft:dirt", count = 1 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+
+    engine:tick()
+    local w1 = state.work["1"]
+    local w2_1 = state.work["2"]
+    local w3_1 = state.work["3"]
+
+    engine:tick()
+    local w2 = state.work["2"]
+    local w3_2 = state.work["3"]
+
+    engine:tick()
+    local w3 = state.work["3"]
+
+    peripheral = oldPeripheral
+    fs.exists = oldFsExists
+
+    assertEq(type(w1), "table")
+    assertEq(w2_1, nil)
+    assertEq(w3_1, nil)
+    assertEq(type(w2), "table")
+    assertEq(w3_2, nil)
+    assertEq(type(w3), "table")
+    assertEq(invReads >= 1, true)
+  end },
 }
 
 for _, t in ipairs(tests) do

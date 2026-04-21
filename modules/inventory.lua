@@ -20,6 +20,11 @@ end
 local function safeList(inv, state)
   if not inv then return nil, "inventário ausente" end
   if type(inv.list) ~= "function" then return nil, "inventário sem list()" end
+  if state and state.budget and type(state.budget.tryConsume) == "function" then
+    if not state.budget:tryConsume(state, "inv", 1, "inv") then
+      return nil, "budget_exceeded:inv"
+    end
+  end
   bumpIo(state, "list")
   local ok, res = Util.safeCall(inv.list)
   if not ok then return nil, tostring(res) end

@@ -57,6 +57,11 @@ local function call(state, bridge, method, ...)
   if not bridge or type(bridge[method]) ~= "function" then
     return nil, "Método indisponível: " .. tostring(method)
   end
+  if state and state.budget and type(state.budget.tryConsume) == "function" then
+    if not state.budget:tryConsume(state, "me", 1, "me") then
+      return nil, "budget_exceeded:me"
+    end
+  end
   bumpIo(state, method)
   local ok, res1, res2 = Util.safeCall(bridge[method], ...)
   if not ok then return nil, tostring(res1) end
@@ -110,6 +115,12 @@ function ME:isOnline()
   if not b then return false, "meBridge ausente" end
   local connected, connErr = call(self.state, b, "isConnected")
   local online, onlineErr = call(self.state, b, "isOnline")
+  if type(connErr) == "string" and connErr:match("^budget_exceeded:") then
+    return nil, connErr
+  end
+  if type(onlineErr) == "string" and onlineErr:match("^budget_exceeded:") then
+    return nil, onlineErr
+  end
   if connected == nil and online == nil then
     local e1 = tostring(connErr or "")
     local e2 = tostring(onlineErr or "")

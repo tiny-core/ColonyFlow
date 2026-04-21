@@ -6,6 +6,7 @@ local Peripherals = require("modules.peripherals")
 local UpdateCheck = require("modules.update_check")
 local Scheduler = require("modules.scheduler")
 local Engine = require("modules.engine")
+local Budget = require("modules.budget")
 local UI = require("components.ui")
 
 local M = {}
@@ -78,7 +79,10 @@ function M.run()
       errors = 0,
     },
     metrics = metrics,
+    throttle = { active = false },
   }
+
+  state.budget = Budget.new(cfg)
 
   state.installed = Version.readInstalled()
   state.update = UpdateCheck.defaultState(state.installed)

@@ -13,6 +13,10 @@ local PERSIST_PATH = "data/state.json"
 local PERSIST_INTERVAL_MS = 2000
 local PERSIST_MAX_AGE_MS = 6 * 60 * 60 * 1000
 
+local function isBudgetExceeded(err)
+  return type(err) == "string" and err:match("^budget_exceeded:") ~= nil
+end
+
 function Engine:_restorePersistedWork()
   local persisted = Persistence.load(PERSIST_PATH)
   if not persisted then return end
@@ -83,6 +87,8 @@ function Engine.new(state)
     me = ME.new(state),
     tier = nil,
     work = {},
+    _rq_cursor = 1,
+    _next_requests_refresh_at_ms = 0,
   }, Engine)
 
   self._persist_next_at_ms = Util.nowUtcMs() + PERSIST_INTERVAL_MS
@@ -162,10 +168,15 @@ local function resolveInvByName(name)
   return peripheral.wrap(name)
 end
 
-local function pushFromBuffer(bufferInv, targetName, itemName, qty)
+local function pushFromBuffer(bufferInv, targetName, itemName, qty, state)
   if not bufferInv then return 0, "buffer_indisponivel" end
   if type(bufferInv.list) ~= "function" then return 0, "buffer_sem_list" end
   if type(bufferInv.pushItems) ~= "function" then return 0, "buffer_sem_pushItems" end
+  if state and state.budget and type(state.budget.tryConsume) == "function" then
+    if not state.budget:tryConsume(state, "inv", 1, "inv") then
+      return 0, "budget_exceeded:inv"
+    end
+  end
   local list = bufferInv.list()
   if type(list) ~= "table" then return 0, "buffer_list_invalida" end
   local movedTotal = 0
@@ -173,6 +184,11 @@ local function pushFromBuffer(bufferInv, targetName, itemName, qty)
   for slot, stack in pairs(list) do
     if remaining <= 0 then break end
     if type(stack) == "table" and stack.name == itemName then
+      if state and state.budget and type(state.budget.tryConsume) == "function" then
+        if not state.budget:tryConsume(state, "inv", 1, "inv") then
+          return movedTotal, "budget_exceeded:inv"
+        end
+      end
       local moved = bufferInv.pushItems(targetName, slot, remaining)
       moved = tonumber(moved or 0) or 0
       if moved > 0 then
@@ -197,30 +213,39 @@ local function getDestinationSnapshot(state, targetName, targetInv, forceRefresh
 end
 
 local function getMeAmount(me, itemName)
-  if not me then return 0 end
+  if not me then return 0, nil end
   if type(me.getItem) == "function" then
-    local res = me:getItem({ name = itemName })
+    local res, err = me:getItem({ name = itemName })
+    if res == nil and isBudgetExceeded(err) then
+      return nil, err
+    end
     if type(res) == "table" then
       local n = tonumber(res.amount or 0) or 0
-      if n > 0 then return n end
+      if n > 0 then return n, nil end
     end
   end
-  if type(me.listItems) ~= "function" then return 0 end
-  local list = me:listItems({ name = itemName })
-  if type(list) ~= "table" then return 0 end
+  if type(me.listItems) ~= "function" then return 0, nil end
+  local list, err = me:listItems({ name = itemName })
+  if list == nil and isBudgetExceeded(err) then
+    return nil, err
+  end
+  if type(list) ~= "table" then return 0, nil end
   local total = 0
   for _, v in pairs(list) do
     if type(v) == "table" and v.name == itemName then
       total = total + (tonumber(v.amount or v.count or 0) or 0)
     end
   end
-  return total
+  return total, nil
 end
 
 local function isMeCraftable(me, itemName, count)
   if not me then return nil, nil end
   if type(me.getItem) == "function" then
-    local res = me:getItem({ name = itemName })
+    local res, err = me:getItem({ name = itemName })
+    if res == nil and isBudgetExceeded(err) then
+      return nil, err
+    end
     if type(res) == "table" and res.isCraftable ~= nil then
       if res.isCraftable == true then
         return true, nil
@@ -228,7 +253,11 @@ local function isMeCraftable(me, itemName, count)
     end
   end
   if type(me.isCraftable) ~= "function" then return nil, nil end
-  return me:isCraftable({ name = itemName, count = count })
+  local res, err = me:isCraftable({ name = itemName, count = count })
+  if res == nil and isBudgetExceeded(err) then
+    return nil, err
+  end
+  return res, err
 end
 
 local function strLower(s)
@@ -365,11 +394,17 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
         goto continue_item
       end
     end
-    local amount = getMeAmount(me, it.name)
+    local amount, amountErr = getMeAmount(me, it.name)
+    if amount == nil and isBudgetExceeded(amountErr) then
+      return nil, amountErr
+    end
     local craftable, craftableErr = nil, nil
     if amount <= 0 then
       craftable, craftableErr = isMeCraftable(me, it.name,
         tonumber(it.count or request.requiredCount or request.count or 1) or 1)
+      if craftable == nil and isBudgetExceeded(craftableErr) then
+        return nil, craftableErr
+      end
     end
     if amount <= 0 and craftable == false then
       table.insert(blockedByCraft, { name = it.name, class = className, tier = t, max = maxTier, err = craftableErr })
@@ -635,6 +670,10 @@ function Engine:tick()
 
   state.stats.processed = state.stats.processed + 1
 
+  if state.budget and type(state.budget.beginTick) == "function" then
+    state.budget:beginTick(state)
+  end
+
   self:updateHealthSnapshot(false)
 
   if not state.devices.colonyIntegrator then
@@ -647,13 +686,45 @@ function Engine:tick()
     self.tier = Tier.new(state, self.eq)
   end
 
-  local requests = self.mine:listRequests()
-  state.requests = requests
+  local sbEnabled = true
+  if state.cfg and type(state.cfg.getBool) == "function" then
+    sbEnabled = state.cfg:getBool("scheduler_budget", "enabled", true) == true
+  end
 
-  local colonyStats = state.cache:get("mc", "stats")
+  local nowMs = Util.nowUtcMs()
+  local refreshSec = sbEnabled and state.cfg:getNumber("scheduler_budget", "requests_refresh_interval_seconds", 5) or 0
+  local refreshMs = (tonumber(refreshSec or 0) or 0) > 0 and (tonumber(refreshSec or 0) * 1000) or 0
+  if refreshMs < 0 then refreshMs = 0 end
+
+  local requests = state.requests
+  if type(requests) ~= "table" then requests = {} end
+  local shouldRefresh = (refreshMs == 0) or (not self._next_requests_refresh_at_ms) or (nowMs >= self._next_requests_refresh_at_ms)
+  if shouldRefresh then
+    local fresh, freshErr = self.mine:listRequests()
+    if fresh == nil and isBudgetExceeded(freshErr) then
+      self:_persistWorkMaybe()
+      return
+    end
+    if type(fresh) == "table" then
+      requests = fresh
+      state.requests = fresh
+    end
+    self._next_requests_refresh_at_ms = nowMs + refreshMs
+  else
+    state.requests = requests
+  end
+
+  local colonyStats = state.cache and type(state.cache.get) == "function" and state.cache:get("mc", "stats") or nil
   if not colonyStats then
-    colonyStats = self.mine:getColonyStats()
-    state.cache:set("mc", "stats", colonyStats, 2)
+    local cs, csErr = self.mine:getColonyStats()
+    if cs == nil and isBudgetExceeded(csErr) then
+      self:_persistWorkMaybe()
+      return
+    end
+    colonyStats = cs or {}
+    if state.cache and type(state.cache.set) == "function" then
+      state.cache:set("mc", "stats", colonyStats, 2)
+    end
   end
   state.colonyStats = colonyStats
 
@@ -662,7 +733,7 @@ function Engine:tick()
   if not targetInv then
     state.logger:warn("Destino padrão indisponível; aguardando...",
       { target = state.cfg:get("delivery", "default_target_container", "") })
-    for _, r in ipairs(requests) do
+    for _, r in ipairs(requests or {}) do
       if r and r.id and isPendingState(state.cfg, r.state) then
         local work = self.work[r.id] or {}
         local needed = tonumber(r.requiredCount or r.count or 0) or 0
@@ -683,28 +754,55 @@ function Engine:tick()
   end
 
   local snap, snapErr = getDestinationSnapshot(state, targetName, targetInv, false)
+  if snap == nil and isBudgetExceeded(snapErr) then
+    self:_persistWorkMaybe()
+    return
+  end
   local available = {}
   if type(snap) == "table" then
     for k, v in pairs(snap) do
       available[k] = tonumber(v or 0) or 0
     end
   end
-  local buildings = state.cache:get("mc", "buildings")
+  local buildings = state.cache and type(state.cache.get) == "function" and state.cache:get("mc", "buildings") or nil
   if not buildings then
-    buildings = self.mine:listBuildings()
-    state.cache:set("mc", "buildings", buildings, 5)
+    local b, bErr = self.mine:listBuildings()
+    if b == nil and isBudgetExceeded(bErr) then
+      self:_persistWorkMaybe()
+      return
+    end
+    buildings = b or {}
+    if state.cache and type(state.cache.set) == "function" then
+      state.cache:set("mc", "buildings", buildings, 5)
+    end
   end
-  local citizens = state.cache:get("mc", "citizens")
+  local citizens = state.cache and type(state.cache.get) == "function" and state.cache:get("mc", "citizens") or nil
   if not citizens then
-    citizens = self.mine:listCitizens()
-    state.cache:set("mc", "citizens", citizens, 5)
+    local c, cErr = self.mine:listCitizens()
+    if c == nil and isBudgetExceeded(cErr) then
+      self:_persistWorkMaybe()
+      return
+    end
+    citizens = c or {}
+    if state.cache and type(state.cache.set) == "function" then
+      state.cache:set("mc", "citizens", citizens, 5)
+    end
   end
 
-  for _, r in ipairs(requests) do
-    if r and r.id and isPendingState(state.cfg, r.state) then
+  local nowEpoch = os.epoch("utc")
+  local rqLimit = sbEnabled and state.cfg:getNumber("scheduler_budget", "requests_per_tick", 10) or 0
+  rqLimit = tonumber(rqLimit or 0) or 0
+  if rqLimit > 0 then rqLimit = math.floor(rqLimit) end
+  if rqLimit <= 0 then rqLimit = math.huge end
+
+  local function processOne(r)
+    if not (r and r.id and isPendingState(state.cfg, r.state)) then
+      return false, nil
+    end
+
       local job = self.work[r.id]
-      if job and job.next_retry and job.next_retry > os.epoch("utc") then
-        goto continue
+      if job and job.next_retry and job.next_retry > nowEpoch then
+        return false, nil
       end
 
       local building, buildingResolved = resolveBuildingForRequest(buildings, citizens, r.target)
@@ -716,6 +814,9 @@ function Engine:tick()
           (r.items and r.items[1] and r.items[1].name) or nil
 
       if not candidate then
+        if isBudgetExceeded(why) then
+          return nil, tostring(why)
+        end
         do
           local reqItem = work.requested or ""
           local needed = tonumber(r.requiredCount or r.count or 0) or 0
@@ -756,7 +857,7 @@ function Engine:tick()
         else
           state.logger:warn("Request sem candidato", { request = r.id, reason = why })
         end
-        goto continue
+        return true, nil
       end
 
       work.chosen = candidate.name
@@ -766,10 +867,10 @@ function Engine:tick()
       if not snap then
         work.status = "waiting_retry"
         work.err = snapErr
-        work.next_retry = os.epoch("utc") + 5000
+        work.next_retry = nowEpoch + 5000
         self.work[r.id] = work
         state.logger:warn("Falha ao ler destino", { request = r.id, err = snapErr })
-        goto continue
+        return true, nil
       end
 
       local presentTotal = Inventory.countFromSnapshot(snap, candidate.name)
@@ -783,10 +884,13 @@ function Engine:tick()
       if missing <= 0 then
         work.status = "done"
         self.work[r.id] = work
-        goto continue
+        return true, nil
       end
 
       local meOnline, meErr = self.me:isOnline()
+      if isBudgetExceeded(meErr) then
+        return nil, tostring(meErr)
+      end
       if not meOnline then
         work.status = "waiting_retry"
         local errStr = tostring(meErr or "")
@@ -796,7 +900,7 @@ function Engine:tick()
           if nextAt and nextAt > os.epoch("utc") then
             work.next_retry = nextAt
           else
-            work.next_retry = os.epoch("utc") + 5000
+            work.next_retry = nowEpoch + 5000
           end
           if not work.logged_me_degraded then
             state.logger:warn("ME degraded; aguardando retry...", {
@@ -807,37 +911,43 @@ function Engine:tick()
           end
         else
           work.err = "me_offline:" .. errStr
-          work.next_retry = os.epoch("utc") + 5000
+          work.next_retry = nowEpoch + 5000
           work.logged_me_degraded = nil
           state.logger:warn("ME indisponível; aguardando...", { request = r.id, err = errStr })
         end
         self.work[r.id] = work
-        goto continue
+        return true, nil
       end
       work.logged_me_degraded = nil
 
-      local meAmount = getMeAmount(self.me, candidate.name)
+      local meAmount, meAmountErr = getMeAmount(self.me, candidate.name)
+      if meAmount == nil and isBudgetExceeded(meAmountErr) then
+        return nil, tostring(meAmountErr)
+      end
       local missingDest = missing
       local craftQty = math.max(0, missingDest - meAmount)
       local exportQty = math.min(meAmount, missingDest)
 
       if exportQty > 0 then
         local freeSpace, freeErr = Inventory.getFreeSpace(targetInv, candidate.name, candidate.maxStackSize, state)
+        if freeSpace == nil and isBudgetExceeded(freeErr) then
+          return nil, tostring(freeErr)
+        end
         if not freeSpace then
           work.status = "waiting_retry"
           work.err = "erro_capacidade_destino:" .. tostring(freeErr or "")
-          work.next_retry = os.epoch("utc") + 5000
+          work.next_retry = nowEpoch + 5000
           state.logger:warn("Falha ao ler capacidade do destino", { request = r.id, err = freeErr })
-          goto continue
+          return true, nil
         end
         if freeSpace <= 0 then
           work.status = "waiting_retry"
           work.err = "destino_cheio_capacidade"
-          work.next_retry = os.epoch("utc") + 5000
+          work.next_retry = nowEpoch + 5000
           state.logger:info("Destino cheio, aguardando espaço", { request = r.id, item = candidate.name })
           exportQty = 0
           craftQty = 0
-          goto continue
+          return true, nil
         end
         exportQty = math.min(exportQty, freeSpace)
       end
@@ -847,21 +957,30 @@ function Engine:tick()
         local lockKey = tostring(candidate.name) .. "|" .. tostring(craftQty) .. "|" .. tostring(targetName)
         local locked = state.cache:get("craft_lock", lockKey)
         local crafting, craftErr = self.me:isCrafting({ name = candidate.name, count = craftQty })
+        if crafting == nil and isBudgetExceeded(craftErr) then
+          return nil, tostring(craftErr)
+        end
         if crafting == true or locked then
           work.status = "crafting"
           work.craft = work.craft or {}
           work.craft.key = lockKey
-          work.craft.last_seen = os.epoch("utc")
+          work.craft.last_seen = nowEpoch
         else
           local craftable, craftableErr = self.me:isCraftable({ name = candidate.name, count = craftQty })
+          if craftable == nil and isBudgetExceeded(craftableErr) then
+            return nil, tostring(craftableErr)
+          end
           if craftable == false then
             work.status = "waiting_retry"
             work.err = "nao_craftavel:" .. tostring(craftableErr or "")
-            work.next_retry = os.epoch("utc") + 15000
+            work.next_retry = nowEpoch + 15000
             state.logger:warn("Item não craftável agora; aguardando...",
               { request = r.id, item = candidate.name, err = tostring(craftableErr) })
           else
             local started, startErr = self.me:craftItem({ name = candidate.name, count = craftQty })
+            if started == nil and isBudgetExceeded(startErr) then
+              return nil, tostring(startErr)
+            end
             if started == nil and startErr == nil then
               started = true
               startErr = "retorno_nil"
@@ -872,12 +991,12 @@ function Engine:tick()
               work.status = "crafting"
               work.craft = work.craft or {}
               work.craft.key = lockKey
-              work.craft.started_at = os.epoch("utc")
+              work.craft.started_at = nowEpoch
               work.craft.message = startErr
             else
               work.status = "waiting_retry"
               work.err = "craft_falhou:" .. tostring(startErr or "")
-              work.next_retry = os.epoch("utc") + 15000
+              work.next_retry = nowEpoch + 15000
               state.logger:warn("Falha ao iniciar craft",
                 { request = r.id, item = candidate.name, err = tostring(startErr) })
             end
@@ -901,10 +1020,13 @@ function Engine:tick()
         end
 
         local beforeSnap, beforeErr = getDestinationSnapshot(state, targetName, targetInv, true)
+        if beforeSnap == nil and isBudgetExceeded(beforeErr) then
+          return nil, tostring(beforeErr)
+        end
         if not beforeSnap then
           work.status = "waiting_retry"
           work.err = beforeErr
-          work.next_retry = os.epoch("utc") + 5000
+          work.next_retry = nowEpoch + 5000
           state.logger:warn("Falha ao ler destino antes da entrega", { request = r.id, err = beforeErr })
         else
           local exported, exportErr = nil, nil
@@ -920,9 +1042,15 @@ function Engine:tick()
               exported, exportErr = 0, "export_buffer_indisponivel:" .. bufferName
             else
               exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, exportDirection)
+              if exported == nil and isBudgetExceeded(exportErr) then
+                return nil, tostring(exportErr)
+              end
               exported = tonumber(exported or 0) or 0
               if exported > 0 then
-                pushed, pushErr = pushFromBuffer(bufferInv, targetName, candidate.name, exported)
+                pushed, pushErr = pushFromBuffer(bufferInv, targetName, candidate.name, exported, state)
+                if pushed ~= nil and isBudgetExceeded(pushErr) then
+                  return nil, tostring(pushErr)
+                end
                 pushed = tonumber(pushed or 0) or 0
                 if pushed <= 0 then
                   exported, exportErr = 0, "push_buffer_falhou:" .. tostring(pushErr or "")
@@ -933,19 +1061,25 @@ function Engine:tick()
             exported, exportErr = 0, "export_mode_invalido:" .. tostring(exportMode)
           end
 
+          if exported == nil and isBudgetExceeded(exportErr) then
+            return nil, tostring(exportErr)
+          end
           exported = tonumber(exported or 0) or 0
           if exported <= 0 then
             work.status = "waiting_retry"
             work.err = "destino_cheio_ou_export_falhou:" .. tostring(exportErr or "")
-            work.next_retry = os.epoch("utc") + 5000
+            work.next_retry = nowEpoch + 5000
             state.logger:warn("Entrega não ocorreu; aguardando...",
               { request = r.id, item = candidate.name, err = tostring(exportErr) })
           else
             local afterSnap, afterErr = getDestinationSnapshot(state, targetName, targetInv, true)
+            if afterSnap == nil and isBudgetExceeded(afterErr) then
+              return nil, tostring(afterErr)
+            end
             if not afterSnap then
               work.status = "waiting_retry"
               work.err = "pos_entrega_snapshot_falhou:" .. tostring(afterErr or "")
-              work.next_retry = os.epoch("utc") + 5000
+              work.next_retry = nowEpoch + 5000
               state.logger:warn("Falha ao ler destino após entrega", { request = r.id, err = afterErr })
             else
               local beforeCount = Inventory.countFromSnapshot(beforeSnap, candidate.name)
@@ -953,7 +1087,7 @@ function Engine:tick()
               if afterCount < beforeCount then
                 work.status = "waiting_retry"
                 work.err = "pos_entrega_inconsistente"
-                work.next_retry = os.epoch("utc") + 5000
+                work.next_retry = nowEpoch + 5000
                 state.logger:warn("Validação pós-entrega inconsistente; aguardando...",
                   { request = r.id, item = candidate.name })
               else
@@ -1008,8 +1142,37 @@ function Engine:tick()
           work.logged_equivalents = true
         end
       end
+      return true, nil
+  end
+
+  local n = type(requests) == "table" and #requests or 0
+  if n > 0 then
+    local idx = tonumber(self._rq_cursor or 1) or 1
+    if idx < 1 then idx = 1 end
+    if idx > n then idx = 1 end
+
+    local scanned = 0
+    local processed = 0
+    while processed < rqLimit and scanned < n do
+      local currentIdx = idx
+      local r = requests[currentIdx]
+      idx = currentIdx + 1
+      if idx > n then idx = 1 end
+      scanned = scanned + 1
+
+      local did, budgetErr = processOne(r)
+      if did == nil and budgetErr ~= nil then
+        self._rq_cursor = currentIdx
+        self:_persistWorkMaybe()
+        return
+      end
+      if did == true then
+        processed = processed + 1
+      end
     end
-    ::continue::
+    self._rq_cursor = idx
+  else
+    self._rq_cursor = 1
   end
 
   self:_persistWorkMaybe()

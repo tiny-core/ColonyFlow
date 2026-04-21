@@ -63,6 +63,18 @@ enabled=false
 ui_enabled=false
 debug_log_enabled=false
 debug_log_interval_seconds=30
+
+[scheduler_budget]
+enabled=true
+requests_per_tick=10
+mc_calls_per_tick=20
+me_calls_per_tick=40
+inv_calls_per_tick=20
+window_seconds=2
+mc_calls_per_window=50
+me_calls_per_window=100
+inv_calls_per_window=50
+requests_refresh_interval_seconds=5
 ]]
 
 local function parseIni(text)

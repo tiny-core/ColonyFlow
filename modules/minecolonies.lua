@@ -22,6 +22,21 @@ local function bumpIo(state, method)
   end
 end
 
+local function call(state, integrator, method, ...)
+  if not integrator or type(integrator[method]) ~= "function" then
+    return nil, "method_missing:" .. tostring(method)
+  end
+  if state and state.budget and type(state.budget.tryConsume) == "function" then
+    if not state.budget:tryConsume(state, "mc", 1, "mc") then
+      return nil, "budget_exceeded:mc"
+    end
+  end
+  bumpIo(state, method)
+  local ok, res1, res2 = Util.safeCall(integrator[method], ...)
+  if not ok then return nil, tostring(res1) end
+  return res1, res2
+end
+
 local function fnv1a32(str)
   local hash = 2166136261
   for i = 1, #str do
@@ -89,10 +104,12 @@ function Mine:listRequests()
   local integrator = self.state.devices.colonyIntegrator
   local out = {}
 
-  bumpIo(self.state, "getRequests")
-  local ok, result = Util.safeCall(integrator.getRequests)
-  if not ok then
-    self.state.logger:error("Falha ao ler requests do MineColonies", { err = tostring(result) })
+  local result, err = call(self.state, integrator, "getRequests")
+  if result == nil and err and tostring(err):match("^budget_exceeded:") then
+    return nil, tostring(err)
+  end
+  if result == nil and err then
+    self.state.logger:error("Falha ao ler requests do MineColonies", { err = tostring(err) })
   elseif type(result) == "table" then
     for _, r in ipairs(result) do
       table.insert(out, normalizeRequest(r))
@@ -103,10 +120,12 @@ function Mine:listRequests()
   local hasWOR = type(integrator.getWorkOrderResources) == "function"
   local hasBR = type(integrator.getBuilderResources) == "function"
   if hasWO and (hasWOR or hasBR) then
-    bumpIo(self.state, "getWorkOrders")
-    local okWO, woResult = Util.safeCall(integrator.getWorkOrders)
-    if not okWO then
-      self.state.logger:warn("Falha ao ler WorkOrders do MineColonies", { err = tostring(woResult) })
+    local woResult, woErr = call(self.state, integrator, "getWorkOrders")
+    if woResult == nil and woErr and tostring(woErr):match("^budget_exceeded:") then
+      return nil, tostring(woErr)
+    end
+    if woResult == nil and woErr then
+      self.state.logger:warn("Falha ao ler WorkOrders do MineColonies", { err = tostring(woErr) })
     elseif type(woResult) == "table" then
       local added = 0
       local lastErr = nil
@@ -115,22 +134,26 @@ function Mine:listRequests()
         local resources = nil
 
         if hasWOR then
-          bumpIo(self.state, "getWorkOrderResources")
-          local okRes, resOrErr = Util.safeCall(integrator.getWorkOrderResources, wo.id)
-          if okRes and type(resOrErr) == "table" then
+          local resOrErr, rErr = call(self.state, integrator, "getWorkOrderResources", wo.id)
+          if resOrErr == nil and rErr and tostring(rErr):match("^budget_exceeded:") then
+            return nil, tostring(rErr)
+          end
+          if type(resOrErr) == "table" then
             resources = resOrErr
           else
-            lastErr = resOrErr
+            lastErr = rErr or resOrErr
           end
         end
 
         if (not resources) and hasBR and type(wo.builder) == "table" then
-          bumpIo(self.state, "getBuilderResources")
-          local okRes, resOrErr = Util.safeCall(integrator.getBuilderResources, wo.builder)
-          if okRes and type(resOrErr) == "table" then
+          local resOrErr, rErr = call(self.state, integrator, "getBuilderResources", wo.builder)
+          if resOrErr == nil and rErr and tostring(rErr):match("^budget_exceeded:") then
+            return nil, tostring(rErr)
+          end
+          if type(resOrErr) == "table" then
             resources = resOrErr
           else
-            lastErr = resOrErr
+            lastErr = rErr or resOrErr
           end
         end
 
@@ -216,15 +239,15 @@ end
 
 function Mine:listBuildings()
   local integrator = self.state.devices.colonyIntegrator
-  bumpIo(self.state, "getBuildings")
-  local ok, result = Util.safeCall(integrator.getBuildings)
-  if not ok then
-    self.state.logger:error("Falha ao ler buildings do MineColonies", { err = tostring(result) })
+  local result, err = call(self.state, integrator, "getBuildings")
+  if result == nil and err and tostring(err):match("^budget_exceeded:") then
+    return nil, tostring(err)
+  end
+  if result == nil and err then
+    self.state.logger:error("Falha ao ler buildings do MineColonies", { err = tostring(err) })
     return {}
   end
-  if type(result) ~= "table" then
-    return {}
-  end
+  if type(result) ~= "table" then return {} end
 
   local out = {}
   for _, b in ipairs(result) do
@@ -246,15 +269,15 @@ function Mine:listCitizens()
   local integrator = self.state.devices.colonyIntegrator
   if not integrator or type(integrator.getCitizens) ~= "function" then return {} end
 
-  bumpIo(self.state, "getCitizens")
-  local ok, result = Util.safeCall(integrator.getCitizens)
-  if not ok then
-    self.state.logger:error("Falha ao ler citizens do MineColonies", { err = tostring(result) })
+  local result, err = call(self.state, integrator, "getCitizens")
+  if result == nil and err and tostring(err):match("^budget_exceeded:") then
+    return nil, tostring(err)
+  end
+  if result == nil and err then
+    self.state.logger:error("Falha ao ler citizens do MineColonies", { err = tostring(err) })
     return {}
   end
-  if type(result) ~= "table" then
-    return {}
-  end
+  if type(result) ~= "table" then return {} end
 
   local out = {}
   for _, c in ipairs(result) do
@@ -285,25 +308,35 @@ function Mine:getColonyStats()
   local integrator = self.state.devices.colonyIntegrator
   local stats = {}
 
-  bumpIo(self.state, "getColonyName")
-  local okName, name = Util.safeCall(integrator.getColonyName)
-  if okName then stats.name = name end
+  local name, errName = call(self.state, integrator, "getColonyName")
+  if name == nil and errName and tostring(errName):match("^budget_exceeded:") then
+    return nil, tostring(errName)
+  end
+  if name ~= nil then stats.name = name end
 
-  bumpIo(self.state, "amountOfCitizens")
-  local okCit, citizens = Util.safeCall(integrator.amountOfCitizens)
-  if okCit then stats.citizens = citizens end
+  local citizens, errCit = call(self.state, integrator, "amountOfCitizens")
+  if citizens == nil and errCit and tostring(errCit):match("^budget_exceeded:") then
+    return nil, tostring(errCit)
+  end
+  if citizens ~= nil then stats.citizens = citizens end
 
-  bumpIo(self.state, "maxOfCitizens")
-  local okMax, maxCit = Util.safeCall(integrator.maxOfCitizens)
-  if okMax then stats.maxCitizens = maxCit end
+  local maxCit, errMax = call(self.state, integrator, "maxOfCitizens")
+  if maxCit == nil and errMax and tostring(errMax):match("^budget_exceeded:") then
+    return nil, tostring(errMax)
+  end
+  if maxCit ~= nil then stats.maxCitizens = maxCit end
 
-  bumpIo(self.state, "getHappiness")
-  local okHappy, happiness = Util.safeCall(integrator.getHappiness)
-  if okHappy then stats.happiness = happiness end
+  local happiness, errHappy = call(self.state, integrator, "getHappiness")
+  if happiness == nil and errHappy and tostring(errHappy):match("^budget_exceeded:") then
+    return nil, tostring(errHappy)
+  end
+  if happiness ~= nil then stats.happiness = happiness end
 
-  bumpIo(self.state, "amountOfConstructionSites")
-  local okSites, sites = Util.safeCall(integrator.amountOfConstructionSites)
-  if okSites then stats.constructionSites = sites end
+  local sites, errSites = call(self.state, integrator, "amountOfConstructionSites")
+  if sites == nil and errSites and tostring(errSites):match("^budget_exceeded:") then
+    return nil, tostring(errSites)
+  end
+  if sites ~= nil then stats.constructionSites = sites end
 
   return stats
 end
