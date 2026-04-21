@@ -1,22 +1,22 @@
 # Architecture
 
-Este documento descreve a arquitetura do ColonyFlow em camadas e os principais contratos entre modulos.
+Este documento descreve a arquitetura do ColonyFlow em camadas e os principais contratos entre módulos.
 
-## Visao geral (camadas)
+## Visão geral (camadas)
 
 ```text
 ┌───────────────────────────────────────────────────────────────┐
-│                        Apresentacao (UI)                       │
+│                        Apresentação (UI)                       │
 ├───────────────────────────────────────────────────────────────┤
 │  components/ui.lua  -> render dual-monitor a partir de snapshot│
 ├───────────────────────────────────────────────────────────────┤
-│                       Aplicacao / Dominio                      │
+│                       Aplicação / Domínio                      │
 ├───────────────────────────────────────────────────────────────┤
 │  modules/scheduler.lua  -> loop + budget                        │
 │  modules/engine.lua     -> tick, fila/work, estado              │
 │  modules/snapshot.lua   -> contrato de snapshot (sem IO)        │
 ├───────────────────────────────────────────────────────────────┤
-│                        Integracoes / IO                         │
+│                        Integrações / IO                         │
 ├───────────────────────────────────────────────────────────────┤
 │  modules/minecolonies.lua -> colonyIntegrator (requests/buildings)│
 │  modules/me.lua           -> meBridge (estoque/craft/export)      │
@@ -31,30 +31,30 @@ Este documento descreve a arquitetura do ColonyFlow em camadas e os principais c
 
 ## Responsabilidades (resumo)
 
-| Area | Arquivo | Responsabilidade |
+| Área | Arquivo | Responsabilidade |
 |------|---------|------------------|
 | Entrada | `startup.lua` | ponto de entrada; delega para bootstrap |
-| Bootstrap | `lib/bootstrap.lua` | carrega config; resolve perifericos; inicializa modulos |
+| Bootstrap | `lib/bootstrap.lua` | carrega config; resolve periféricos; inicializa módulos |
 | Loop | `modules/scheduler.lua` | coordena ticks; aplica budget/limites por ciclo |
-| Estado/Decisao | `modules/engine.lua` | processa requests, controla work por request, transicoes de estado |
+| Estado/Decisão | `modules/engine.lua` | processa requests, controla work por request, transições de estado |
 | UI contract | `modules/snapshot.lua` | cria snapshot consolidado para UI (sem IO) |
 | UI | `components/ui.lua` | renderiza snapshot em 2 monitores; pagina e mostra status |
-| MineColonies | `modules/minecolonies.lua` | le requests/buildings e normaliza payload |
+| MineColonies | `modules/minecolonies.lua` | lê requests/buildings e normaliza payload |
 | ME/AE2 | `modules/me.lua` | consulta estoque/craftabilidade; abre crafts; exporta ao destino |
 
 ## Contratos e invariantes importantes
 
-- UI deve consumir **snapshot** (nao chamar perifericos).
-- Integracoes (`minecolonies`, `me`, `inventory`) devem encapsular `pcall`/tratamento de erro e retornar dados normalizados para o engine.
-- Engine deve manter estado explicito por request/work para evitar duplicidade.
-- Calculo de faltante deve usar destino como fonte de verdade parcial (nao craftar cegamente).
+- UI deve consumir **snapshot** (não chamar periféricos).
+- Integrações (`minecolonies`, `me`, `inventory`) devem encapsular `pcall`/tratamento de erro e retornar dados normalizados para o engine.
+- Engine deve manter estado explícito por request/work para evitar duplicidade.
+- Cálculo de faltante deve usar destino como fonte de verdade parcial (não craftar cegamente).
 
 ## Estrutura do repo (o que fica onde)
 
-- `lib/`: infraestrutura reutilizavel e generica
-- `modules/`: regras e integracoes
+- `lib/`: infraestrutura reutilizável e genérica
+- `modules/`: regras e integrações
 - `components/`: UI ASCII
-- `data/`: dados do usuario (ex.: `mappings.json`)
+- `data/`: dados do usuário (ex.: `mappings.json`)
 - `tests/`: harness de testes
 - `tools/`: instalador e ferramentas auxiliares
 
@@ -64,4 +64,3 @@ Este documento descreve a arquitetura do ColonyFlow em camadas e os principais c
 2. `modules/scheduler.lua` -> `modules/engine.lua`
 3. `modules/snapshot.lua` -> `components/ui.lua`
 4. `modules/minecolonies.lua` e `modules/me.lua`
-

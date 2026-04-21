@@ -1,18 +1,18 @@
 # Pitfalls
 
-Este documento lista armadilhas tipicas em automacao MineColonies <-> AE2 e como o ColonyFlow evita (ou deve evitar) cada uma.
+Este documento lista armadilhas típicas em automação MineColonies <-> AE2 e como o ColonyFlow evita (ou deve evitar) cada uma.
 
 ## 1) Craft duplicado por falta de estado
 
 **Sintoma:**
-- o mesmo item abre craft em ciclos consecutivos e o estoque cresce alem do pedido
+- o mesmo item abre craft em ciclos consecutivos e o estoque cresce além do pedido
 
 **Causa comum:**
-- nao existe identidade estavel de trabalho por request (ou nao e persistida/lembrada entre ticks)
+- não existe identidade estável de trabalho por request (ou não é persistida/lembrada entre ticks)
 
 **Como evitar:**
-- manter estado explicito por request/work no engine
-- aplicar retry/backoff em falhas (nao repetir acao imediatamente)
+- manter estado explícito por request/work no engine
+- aplicar retry/backoff em falhas (não repetir ação imediatamente)
 
 **Onde olhar no codigo:**
 - `modules/engine.lua` (estado do work por request)
@@ -23,38 +23,38 @@ Este documento lista armadilhas tipicas em automacao MineColonies <-> AE2 e como
 ## 2) Entregar no container errado
 
 **Sintoma:**
-- craft conclui, mas request continua pendente e o destino nao muda
+- craft conclui, mas request continua pendente e o destino não muda
 
 **Causa comum:**
-- exportacao do ME depende de onde o bridge esta no mundo e/ou resolucao de periferico incorreta
+- exportação do ME depende de onde o bridge está no mundo e/ou resolução de periférico incorreta
 
 **Como evitar:**
-- centralizar resolucao de destino no bootstrap
-- validar destino (quando possivel) por leitura de inventario apos exportacao
+- centralizar resolução de destino no bootstrap
+- validar destino (quando possível) por leitura de inventário após exportação
 
 **Onde olhar no codigo:**
-- `lib/bootstrap.lua` (resolucao/validacao de perifericos e destinos)
-- `modules/me.lua` (exportacao ao destino)
-- `modules/inventory.lua` (inspecao e agregacao de slots)
+- `lib/bootstrap.lua` (resolução/validação de periféricos e destinos)
+- `modules/me.lua` (exportação ao destino)
+- `modules/inventory.lua` (inspeção e agregação de slots)
 
 ---
 
-## 3) Matching fragil de itens (variantes, dano, mods diferentes)
+## 3) Matching frágil de itens (variantes, dano, mods diferentes)
 
 **Sintoma:**
-- item "nao encontrado" no ME para itens comuns, ou entrega de variante errada
+- item "não encontrado" no ME para itens comuns, ou entrega de variante errada
 
 **Causa comum:**
 - usar displayName/aliases soltos e ignorar metadados simples
 
 **Como evitar:**
-- usar `name` tecnico como chave primaria
-- aplicar tiers/equivalencias de forma explicita (auditoria em logs/UI)
+- usar `name` técnico como chave primária
+- aplicar tiers/equivalências de forma explícita (auditoria em logs/UI)
 
 **Onde olhar no codigo:**
-- `modules/minecolonies.lua` (normalizacao do payload de request)
-- `modules/equivalence.lua` e `modules/tier.lua` (resolucao de candidatos)
-- `data/mappings.json` (regras do usuario)
+- `modules/minecolonies.lua` (normalização do payload de request)
+- `modules/equivalence.lua` e `modules/tier.lua` (resolução de candidatos)
+- `data/mappings.json` (regras do usuário)
 
 ---
 
@@ -64,7 +64,7 @@ Este documento lista armadilhas tipicas em automacao MineColonies <-> AE2 e como
 - flicker constante e loop principal lento (perde responsividade)
 
 **Causa comum:**
-- UI faz IO (perifericos) ou redraw completo em alta frequencia
+- UI faz IO (periféricos) ou redraw completo em alta frequência
 
 **Como evitar:**
 - usar snapshot publicado pelo engine
@@ -77,20 +77,19 @@ Este documento lista armadilhas tipicas em automacao MineColonies <-> AE2 e como
 
 ---
 
-## 5) Falhas silenciosas de perifericos
+## 5) Falhas silenciosas de periféricos
 
 **Sintoma:**
-- telas congeladas, nil access, ou sistema "parado" sem diagnostico claro
+- telas congeladas, nil access, ou sistema "parado" sem diagnóstico claro
 
 **Causa comum:**
-- discovery apenas no startup e falta de health/watchdog durante execucao
+- discovery apenas no startup e falta de health/watchdog durante execução
 
 **Como evitar:**
-- validar perifericos no boot e monitorar saude
+- validar periféricos no boot e monitorar saúde
 - entrar em modo degradado com log e banner na UI
 
 **Onde olhar no codigo:**
 - `modules/peripherals.lua` (descoberta e health)
-- `modules/doctor.lua` (diagnostico)
+- `modules/doctor.lua` (diagnóstico)
 - `lib/logger.lua` (eventos e contexto)
-

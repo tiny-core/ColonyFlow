@@ -1,49 +1,49 @@
-# Leia-me do codigo
+# Leia-me do código
 
-Este guia existe para ajudar voce a ler o ColonyFlow do ponto de entrada ate o coracao (engine/scheduler) e as integracoes (MineColonies e ME/AE2), entendendo o "por que" das decisoes.
+Este guia existe para ajudar você a ler o ColonyFlow do ponto de entrada até o coração (engine/scheduler) e as integrações (MineColonies e ME/AE2), entendendo o "por quê" das decisões.
 
 ## Como pensar o sistema
 
 Modelo mental (camadas):
 
-- **Entrada/Bootstrap:** `startup.lua` chama o bootstrap e valida ambiente/config/perifericos.
-- **Infra (lib/):** utilitarios sem "regra de negocio" (config, logger, cache, helpers).
-- **Dominio (modules/):** regras e orquestracao (engine, scheduler, minecolonies, me, inventory, equivalence, tier).
-- **Apresentacao (components/):** UI ASCII (2 monitores) consumindo snapshot, sem IO de perifericos.
+- **Entrada/Bootstrap:** `startup.lua` chama o bootstrap e valida ambiente/config/periféricos.
+- **Infra (lib/):** utilitários sem "regra de negócio" (config, logger, cache, helpers).
+- **Domínio (modules/):** regras e orquestração (engine, scheduler, minecolonies, me, inventory, equivalence, tier).
+- **Apresentação (components/):** UI ASCII (2 monitores) consumindo snapshot, sem IO de periféricos.
 
 Regra de ouro:
 
-- **IO e decisao nao devem viver na UI.** O engine produz estado/snapshot; a UI apenas renderiza.
+- **IO e decisão não devem viver na UI.** O engine produz estado/snapshot; a UI apenas renderiza.
 
 ## Fluxo principal (do pedido ate a entrega)
 
 Fluxo simplificado:
 
 1. Ler requests do MineColonies (`modules/minecolonies.lua`)
-2. Normalizar para um formato interno estavel (request id, target, itens aceitos)
-3. Resolver candidatos e aplicar tiers/equivalencias (`modules/equivalence.lua`, `modules/tier.lua`)
+2. Normalizar para um formato interno estável (request id, target, itens aceitos)
+3. Resolver candidatos e aplicar tiers/equivalências (`modules/equivalence.lua`, `modules/tier.lua`)
 4. Resolver/inspecionar destino e calcular faltante real (`modules/inventory.lua`)
 5. Consultar ME (estoque + craftabilidade) e abrir craft apenas do faltante (`modules/me.lua`)
-6. Entregar ao destino e validar (quando possivel) (`modules/me.lua` + destino)
+6. Entregar ao destino e validar (quando possível) (`modules/me.lua` + destino)
 7. Atualizar estado, logs e UI (engine -> snapshot -> components/ui.lua)
 
 Pontos onde bugs normalmente aparecem:
 
-- Identidade de request e deduplicacao de trabalho (nao abrir craft duplicado)
-- Resolucao de destino (nao entregar no container errado)
-- Matching (nao confundir variantes / dano)
-- UI/loop (nao travar o sistema por redraw ou IO extra)
+- Identidade de request e deduplicação de trabalho (não abrir craft duplicado)
+- Resolução de destino (não entregar no container errado)
+- Matching (não confundir variantes / dano)
+- UI/loop (não travar o sistema por redraw ou IO extra)
 
-## Mapa do repo
+## Mapa do repositório
 
-Diretorios principais:
+Diretórios principais:
 
 - `lib/` infraestrutura compartilhada (config/logger/cache/util/version/bootstrap)
-- `modules/` regras e integracoes (engine/scheduler/minecolonies/me/inventory/equivalence/tier/...)
+- `modules/` regras e integrações (engine/scheduler/minecolonies/me/inventory/equivalence/tier/...)
 - `components/` UI ASCII (monitores)
 - `tools/` ferramentas (instalador, gerador de manifest)
 - `tests/` harness de testes (executado via `startup test`)
-- `data/` dados do usuario (ex.: `mappings.json`)
+- `data/` dados do usuário (ex.: `mappings.json`)
 
 Arquivos na raiz:
 
@@ -68,41 +68,41 @@ Leitura em "camadas":
 - Primeiro: entender interfaces e responsabilidades de cada arquivo.
 - Depois: seguir o fluxo (engine.tick -> work -> snapshot -> UI) e ver onde entram minecolonies e me.
 
-## Glossario
+## Glossário
 
 - **request**: pedido vindo do MineColonies (pode aceitar varios itens equivalentes)
 - **target**: destino do pedido (container/periferico)
 - **chosen**: item escolhido para atender o pedido (pode ser igual ao pedido ou equivalente aceito)
 - **missing**: faltante real = max(0, requerido - presente_no_destino)
-- **retry/backoff**: politica de retentativa para falhas temporarias (ME offline, destino ausente)
+- **retry/backoff**: política de retentativa para falhas temporárias (ME offline, destino ausente)
 - **snapshot**: estado consolidado publicado pelo engine e consumido pela UI (sem IO na UI)
 
-## Operacao (rodar, doctor, testes)
+## Operação (rodar, doctor, testes)
 
 No computador (CC: Tweaked):
 
 - Rodar: `startup`
-- Diagnostico: `tools/install.lua doctor` (quando instalado via instalador) ou `startup doctor` (se exposto)
-- Configuracao: `startup config`
+- Diagnóstico: `tools/install.lua doctor` (quando instalado via instalador) ou `startup doctor` (se exposto)
+- Configuração: `startup config`
 - Testes: `startup test`
 
-Boas praticas:
+Boas práticas:
 
 - Depois de mexer em arquivos Lua, rode `startup test`.
-- Em falhas de periferico, procure mensagens no log e banners/alertas na UI.
+- Em falhas de periférico, procure mensagens no log e banners/alertas na UI.
 
 ## Quando X quebra (onde olhar)
 
 Sintomas comuns:
 
 - **Craft duplicado / craft demais:** ver `modules/engine.lua` (chaves/estado de work), `modules/me.lua` (dedupe/job tracking)
-- **Entrega no lugar errado:** ver `modules/me.lua` (exportacao) e resolucao de destino/config em `lib/bootstrap.lua`
-- **Item nao casa no ME:** ver `modules/minecolonies.lua` (normalizacao) e `modules/equivalence.lua`/`modules/tier.lua`
+- **Entrega no lugar errado:** ver `modules/me.lua` (exportação) e resolução de destino/config em `lib/bootstrap.lua`
+- **Item não casa no ME:** ver `modules/minecolonies.lua` (normalização) e `modules/equivalence.lua`/`modules/tier.lua`
 - **UI travando / flicker:** ver `components/ui.lua` e `modules/snapshot.lua` (UI deve consumir snapshot)
-- **Perifericos somem:** ver `modules/peripherals.lua` e `modules/doctor.lua`
+- **Periféricos somem:** ver `modules/peripherals.lua` e `modules/doctor.lua`
 
 Docs de apoio:
 
-- `docs/SUMMARY.md` (visao rapida do sistema)
+- `docs/SUMMARY.md` (visão rápida do sistema)
 - `docs/ARCHITECTURE.md` (camadas e responsabilidades)
-- `docs/PITFALLS.md` (armadilhas e recuperacao)
+- `docs/PITFALLS.md` (armadilhas e recuperação)

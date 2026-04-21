@@ -16,8 +16,8 @@ awaiting human testing
 expected: Rodar `startup test` e terminar com `Tests: X/X OK`.
 result: pending
 
-### 2. Leitura rapida do guia
-expected: `docs/LEIA-ME-DO-CODIGO.md` ajuda a localizar rapidamente onde mexer (engine/scheduler/ui/integracoes).
+### 2. Leitura rápida do guia
+expected: `docs/LEIA-ME-DO-CODIGO.md` ajuda a localizar rapidamente onde mexer (engine/scheduler/ui/integrações).
 result: pending
 
 ## Summary
@@ -30,4 +30,3 @@ skipped: 0
 blocked: 0
 
 ## Gaps
-
