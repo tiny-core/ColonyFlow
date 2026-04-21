@@ -286,7 +286,7 @@ function UI:collectNoCraftItems(state)
   local out = {}
   local seen = {}
   for _, r in ipairs(state.requests or {}) do
-    local job = state.work and state.work[r.id] or nil
+    local job = state.work and state.work[tostring(r.id)] or nil
     if job and errCode(job.err) == "nao_craftavel" then
       local tag = tostring(job.chosen or job.requested or "")
       if tag ~= "" and not seen[tag] then
@@ -441,7 +441,7 @@ function UI:renderRequests(state, mon)
 
   for i = startIdx, endIdx do
     local r = state.requests[i]
-    local job = state.work and state.work[r.id] or nil
+    local job = state.work and state.work[tostring(r.id)] or nil
     local reqItem = (r.items[1] and r.items[1].name) or ""
     local chosen = job and job.chosen or ""
     local jobState = job and job.status or ""
@@ -485,7 +485,7 @@ function UI:renderRequests(state, mon)
   local y = 5
   for i = startIdx, endIdx do
     local r = state.requests[i]
-    local job = state.work and state.work[r.id] or nil
+    local job = state.work and state.work[tostring(r.id)] or nil
     local reqItem = (r.items[1] and r.items[1].name) or ""
     local chosen = job and job.chosen or ""
     local missing = job and job.missing or ""
@@ -872,14 +872,9 @@ end
 
 function UI:handleEvent(event, side, x, y)
   if event == "monitor_touch" then
-    local reqMonName = nil
-    if self.state.devices.monitorRequests then
-      reqMonName = peripheral.getName(self.state.devices.monitorRequests)
-    end
-    local statusMonName = nil
-    if self.state.devices.monitorStatus then
-      statusMonName = peripheral.getName(self.state.devices.monitorStatus)
-    end
+    local devices = type(self.state) == "table" and self.state.devices or nil
+    local reqMonName = devices and devices.monitorRequestsName or nil
+    local statusMonName = devices and devices.monitorStatusName or nil
     if side == reqMonName then
       local w, _ = self.state.devices.monitorRequests.getSize()
       if x < w / 2 then
@@ -943,7 +938,9 @@ end
 
 function UI:tick()
   local state = self.state
-  self:renderRequests(state, state.devices.monitorRequests)
+  local view = (type(state) == "table" and type(state.snapshot) == "table") and state.snapshot or state
+
+  self:renderRequests(view, state.devices.monitorRequests)
   if self._lastStatusView ~= self.statusView then
     self.buffers.status = {}
     self.sizes.status = nil
@@ -951,11 +948,11 @@ function UI:tick()
     self._lastStatusView = self.statusView
   end
   if self.statusView == "nocraft" then
-    self:renderNoCraft(state, state.devices.monitorStatus)
+    self:renderNoCraft(view, state.devices.monitorStatus)
   elseif self.statusView == "update" then
-    self:renderUpdateDetails(state, state.devices.monitorStatus)
+    self:renderUpdateDetails(view, state.devices.monitorStatus)
   else
-    self:renderStatus(state, state.devices.monitorStatus)
+    self:renderStatus(view, state.devices.monitorStatus)
   end
 end
 
