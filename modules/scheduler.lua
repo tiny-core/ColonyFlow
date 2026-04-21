@@ -1,3 +1,13 @@
+-- Scheduler/loops do sistema.
+-- Orquestra loops em paralelo:
+-- - engine.tick (logica + IO controlado)
+-- - ui.tick (render baseado em snapshot)
+-- - eventos (touch/terminate) e roteamento para UI
+-- - update check (background, com backoff)
+-- Invariantes:
+-- - loops devem usar pcall e nunca derrubar o programa por erro transitorio
+-- - respeitar intervalos de poll e budget para evitar travamentos
+
 local Util = require("lib.util")
 local UpdateCheck = require("modules.update_check")
 

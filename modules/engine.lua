@@ -1,3 +1,9 @@
+-- Engine: coracao do sistema.
+-- Faz o tick de processamento: le requests (MineColonies), decide acao (tiers/equivalencias),
+-- calcula faltante real (destino), aciona ME (craft/entrega) e atualiza `state.work`.
+-- Publica `state.snapshot` para a UI (UI nao deve tocar perifericos diretamente).
+-- Persistencia: salva jobs em disco para retomar apos reboot.
+
 local MineColonies = require("modules.minecolonies")
 local Inventory = require("modules.inventory")
 local Equivalence = require("modules.equivalence")
@@ -709,7 +715,8 @@ function Engine:tick()
 
   local requests = state.requests
   if type(requests) ~= "table" then requests = {} end
-  local shouldRefresh = (refreshMs == 0) or (not self._next_requests_refresh_at_ms) or (nowMs >= self._next_requests_refresh_at_ms)
+  local shouldRefresh = (refreshMs == 0) or (not self._next_requests_refresh_at_ms) or
+  (nowMs >= self._next_requests_refresh_at_ms)
   if shouldRefresh then
     local fresh, freshErr = self.mine:listRequests()
     if fresh == nil and isBudgetExceeded(freshErr) then
@@ -817,349 +824,349 @@ function Engine:tick()
       return false, nil
     end
 
-      local job = self.work[r.id]
-      if job and job.next_retry and job.next_retry > nowEpoch then
-        return false, nil
+    local job = self.work[r.id]
+    if job and job.next_retry and job.next_retry > nowEpoch then
+      return false, nil
+    end
+
+    local building, buildingResolved = resolveBuildingForRequest(buildings, citizens, r.target)
+    local candidate, why = pickCandidate(state, self.eq, self.tier, self.me, r, building, buildingResolved)
+    local work = self.work[r.id] or {}
+    work.request_state = r.state
+    work.target = r.target
+    work.requested = (r.accepted and r.accepted[1] and r.accepted[1].name) or
+        (r.items and r.items[1] and r.items[1].name) or nil
+
+    if not candidate then
+      if isBudgetExceeded(why) then
+        return nil, tostring(why)
       end
-
-      local building, buildingResolved = resolveBuildingForRequest(buildings, citizens, r.target)
-      local candidate, why = pickCandidate(state, self.eq, self.tier, self.me, r, building, buildingResolved)
-      local work = self.work[r.id] or {}
-      work.request_state = r.state
-      work.target = r.target
-      work.requested = (r.accepted and r.accepted[1] and r.accepted[1].name) or
-          (r.items and r.items[1] and r.items[1].name) or nil
-
-      if not candidate then
-        if isBudgetExceeded(why) then
-          return nil, tostring(why)
+      do
+        local reqItem = work.requested or ""
+        local needed = tonumber(r.requiredCount or r.count or 0) or 0
+        if snap and reqItem ~= "" then
+          local presentTotal = Inventory.countFromSnapshot(snap, reqItem)
+          local alloc = math.min(tonumber(available[reqItem] or 0) or 0, needed)
+          available[reqItem] = (tonumber(available[reqItem] or 0) or 0) - alloc
+          local missing = math.max(0, needed - alloc)
+          work.needed = needed
+          work.present_total = presentTotal
+          work.present = alloc
+          work.missing = missing
+        else
+          work.needed = needed
+          work.present_total = nil
+          work.present = 0
+          work.missing = needed
         end
-        do
-          local reqItem = work.requested or ""
-          local needed = tonumber(r.requiredCount or r.count or 0) or 0
-          if snap and reqItem ~= "" then
-            local presentTotal = Inventory.countFromSnapshot(snap, reqItem)
-            local alloc = math.min(tonumber(available[reqItem] or 0) or 0, needed)
-            available[reqItem] = (tonumber(available[reqItem] or 0) or 0) - alloc
-            local missing = math.max(0, needed - alloc)
-            work.needed = needed
-            work.present_total = presentTotal
-            work.present = alloc
-            work.missing = missing
-          else
-            work.needed = needed
-            work.present_total = nil
-            work.present = 0
-            work.missing = needed
-          end
-        end
-        if type(why) == "table" and why.reason == "blocked_by_tier" then
-          work.status = "blocked_by_tier"
-          work.err = "blocked_by_tier"
+      end
+      if type(why) == "table" and why.reason == "blocked_by_tier" then
+        work.status = "blocked_by_tier"
+        work.err = "blocked_by_tier"
+        work.next_retry = os.epoch("utc") + 15000
+      else
+        if why == "nao_craftavel" then
+          work.status = "waiting_retry"
+          work.err = "nao_craftavel"
           work.next_retry = os.epoch("utc") + 15000
         else
-          if why == "nao_craftavel" then
-            work.status = "waiting_retry"
-            work.err = "nao_craftavel"
-            work.next_retry = os.epoch("utc") + 15000
-          else
-            work.status = (why == "nao_suportado") and "unsupported" or "error"
-            work.err = why
-            work.next_retry = os.epoch("utc") + 15000
-          end
-        end
-        self.work[r.id] = work
-        if why == "nao_craftavel" then
-          state.logger:warn("Item não craftável agora; aguardando...", { request = r.id, item = work.requested })
-        else
-          state.logger:warn("Request sem candidato", { request = r.id, reason = why })
-        end
-        return true, nil
-      end
-
-      work.chosen = candidate.name
-      work.choice = why
-      work.needed = tonumber(candidate.count or r.requiredCount or r.count or 0) or 0
-
-      if not snap then
-        work.status = "waiting_retry"
-        work.err = snapErr
-        work.next_retry = nowEpoch + 5000
-        self.work[r.id] = work
-        state.logger:warn("Falha ao ler destino", { request = r.id, err = snapErr })
-        return true, nil
-      end
-
-      local presentTotal = Inventory.countFromSnapshot(snap, candidate.name)
-      local alloc = math.min(tonumber(available[candidate.name] or 0) or 0, work.needed)
-      available[candidate.name] = (tonumber(available[candidate.name] or 0) or 0) - alloc
-      local missing = math.max(0, work.needed - alloc)
-      work.present_total = presentTotal
-      work.present = alloc
-      work.missing = missing
-
-      if missing <= 0 then
-        work.status = "done"
-        self.work[r.id] = work
-        return true, nil
-      end
-
-      local meOnline, meErr = self.me:isOnline()
-      if isBudgetExceeded(meErr) then
-        return nil, tostring(meErr)
-      end
-      if not meOnline then
-        work.status = "waiting_retry"
-        local errStr = tostring(meErr or "")
-        if errStr == "degraded" then
-          work.err = "me_degraded"
-          local nextAt = state.health and tonumber(state.health.next_me_retry_at_ms) or nil
-          if nextAt and nextAt > os.epoch("utc") then
-            work.next_retry = nextAt
-          else
-            work.next_retry = nowEpoch + 5000
-          end
-          if not work.logged_me_degraded then
-            state.logger:warn("ME degraded; aguardando retry...", {
-              request = r.id,
-              next_retry_at_ms = work.next_retry
-            })
-            work.logged_me_degraded = true
-          end
-        else
-          work.err = "me_offline:" .. errStr
-          work.next_retry = nowEpoch + 5000
-          work.logged_me_degraded = nil
-          state.logger:warn("ME indisponível; aguardando...", { request = r.id, err = errStr })
-        end
-        self.work[r.id] = work
-        return true, nil
-      end
-      work.logged_me_degraded = nil
-
-      local meAmount, meAmountErr = getMeAmount(self.me, candidate.name)
-      if meAmount == nil and isBudgetExceeded(meAmountErr) then
-        return nil, tostring(meAmountErr)
-      end
-      local missingDest = missing
-      local craftQty = math.max(0, missingDest - meAmount)
-      local exportQty = math.min(meAmount, missingDest)
-
-      if exportQty > 0 then
-        local freeSpace, freeErr = Inventory.getFreeSpace(targetInv, candidate.name, candidate.maxStackSize, state)
-        if freeSpace == nil and isBudgetExceeded(freeErr) then
-          return nil, tostring(freeErr)
-        end
-        if not freeSpace then
-          work.status = "waiting_retry"
-          work.err = "erro_capacidade_destino:" .. tostring(freeErr or "")
-          work.next_retry = nowEpoch + 5000
-          state.logger:warn("Falha ao ler capacidade do destino", { request = r.id, err = freeErr })
-          return true, nil
-        end
-        if freeSpace <= 0 then
-          work.status = "waiting_retry"
-          work.err = "destino_cheio_capacidade"
-          work.next_retry = nowEpoch + 5000
-          state.logger:info("Destino cheio, aguardando espaço", { request = r.id, item = candidate.name })
-          exportQty = 0
-          craftQty = 0
-          return true, nil
-        end
-        exportQty = math.min(exportQty, freeSpace)
-      end
-
-      if craftQty > 0 then
-        local lockTtlSeconds = 15
-        local lockKey = tostring(candidate.name) .. "|" .. tostring(craftQty) .. "|" .. tostring(targetName)
-        local locked = state.cache:get("craft_lock", lockKey)
-        local crafting, craftErr = self.me:isCrafting({ name = candidate.name, count = craftQty })
-        if crafting == nil and isBudgetExceeded(craftErr) then
-          return nil, tostring(craftErr)
-        end
-        if crafting == true or locked then
-          work.status = "crafting"
-          work.craft = work.craft or {}
-          work.craft.key = lockKey
-          work.craft.last_seen = nowEpoch
-        else
-          local craftable, craftableErr = self.me:isCraftable({ name = candidate.name, count = craftQty })
-          if craftable == nil and isBudgetExceeded(craftableErr) then
-            return nil, tostring(craftableErr)
-          end
-          if craftable == false then
-            work.status = "waiting_retry"
-            work.err = "nao_craftavel:" .. tostring(craftableErr or "")
-            work.next_retry = nowEpoch + 15000
-            state.logger:warn("Item não craftável agora; aguardando...",
-              { request = r.id, item = candidate.name, err = tostring(craftableErr) })
-          else
-            local started, startErr = self.me:craftItem({ name = candidate.name, count = craftQty })
-            if started == nil and isBudgetExceeded(startErr) then
-              return nil, tostring(startErr)
-            end
-            if started == nil and startErr == nil then
-              started = true
-              startErr = "retorno_nil"
-            end
-            if started == true then
-              state.cache:set("craft_lock", lockKey, true, lockTtlSeconds)
-              state.stats.crafted = state.stats.crafted + 1
-              work.status = "crafting"
-              work.craft = work.craft or {}
-              work.craft.key = lockKey
-              work.craft.started_at = nowEpoch
-              work.craft.message = startErr
-            else
-              work.status = "waiting_retry"
-              work.err = "craft_falhou:" .. tostring(startErr or "")
-              work.next_retry = nowEpoch + 15000
-              state.logger:warn("Falha ao iniciar craft",
-                { request = r.id, item = candidate.name, err = tostring(startErr) })
-            end
-          end
+          work.status = (why == "nao_suportado") and "unsupported" or "error"
+          work.err = why
+          work.next_retry = os.epoch("utc") + 15000
         end
       end
-
-      if exportQty > 0 then
-        local exportMode = tostring(state.cfg:get("delivery", "export_mode", "auto") or "auto"):lower()
-        local exportDirection = tostring(state.cfg:get("delivery", "export_direction", "up") or "up"):lower()
-        local bufferName = tostring(state.cfg:get("delivery", "export_buffer_container", "") or "")
-
-        if exportMode == "auto" then
-          if self.me:supportsExportToPeripheral() then
-            exportMode = "peripheral"
-          elseif bufferName ~= "" then
-            exportMode = "buffer"
-          else
-            exportMode = "direction"
-          end
-        end
-
-        local beforeSnap, beforeErr = getDestinationSnapshot(state, targetName, targetInv, true)
-        if beforeSnap == nil and isBudgetExceeded(beforeErr) then
-          return nil, tostring(beforeErr)
-        end
-        if not beforeSnap then
-          work.status = "waiting_retry"
-          work.err = beforeErr
-          work.next_retry = nowEpoch + 5000
-          state.logger:warn("Falha ao ler destino antes da entrega", { request = r.id, err = beforeErr })
-        else
-          local exported, exportErr = nil, nil
-          local pushed, pushErr = nil, nil
-
-          if exportMode == "peripheral" then
-            exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, targetName)
-          elseif exportMode == "direction" then
-            exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, exportDirection)
-          elseif exportMode == "buffer" then
-            local bufferInv = resolveInvByName(bufferName)
-            if not bufferInv then
-              exported, exportErr = 0, "export_buffer_indisponivel:" .. bufferName
-            else
-              exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, exportDirection)
-              if exported == nil and isBudgetExceeded(exportErr) then
-                return nil, tostring(exportErr)
-              end
-              exported = tonumber(exported or 0) or 0
-              if exported > 0 then
-                pushed, pushErr = pushFromBuffer(bufferInv, targetName, candidate.name, exported, state)
-                if pushed ~= nil and isBudgetExceeded(pushErr) then
-                  return nil, tostring(pushErr)
-                end
-                pushed = tonumber(pushed or 0) or 0
-                if pushed <= 0 then
-                  exported, exportErr = 0, "push_buffer_falhou:" .. tostring(pushErr or "")
-                end
-              end
-            end
-          else
-            exported, exportErr = 0, "export_mode_invalido:" .. tostring(exportMode)
-          end
-
-          if exported == nil and isBudgetExceeded(exportErr) then
-            return nil, tostring(exportErr)
-          end
-          exported = tonumber(exported or 0) or 0
-          if exported <= 0 then
-            work.status = "waiting_retry"
-            work.err = "destino_cheio_ou_export_falhou:" .. tostring(exportErr or "")
-            work.next_retry = nowEpoch + 5000
-            state.logger:warn("Entrega não ocorreu; aguardando...",
-              { request = r.id, item = candidate.name, err = tostring(exportErr) })
-          else
-            local afterSnap, afterErr = getDestinationSnapshot(state, targetName, targetInv, true)
-            if afterSnap == nil and isBudgetExceeded(afterErr) then
-              return nil, tostring(afterErr)
-            end
-            if not afterSnap then
-              work.status = "waiting_retry"
-              work.err = "pos_entrega_snapshot_falhou:" .. tostring(afterErr or "")
-              work.next_retry = nowEpoch + 5000
-              state.logger:warn("Falha ao ler destino após entrega", { request = r.id, err = afterErr })
-            else
-              local beforeCount = Inventory.countFromSnapshot(beforeSnap, candidate.name)
-              local afterCount = Inventory.countFromSnapshot(afterSnap, candidate.name)
-              if afterCount < beforeCount then
-                work.status = "waiting_retry"
-                work.err = "pos_entrega_inconsistente"
-                work.next_retry = nowEpoch + 5000
-                state.logger:warn("Validação pós-entrega inconsistente; aguardando...",
-                  { request = r.id, item = candidate.name })
-              else
-                state.stats.delivered = state.stats.delivered + exported
-                work.delivered = (work.delivered or 0) + exported
-                work.present = afterCount
-                work.missing = math.max(0, work.needed - afterCount)
-                if work.missing <= 0 then
-                  work.status = "done"
-                elseif work.status ~= "crafting" and work.status ~= "waiting_retry" then
-                  work.status = "pending"
-                end
-              end
-            end
-          end
-        end
-      end
-
-      if not work.status then
-        work.status = "pending"
-      end
-
-      local reqItem = (r.items and r.items[1] and r.items[1].name) or ""
-      if candidate.name ~= reqItem then
-        if not work.logged_substitution then
-          state.stats.substitutions = state.stats.substitutions + 1
-          state.logger:info("Substituindo item solicitado", {
-            requestId = r.id,
-            reqItem = reqItem,
-            chosen = candidate.name
-          })
-          work.logged_substitution = true
-        end
-      end
-
       self.work[r.id] = work
-
-      if type(why) == "table" and type(why.equivalents) == "table" and #why.equivalents > 1 then
-        if not work.logged_equivalents then
-          state.logger:info("Equivalências conhecidas para o item escolhido", {
-            requestId = r.id,
-            requested = reqItem,
-            chosen = candidate.name,
-            target = r.target,
-            tier = why.tier,
-            class = why.class,
-            max_tier = why.max_tier,
-            resolved = why.max_tier_resolved,
-            source = why.max_tier_source,
-            building = why.building,
-          })
-          work.logged_equivalents = true
-        end
+      if why == "nao_craftavel" then
+        state.logger:warn("Item não craftável agora; aguardando...", { request = r.id, item = work.requested })
+      else
+        state.logger:warn("Request sem candidato", { request = r.id, reason = why })
       end
       return true, nil
+    end
+
+    work.chosen = candidate.name
+    work.choice = why
+    work.needed = tonumber(candidate.count or r.requiredCount or r.count or 0) or 0
+
+    if not snap then
+      work.status = "waiting_retry"
+      work.err = snapErr
+      work.next_retry = nowEpoch + 5000
+      self.work[r.id] = work
+      state.logger:warn("Falha ao ler destino", { request = r.id, err = snapErr })
+      return true, nil
+    end
+
+    local presentTotal = Inventory.countFromSnapshot(snap, candidate.name)
+    local alloc = math.min(tonumber(available[candidate.name] or 0) or 0, work.needed)
+    available[candidate.name] = (tonumber(available[candidate.name] or 0) or 0) - alloc
+    local missing = math.max(0, work.needed - alloc)
+    work.present_total = presentTotal
+    work.present = alloc
+    work.missing = missing
+
+    if missing <= 0 then
+      work.status = "done"
+      self.work[r.id] = work
+      return true, nil
+    end
+
+    local meOnline, meErr = self.me:isOnline()
+    if isBudgetExceeded(meErr) then
+      return nil, tostring(meErr)
+    end
+    if not meOnline then
+      work.status = "waiting_retry"
+      local errStr = tostring(meErr or "")
+      if errStr == "degraded" then
+        work.err = "me_degraded"
+        local nextAt = state.health and tonumber(state.health.next_me_retry_at_ms) or nil
+        if nextAt and nextAt > os.epoch("utc") then
+          work.next_retry = nextAt
+        else
+          work.next_retry = nowEpoch + 5000
+        end
+        if not work.logged_me_degraded then
+          state.logger:warn("ME degraded; aguardando retry...", {
+            request = r.id,
+            next_retry_at_ms = work.next_retry
+          })
+          work.logged_me_degraded = true
+        end
+      else
+        work.err = "me_offline:" .. errStr
+        work.next_retry = nowEpoch + 5000
+        work.logged_me_degraded = nil
+        state.logger:warn("ME indisponível; aguardando...", { request = r.id, err = errStr })
+      end
+      self.work[r.id] = work
+      return true, nil
+    end
+    work.logged_me_degraded = nil
+
+    local meAmount, meAmountErr = getMeAmount(self.me, candidate.name)
+    if meAmount == nil and isBudgetExceeded(meAmountErr) then
+      return nil, tostring(meAmountErr)
+    end
+    local missingDest = missing
+    local craftQty = math.max(0, missingDest - meAmount)
+    local exportQty = math.min(meAmount, missingDest)
+
+    if exportQty > 0 then
+      local freeSpace, freeErr = Inventory.getFreeSpace(targetInv, candidate.name, candidate.maxStackSize, state)
+      if freeSpace == nil and isBudgetExceeded(freeErr) then
+        return nil, tostring(freeErr)
+      end
+      if not freeSpace then
+        work.status = "waiting_retry"
+        work.err = "erro_capacidade_destino:" .. tostring(freeErr or "")
+        work.next_retry = nowEpoch + 5000
+        state.logger:warn("Falha ao ler capacidade do destino", { request = r.id, err = freeErr })
+        return true, nil
+      end
+      if freeSpace <= 0 then
+        work.status = "waiting_retry"
+        work.err = "destino_cheio_capacidade"
+        work.next_retry = nowEpoch + 5000
+        state.logger:info("Destino cheio, aguardando espaço", { request = r.id, item = candidate.name })
+        exportQty = 0
+        craftQty = 0
+        return true, nil
+      end
+      exportQty = math.min(exportQty, freeSpace)
+    end
+
+    if craftQty > 0 then
+      local lockTtlSeconds = 15
+      local lockKey = tostring(candidate.name) .. "|" .. tostring(craftQty) .. "|" .. tostring(targetName)
+      local locked = state.cache:get("craft_lock", lockKey)
+      local crafting, craftErr = self.me:isCrafting({ name = candidate.name, count = craftQty })
+      if crafting == nil and isBudgetExceeded(craftErr) then
+        return nil, tostring(craftErr)
+      end
+      if crafting == true or locked then
+        work.status = "crafting"
+        work.craft = work.craft or {}
+        work.craft.key = lockKey
+        work.craft.last_seen = nowEpoch
+      else
+        local craftable, craftableErr = self.me:isCraftable({ name = candidate.name, count = craftQty })
+        if craftable == nil and isBudgetExceeded(craftableErr) then
+          return nil, tostring(craftableErr)
+        end
+        if craftable == false then
+          work.status = "waiting_retry"
+          work.err = "nao_craftavel:" .. tostring(craftableErr or "")
+          work.next_retry = nowEpoch + 15000
+          state.logger:warn("Item não craftável agora; aguardando...",
+            { request = r.id, item = candidate.name, err = tostring(craftableErr) })
+        else
+          local started, startErr = self.me:craftItem({ name = candidate.name, count = craftQty })
+          if started == nil and isBudgetExceeded(startErr) then
+            return nil, tostring(startErr)
+          end
+          if started == nil and startErr == nil then
+            started = true
+            startErr = "retorno_nil"
+          end
+          if started == true then
+            state.cache:set("craft_lock", lockKey, true, lockTtlSeconds)
+            state.stats.crafted = state.stats.crafted + 1
+            work.status = "crafting"
+            work.craft = work.craft or {}
+            work.craft.key = lockKey
+            work.craft.started_at = nowEpoch
+            work.craft.message = startErr
+          else
+            work.status = "waiting_retry"
+            work.err = "craft_falhou:" .. tostring(startErr or "")
+            work.next_retry = nowEpoch + 15000
+            state.logger:warn("Falha ao iniciar craft",
+              { request = r.id, item = candidate.name, err = tostring(startErr) })
+          end
+        end
+      end
+    end
+
+    if exportQty > 0 then
+      local exportMode = tostring(state.cfg:get("delivery", "export_mode", "auto") or "auto"):lower()
+      local exportDirection = tostring(state.cfg:get("delivery", "export_direction", "up") or "up"):lower()
+      local bufferName = tostring(state.cfg:get("delivery", "export_buffer_container", "") or "")
+
+      if exportMode == "auto" then
+        if self.me:supportsExportToPeripheral() then
+          exportMode = "peripheral"
+        elseif bufferName ~= "" then
+          exportMode = "buffer"
+        else
+          exportMode = "direction"
+        end
+      end
+
+      local beforeSnap, beforeErr = getDestinationSnapshot(state, targetName, targetInv, true)
+      if beforeSnap == nil and isBudgetExceeded(beforeErr) then
+        return nil, tostring(beforeErr)
+      end
+      if not beforeSnap then
+        work.status = "waiting_retry"
+        work.err = beforeErr
+        work.next_retry = nowEpoch + 5000
+        state.logger:warn("Falha ao ler destino antes da entrega", { request = r.id, err = beforeErr })
+      else
+        local exported, exportErr = nil, nil
+        local pushed, pushErr = nil, nil
+
+        if exportMode == "peripheral" then
+          exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, targetName)
+        elseif exportMode == "direction" then
+          exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, exportDirection)
+        elseif exportMode == "buffer" then
+          local bufferInv = resolveInvByName(bufferName)
+          if not bufferInv then
+            exported, exportErr = 0, "export_buffer_indisponivel:" .. bufferName
+          else
+            exported, exportErr = self.me:exportItem({ name = candidate.name, count = exportQty }, exportDirection)
+            if exported == nil and isBudgetExceeded(exportErr) then
+              return nil, tostring(exportErr)
+            end
+            exported = tonumber(exported or 0) or 0
+            if exported > 0 then
+              pushed, pushErr = pushFromBuffer(bufferInv, targetName, candidate.name, exported, state)
+              if pushed ~= nil and isBudgetExceeded(pushErr) then
+                return nil, tostring(pushErr)
+              end
+              pushed = tonumber(pushed or 0) or 0
+              if pushed <= 0 then
+                exported, exportErr = 0, "push_buffer_falhou:" .. tostring(pushErr or "")
+              end
+            end
+          end
+        else
+          exported, exportErr = 0, "export_mode_invalido:" .. tostring(exportMode)
+        end
+
+        if exported == nil and isBudgetExceeded(exportErr) then
+          return nil, tostring(exportErr)
+        end
+        exported = tonumber(exported or 0) or 0
+        if exported <= 0 then
+          work.status = "waiting_retry"
+          work.err = "destino_cheio_ou_export_falhou:" .. tostring(exportErr or "")
+          work.next_retry = nowEpoch + 5000
+          state.logger:warn("Entrega não ocorreu; aguardando...",
+            { request = r.id, item = candidate.name, err = tostring(exportErr) })
+        else
+          local afterSnap, afterErr = getDestinationSnapshot(state, targetName, targetInv, true)
+          if afterSnap == nil and isBudgetExceeded(afterErr) then
+            return nil, tostring(afterErr)
+          end
+          if not afterSnap then
+            work.status = "waiting_retry"
+            work.err = "pos_entrega_snapshot_falhou:" .. tostring(afterErr or "")
+            work.next_retry = nowEpoch + 5000
+            state.logger:warn("Falha ao ler destino após entrega", { request = r.id, err = afterErr })
+          else
+            local beforeCount = Inventory.countFromSnapshot(beforeSnap, candidate.name)
+            local afterCount = Inventory.countFromSnapshot(afterSnap, candidate.name)
+            if afterCount < beforeCount then
+              work.status = "waiting_retry"
+              work.err = "pos_entrega_inconsistente"
+              work.next_retry = nowEpoch + 5000
+              state.logger:warn("Validação pós-entrega inconsistente; aguardando...",
+                { request = r.id, item = candidate.name })
+            else
+              state.stats.delivered = state.stats.delivered + exported
+              work.delivered = (work.delivered or 0) + exported
+              work.present = afterCount
+              work.missing = math.max(0, work.needed - afterCount)
+              if work.missing <= 0 then
+                work.status = "done"
+              elseif work.status ~= "crafting" and work.status ~= "waiting_retry" then
+                work.status = "pending"
+              end
+            end
+          end
+        end
+      end
+    end
+
+    if not work.status then
+      work.status = "pending"
+    end
+
+    local reqItem = (r.items and r.items[1] and r.items[1].name) or ""
+    if candidate.name ~= reqItem then
+      if not work.logged_substitution then
+        state.stats.substitutions = state.stats.substitutions + 1
+        state.logger:info("Substituindo item solicitado", {
+          requestId = r.id,
+          reqItem = reqItem,
+          chosen = candidate.name
+        })
+        work.logged_substitution = true
+      end
+    end
+
+    self.work[r.id] = work
+
+    if type(why) == "table" and type(why.equivalents) == "table" and #why.equivalents > 1 then
+      if not work.logged_equivalents then
+        state.logger:info("Equivalências conhecidas para o item escolhido", {
+          requestId = r.id,
+          requested = reqItem,
+          chosen = candidate.name,
+          target = r.target,
+          tier = why.tier,
+          class = why.class,
+          max_tier = why.max_tier,
+          resolved = why.max_tier_resolved,
+          source = why.max_tier_source,
+          building = why.building,
+        })
+        work.logged_equivalents = true
+      end
+    end
+    return true, nil
   end
 
   local n = type(requests) == "table" and #requests or 0

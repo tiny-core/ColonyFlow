@@ -1,3 +1,11 @@
+-- Integracao com MineColonies via Advanced Peripherals (colonyIntegrator).
+-- Responsabilidades:
+-- - Ler requests/work orders e normalizar payload cru para um formato interno estavel
+-- - Aplicar limites de budget e medir IO (para observabilidade/performance)
+-- Invariantes:
+-- - Chamar metodos do integrator apenas via wrapper (call) para safeCall + budget + metricas
+-- - Gerar um id estavel quando o MineColonies nao fornecer r.id (hash do conteudo relevante)
+
 local Util = require("lib.util")
 
 local Mine = {}

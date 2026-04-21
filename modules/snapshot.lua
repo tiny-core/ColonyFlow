@@ -1,3 +1,9 @@
+-- Snapshot: contrato de dados entre Engine e UI.
+-- Objetivo: a UI renderiza apenas `state.snapshot` (sem IO), reduzindo acoplamento e flicker.
+-- Invariantes:
+-- - Snapshot.build(state) nao pode acessar `peripheral`/`fs`/`http` (somente copia/normaliza dados)
+-- - Estrutura deve ser estavel (mesmas chaves sempre presentes, com defaults)
+
 local Util = require("lib.util")
 
 local Snapshot = {}

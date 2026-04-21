@@ -1,3 +1,11 @@
+-- Bootstrap do ColonyFlow.
+-- Responsabilidades:
+-- - Garantir config.ini (defaults) e inicializar logger/cache
+-- - Descobrir/validar perifericos essenciais (MineColonies, ME, monitores, destinos)
+-- - Montar o `state` canonico (cfg/logger/cache/devices/stats/metrics/work/snapshot)
+-- - Instanciar Engine + UI e delegar o loop ao Scheduler
+-- Invariante: manter apenas `startup.lua` e `config.ini` na raiz; o resto vive em subpastas.
+
 local Config = require("lib.config")
 local Logger = require("lib.logger")
 local Cache = require("lib.cache")

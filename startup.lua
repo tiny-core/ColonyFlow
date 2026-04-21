@@ -1,3 +1,11 @@
+-- Ponto de entrada do sistema (CC: Tweaked).
+-- Suporta modos operacionais via argumento:
+-- - `startup test`   -> roda o harness em tests/run.lua
+-- - `startup map`    -> abre o editor de mapeamentos
+-- - `startup config` -> abre a CLI de configuracao
+-- - `startup doctor` -> diagnostico rapido do ambiente
+-- Sem argumento: carrega lib/bootstrap.lua e inicia o loop principal.
+
 local args = { ... }
 
 if shell and type(shell.setDir) == "function" then
