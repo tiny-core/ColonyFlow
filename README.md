@@ -19,6 +19,13 @@ Automação in-world (Lua) para **CC: Tweaked** em um **Advanced Computer**, int
 - **Testes** via `startup test`
 - **Instalador/atualizador in-game** via HTTP (raw Git) com update seguro e rollback
 
+## Documentacao
+
+- [docs/LEIA-ME-DO-CODIGO.md](docs/LEIA-ME-DO-CODIGO.md)
+- [docs/SUMMARY.md](docs/SUMMARY.md)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/PITFALLS.md](docs/PITFALLS.md)
+
 ## Pré-requisitos (Mods/Periféricos)
 
 - **CC: Tweaked**
