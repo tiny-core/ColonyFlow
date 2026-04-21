@@ -19,7 +19,7 @@ Automação in-world (Lua) para **CC: Tweaked** em um **Advanced Computer**, int
 - **Testes** via `startup test`
 - **Instalador/atualizador in-game** via HTTP (raw Git) com update seguro e rollback
 
-## Documentacao
+## Documentação
 
 - [docs/LEIA-ME-DO-CODIGO.md](docs/LEIA-ME-DO-CODIGO.md)
 - [docs/SUMMARY.md](docs/SUMMARY.md)
@@ -119,7 +119,7 @@ startup test
 startup map
 ```
 
-### Configuracao
+### Configuração
 
 ```bash
 startup config
@@ -150,9 +150,9 @@ Para bump de versão e atualização do manifesto:
 1. Rode `node tools/gen_manifest.js X.Y.Z` (regenera `manifest.json` com lista ordenada e `size`)
 2. Suba commit com `manifest.json` atualizado
 
-## Licenca
+## Licença
 
-Este projeto e distribuido sob a **GNU General Public License v3.0 (GPL-3.0)**.
+Este projeto é distribuído sob a **GNU General Public License v3.0 (GPL-3.0)**.
 
 - Veja: `LICENSE`
 - Copyright: `COPYRIGHT`
