@@ -119,6 +119,12 @@ startup test
 startup map
 ```
 
+### Configuracao
+
+```bash
+startup config
+```
+
 ## Configuração (alto nível)
 
 - `config.ini`: parâmetros de operação, periféricos, timeouts, UI/logs
