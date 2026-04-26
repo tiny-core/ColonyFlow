@@ -400,5 +400,5 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 20-01-PLAN.md — Logica de roteamento: defaults [delivery_routing] em config.lua + resolveRoutedTarget + roteamento per-request + health display em engine.lua
+- [x] 20-01-PLAN.md — Logica de roteamento: defaults [delivery_routing] em config.lua + resolveRoutedTarget + roteamento per-request + health display em engine.lua
 - [ ] 20-02-PLAN.md — Config CLI: menu delivery_routing em config_cli.lua + 4 testes de roteamento em tests/run.lua

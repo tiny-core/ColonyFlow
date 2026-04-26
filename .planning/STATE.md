@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-17)
 
 **Core value:** Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColonies e entrega do item correto, craftando somente o necessário.
-**Current focus:** Phase 19 — documentacao-didatica-comentarios-pt
+**Current focus:** Phase 20 — roteamento-multi-destino
 
 ## Current Position
 
-Phase: 19 (documentacao-didatica-comentarios-pt) — EXECUTING
-Plan: 1 of 1
-Status: Phase complete — ready for verification
-Last activity: 2026-04-21
+Phase: 20 (roteamento-multi-destino) — EXECUTING
+Plan: 1 of 3
+Status: Plan 01 complete — executing plan 02
+Last activity: 2026-04-26
 
-Progress: [████████░░] 89%
+Progress: [████████░░] 73%
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
 - Phase 1: Roadmap padronizado para compatibilidade com ferramentas GSD
+- Phase 20 P01: resolveRoutedTarget por classe + ctx per-request no tick + health "Targets: X/Y online"
 
 ### Blockers/Concerns
 
@@ -79,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-26T11:00:01.945Z
-Stopped at: context exhaustion at 78% (2026-04-26)
+Last session: 2026-04-26T21:25:00Z
+Stopped at: Completed 20-01-PLAN.md
 Resume file: None
