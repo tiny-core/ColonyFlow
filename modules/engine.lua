@@ -178,6 +178,20 @@ local function resolveTarget(cfg)
   return nil, nil
 end
 
+-- Resolve o inventario de destino roteado por classe de item (D-01, D-02, D-03).
+-- Se a classe do item tiver periferico configurado e online, usa esse periferico.
+-- Caso contrario, cai em resolveTarget(cfg) (default_target_container).
+local function resolveRoutedTarget(cfg, itemName)
+  local class = guessClass(itemName)
+  if class then
+    local routedName = cfg:get("delivery_routing", class, "")
+    if routedName ~= "" and peripheral.isPresent(routedName) then
+      return routedName, peripheral.wrap(routedName)
+    end
+  end
+  return resolveTarget(cfg)   -- fallback: D-01 (offline), D-02 (nao mapeado), D-03 (default offline)
+end
+
 local function resolveInvByName(name)
   if not name or name == "" then return nil end
   if not peripheral.isPresent(name) then return nil end
@@ -634,20 +648,30 @@ local function buildPeripheralHealth(state, me)
   end
   local bufferValue, bufferLevel = deviceStatus(resolveInvByName(resolvePeripheralName(bufferName)), bufferName)
 
-  local targetValue, targetLevel = "NA", "unknown"
-  if cfg and type(cfg.getList) == "function" and type(peripheral) == "table" and type(peripheral.isPresent) == "function" then
-    local _, targetInv = resolveTarget(cfg)
-    if targetInv then
-      targetValue, targetLevel = "Online", "ok"
-    else
-      targetValue, targetLevel = "Offline", "bad"
+  local ROUTING_CLASSES = {
+    "armor_helmet","armor_chestplate","armor_leggings","armor_boots",
+    "tool_pickaxe","tool_shovel","tool_axe","tool_hoe","tool_sword","tool_bow","tool_shield"
+  }
+  local targetsTotal, targetsOnline = 0, 0
+  if cfg and type(cfg.get) == "function" and type(peripheral) == "table" and type(peripheral.isPresent) == "function" then
+    -- contar default_target_container (D-07)
+    local defaultName = trim(cfg:get("delivery", "default_target_container", ""))
+    if defaultName ~= "" then
+      targetsTotal = targetsTotal + 1
+      if peripheral.isPresent(defaultName) then targetsOnline = targetsOnline + 1 end
     end
-  elseif cfg then
-    local raw = trim(type(cfg.get) == "function" and cfg:get("delivery", "default_target_container", "") or "")
-    if raw ~= "" then
-      targetValue, targetLevel = "Offline", "bad"
+    -- contar destinos roteados nao-vazios (D-07)
+    for _, cls in ipairs(ROUTING_CLASSES) do
+      local rn = trim(cfg:get("delivery_routing", cls, ""))
+      if rn ~= "" then
+        targetsTotal = targetsTotal + 1
+        if peripheral.isPresent(rn) then targetsOnline = targetsOnline + 1 end
+      end
     end
   end
+  local targetsValue = (targetsTotal > 0) and (targetsOnline .. "/" .. targetsTotal .. " online") or "NA"
+  local targetsLevel = (targetsTotal == 0 or targetsOnline == 0) and "bad" or
+                       (targetsOnline < targetsTotal and "warn" or "ok")
 
   local colonyDev, colonyName = refreshDeviceFromConfig("colonyIntegrator", "colonyName", "colony_integrator")
   local colonyValue, colonyLevel = deviceStatus(colonyDev, colonyName)
@@ -656,10 +680,10 @@ local function buildPeripheralHealth(state, me)
   local _ = listFromCfg
 
   return {
-    { label = "ME Bridge", value = meValue,     level = meLevel },
-    { label = "Colony",    value = colonyValue, level = colonyLevel },
-    { label = "Buffer",    value = bufferValue, level = bufferLevel },
-    { label = "Target",    value = targetValue, level = targetLevel },
+    { label = "ME Bridge", value = meValue,      level = meLevel },
+    { label = "Colony",    value = colonyValue,  level = colonyLevel },
+    { label = "Buffer",    value = bufferValue,  level = bufferLevel },
+    { label = "Targets",   value = targetsValue, level = targetsLevel },
   }
 end
 
@@ -1155,16 +1179,18 @@ function Engine:tick()
   end
   state.colonyStats = colonyStats
 
-  local targetName, targetInv = resolveTarget(state.cfg)
-  if not targetInv then
+  -- Verificacao de saude: se nem o default_target_container esta online, aborta o tick
+  local defaultTargetName, defaultTargetInv = resolveTarget(state.cfg)
+  if not defaultTargetInv then
     self:_markAllWaitingRetry(requests, "destino_indisponivel")
     publishSnapshot(state)
     self:_persistWorkMaybe()
     return
   end
 
-  local snap, snapErr = getDestinationSnapshot(state, targetName, targetInv, false)
-  if snap == nil and isBudgetExceeded(snapErr) then
+  -- Snapshot pre-calculado do destino default (reutilizado quando nao ha rota especifica)
+  local defaultSnap, defaultSnapErr = getDestinationSnapshot(state, defaultTargetName, defaultTargetInv, false)
+  if defaultSnap == nil and isBudgetExceeded(defaultSnapErr) then
     publishSnapshot(state)
     self:_persistWorkMaybe()
     return
@@ -1184,19 +1210,17 @@ function Engine:tick()
     return
   end
 
+  -- available e compartilhado entre requests do mesmo tick para evitar over-allocation
   local available = {}
-  if type(snap) == "table" then
-    for k, v in pairs(snap) do available[k] = tonumber(v or 0) or 0 end
+  if type(defaultSnap) == "table" then
+    for k, v in pairs(defaultSnap) do available[k] = tonumber(v or 0) or 0 end
   end
 
-  local ctx = {
+  -- ctx base — sera sobrescrito por campos per-request antes de _processRequest
+  local baseCtx = {
     available  = available,
     buildings  = buildings,
     citizens   = citizens,
-    snap       = snap,
-    snapErr    = snapErr,
-    targetName = targetName,
-    targetInv  = targetInv,
     nowEpoch   = os.epoch("utc"),
   }
 
@@ -1215,6 +1239,33 @@ function Engine:tick()
       local currentIdx = idx
       idx = idx < n and idx + 1 or 1
       scanned = scanned + 1
+
+      -- Resolve destino especifico para este request (D-01, D-02, D-05)
+      local reqItemName = (r.accepted and r.accepted[1] and r.accepted[1].name)
+                       or (r.items and r.items[1] and r.items[1].name)
+                       or ""
+      local routedName, routedInv = resolveRoutedTarget(state.cfg, reqItemName)
+      local routedSnap, routedSnapErr
+      if routedName == defaultTargetName then
+        -- Mesmo destino que o default: reutiliza snapshot (D-04, D-05)
+        routedSnap    = defaultSnap
+        routedSnapErr = defaultSnapErr
+      else
+        -- Destino roteado diferente: snapshot on-demand com cache por nome (D-04, D-05)
+        routedSnap, routedSnapErr = getDestinationSnapshot(state, routedName or defaultTargetName,
+                                                            routedInv or defaultTargetInv, false)
+      end
+
+      local ctx = {
+        available  = baseCtx.available,
+        buildings  = baseCtx.buildings,
+        citizens   = baseCtx.citizens,
+        snap       = routedSnap,
+        snapErr    = routedSnapErr,
+        targetName = routedName or defaultTargetName,
+        targetInv  = routedInv or defaultTargetInv,
+        nowEpoch   = baseCtx.nowEpoch,
+      }
 
       local did, budgetErr = self:_processRequest(r, ctx)
       if did == nil and budgetErr ~= nil then
