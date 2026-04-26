@@ -66,10 +66,9 @@ local function call(state, bridge, method, ...)
   if not bridge or type(bridge[method]) ~= "function" then
     return nil, "Método indisponível: " .. tostring(method)
   end
-  if state and state.budget and type(state.budget.tryConsume) == "function" then
-    if not state.budget:tryConsume(state, "me", 1, "me") then
-      return nil, "budget_exceeded:me"
-    end
+  if state and state.budget then
+    local ok, err = state.budget:consume(state, "me")
+    if not ok then return nil, err end
   end
   bumpIo(state, method)
   local ok, res1, res2 = Util.safeCall(bridge[method], ...)

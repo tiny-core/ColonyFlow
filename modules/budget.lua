@@ -75,6 +75,14 @@ function Budget:beginTick(state)
   end
 end
 
+function Budget:consume(state, group, amount)
+  group = tostring(group or "")
+  if not self:tryConsume(state, group, amount or 1, group) then
+    return false, "budget_exceeded:" .. group
+  end
+  return true
+end
+
 function Budget:tryConsume(state, group, amount, reasonKey)
   if self.enabled ~= true then return true end
 

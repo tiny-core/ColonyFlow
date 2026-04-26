@@ -7,6 +7,7 @@ local DEFAULT_INI = [[
 [core]
 poll_interval_seconds=2
 ui_refresh_seconds=1
+peripheral_watchdog_seconds=60
 log_level=INFO
 log_dir=logs
 log_max_files=10

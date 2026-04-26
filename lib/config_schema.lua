@@ -65,6 +65,7 @@ function M.validateUpdates(updatesBySection)
   if type(core) == "table" then
     validateNumber(errors, "core.poll_interval_seconds", core.poll_interval_seconds, 0, nil)
     validateNumber(errors, "core.ui_refresh_seconds", core.ui_refresh_seconds, 0, nil)
+    validateNumber(errors, "core.peripheral_watchdog_seconds", core.peripheral_watchdog_seconds, nil, 0)
     validateEnum(errors, "core.log_level", core.log_level, LOG_LEVELS, function(s) return tostring(s):upper() end)
     validateNumber(errors, "core.log_max_files", core.log_max_files, nil, 1)
     validateNumber(errors, "core.log_max_kb", core.log_max_kb, nil, 1)

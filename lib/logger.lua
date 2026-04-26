@@ -103,14 +103,12 @@ function Logger:cleanupOldFiles()
   for _, f in ipairs(logs) do
     if remaining <= maxFiles then break end
     local p = fs.combine(self.dir, f)
-    if current and p == current then
-      goto continue
+    if not (current and p == current) then
+      if fs.exists(p) then
+        fs.delete(p)
+        remaining = remaining - 1
+      end
     end
-    if fs.exists(p) then
-      fs.delete(p)
-      remaining = remaining - 1
-    end
-    ::continue::
   end
 end
 

@@ -10,6 +10,15 @@
 
 local Util = require("lib.util")
 local UpdateCheck = require("modules.update_check")
+local Peripherals = require("modules.peripherals")
+
+local DEVICE_KEYS = {
+  "colonyIntegrator", "colonyName",
+  "meBridge", "meName",
+  "modem", "modemName",
+  "monitorRequests", "monitorRequestsName",
+  "monitorStatus", "monitorStatusName",
+}
 
 local M = {}
 
@@ -86,7 +95,29 @@ function M.run(state, engine, ui)
   local uiInterval = state.cfg:getNumber("core", "ui_refresh_seconds", 1)
 
   local function loopEngine()
+    local watchdogSeconds = state.cfg:getNumber("core", "peripheral_watchdog_seconds", 60)
+    local lastRediscoverMs = Util.nowUtcMs()
+
     while true do
+      if watchdogSeconds > 0 then
+        local nowMs = Util.nowUtcMs()
+        if (nowMs - lastRediscoverMs) >= (watchdogSeconds * 1000) then
+          local newDevices = Peripherals.discover(state.cfg, state.logger)
+          local changed = (state.devices.meBridge ~= newDevices.meBridge)
+                       or (state.devices.colonyIntegrator ~= newDevices.colonyIntegrator)
+          for _, k in ipairs(DEVICE_KEYS) do
+            state.devices[k] = newDevices[k]
+          end
+          if changed then
+            state.logger:warn("Watchdog: periféricos atualizados", {
+              me = newDevices.meBridge ~= nil,
+              mc = newDevices.colonyIntegrator ~= nil,
+            })
+          end
+          lastRediscoverMs = nowMs
+        end
+      end
+
       local t0 = Util.nowUtcMs()
       local ok, err = pcall(engine.tick, engine)
       local dt = Util.nowUtcMs() - t0

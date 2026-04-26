@@ -512,6 +512,46 @@ local tests = {
     assertEq(type(issues), "table", "issues deveria ser uma tabela")
     assertEq(#issues > 0, true, "deveria ter reportado problemas por nao achar perifericos")
   end },
+  { "watchdog_atualiza_state_devices_quando_periferico_desaparece", function()
+    local Peripherals = require("modules.peripherals")
+    local oldPeripheral = peripheral
+    local bridgePresent = true
+    peripheral = {
+      find = function(t)
+        if t == "meBridge" or t == "me_bridge" then
+          if bridgePresent then return { getName = function() return "me_bridge_0" end } end
+        end
+        return nil
+      end,
+      wrap = function(name)
+        if name == "me_bridge_0" and bridgePresent then return { fake = true } end
+        return nil
+      end,
+      getNames = function() return {} end,
+      isPresent = function(name)
+        if name == "me_bridge_0" then return bridgePresent end
+        return false
+      end,
+      getName = function(dev) return "me_bridge_0" end,
+    }
+
+    local warns = {}
+    local logger = {
+      warn = function(_, msg, ctx) table.insert(warns, msg) end,
+      info = function() end,
+      error = function() end,
+    }
+    local cfg = makeCfg({ peripherals = { me_bridge = "me_bridge_0" }, core = { log_dir = "logs" } })
+
+    local d1 = Peripherals.discover(cfg, logger)
+    assertEq(d1.meBridge ~= nil, true, "meBridge deveria estar presente inicialmente")
+
+    bridgePresent = false
+    local d2 = Peripherals.discover(cfg, logger)
+    assertEq(d2.meBridge, nil, "meBridge deveria desaparecer apos simulate de queda")
+
+    peripheral = oldPeripheral
+  end },
   { "equivalencias_basicas", function()
     local eq = require("modules.equivalence").new({ cache = { get = function() end, set = function() end } })
     local list = eq:getEquivalents("minecraft:iron_chestplate")
@@ -2526,6 +2566,20 @@ local tests = {
     assertEq(w3_2, nil)
     assertEq(type(w3), "table")
     assertEq(invReads >= 1, true)
+  end },
+  { "budget_consume_retorna_err_string_quando_excedido", function()
+    local Budget = require("modules.budget")
+    local cfg = makeCfg({ scheduler_budget = { enabled = "true", me_calls_per_tick = "1" } })
+    local state = { throttle = {}, budget = Budget.new(cfg) }
+    state.budget:beginTick(state)
+
+    local ok1, err1 = state.budget:consume(state, "me")
+    local ok2, err2 = state.budget:consume(state, "me")
+
+    assertEq(ok1, true)
+    assertEq(err1, nil)
+    assertEq(ok2, false)
+    assertEq(err2, "budget_exceeded:me")
   end },
 }
 

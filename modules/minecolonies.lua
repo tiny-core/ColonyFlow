@@ -34,10 +34,9 @@ local function call(state, integrator, method, ...)
   if not integrator or type(integrator[method]) ~= "function" then
     return nil, "method_missing:" .. tostring(method)
   end
-  if state and state.budget and type(state.budget.tryConsume) == "function" then
-    if not state.budget:tryConsume(state, "mc", 1, "mc") then
-      return nil, "budget_exceeded:mc"
-    end
+  if state and state.budget then
+    local ok, err = state.budget:consume(state, "mc")
+    if not ok then return nil, err end
   end
   bumpIo(state, method)
   local ok, res1, res2 = Util.safeCall(integrator[method], ...)
@@ -167,7 +166,7 @@ function Mine:listRequests()
 
         if type(resources) == "table" then
           for _, res in pairs(resources) do
-            if type(res) ~= "table" then goto continue_res end
+            if type(res) == "table" then
             local needed = tonumber(res.needs or res.needed or res.count or res.amount or 0) or 0
 
             local available = 0
@@ -228,7 +227,7 @@ function Mine:listRequests()
               }))
               added = added + 1
             end
-            ::continue_res::
+            end -- type(res) == "table"
           end
         end
       end
@@ -289,9 +288,7 @@ function Mine:listCitizens()
 
   local out = {}
   for _, c in ipairs(result) do
-    if type(c) ~= "table" then
-      goto continue
-    end
+    if type(c) == "table" then
     local work = nil
     if type(c.work) == "table" then
       work = {
@@ -307,7 +304,7 @@ function Mine:listCitizens()
       state = c.state,
       location = c.location,
     })
-    ::continue::
+    end -- type(c) == "table"
   end
   return out
 end

@@ -188,10 +188,9 @@ local function pushFromBuffer(bufferInv, targetName, itemName, qty, state)
   if not bufferInv then return 0, "buffer_indisponivel" end
   if type(bufferInv.list) ~= "function" then return 0, "buffer_sem_list" end
   if type(bufferInv.pushItems) ~= "function" then return 0, "buffer_sem_pushItems" end
-  if state and state.budget and type(state.budget.tryConsume) == "function" then
-    if not state.budget:tryConsume(state, "inv", 1, "inv") then
-      return 0, "budget_exceeded:inv"
-    end
+  if state and state.budget then
+    local ok, err = state.budget:consume(state, "inv")
+    if not ok then return 0, err end
   end
   local list = bufferInv.list()
   if type(list) ~= "table" then return 0, "buffer_list_invalida" end
@@ -200,10 +199,9 @@ local function pushFromBuffer(bufferInv, targetName, itemName, qty, state)
   for slot, stack in pairs(list) do
     if remaining <= 0 then break end
     if type(stack) == "table" and stack.name == itemName then
-      if state and state.budget and type(state.budget.tryConsume) == "function" then
-        if not state.budget:tryConsume(state, "inv", 1, "inv") then
-          return movedTotal, "budget_exceeded:inv"
-        end
+      if state and state.budget then
+        local ok, err = state.budget:consume(state, "inv")
+        if not ok then return movedTotal, err end
       end
       local moved = bufferInv.pushItems(targetName, slot, remaining)
       moved = tonumber(moved or 0) or 0
@@ -495,12 +493,7 @@ local function pickCandidate(state, eq, tier, me, request, building, buildingRes
 
   if not best then
     if #blockedByTier > 0 then
-      return nil, {
-        reason = "blocked_by_tier",
-        building = building and
-            { name = building.name, type = building.type, level = building.level } or nil,
-        blocked = blockedByTier
-      }
+      return nil, "blocked_by_tier"
     end
     if #blockedByCraft > 0 then
       return nil, "nao_craftavel"
@@ -779,7 +772,7 @@ function Engine:_handleNoCandidate(work, r, why, ctx)
     work.missing = needed
   end
 
-  if type(why) == "table" and why.reason == "blocked_by_tier" then
+  if why == "blocked_by_tier" then
     work.status = "blocked_by_tier"
     work.err = "blocked_by_tier"
     work.next_retry = os.epoch("utc") + 15000
