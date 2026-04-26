@@ -327,6 +327,11 @@ function Config.patchIniText(linesOrText, updatesBySection)
   return { text = table.concat(outLines, "\n"), changes = changes }
 end
 
+function Config:validate()
+  local Schema = require("lib.config_schema")
+  return Schema.validateUpdates(self.data)
+end
+
 function Config.patchIniFileAtomic(path, updatesBySection, opts)
   opts = type(opts) == "table" and opts or {}
   local backupDir = tostring(opts.backup_dir or "data/backups")

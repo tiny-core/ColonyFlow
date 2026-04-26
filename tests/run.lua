@@ -2249,6 +2249,203 @@ local tests = {
     assertEq(state.throttle.active, true)
     assertEq(type(state.throttle.reason), "string")
   end },
+  { "util_normalizeName_transforma_corretamente", function()
+    local Util = require("lib.util")
+    assertEq(Util.normalizeName("Hello World"),     "hello world")
+    assertEq(Util.normalizeName("  SPACES  "),      "spaces")
+    assertEq(Util.normalizeName("Multiple   Spaces"), "multiple spaces")
+    assertEq(Util.normalizeName(nil),               "")
+    assertEq(Util.normalizeName("Minecraft:Iron_Pickaxe"), "minecraft:iron_pickaxe")
+  end },
+  { "config_validate_aceita_config_valida", function()
+    local Config = require("lib.config")
+    local oldFs = fs
+    local ini = table.concat({
+      "[core]",
+      "log_level=INFO",
+      "poll_interval_seconds=2",
+      "[delivery]",
+      "export_mode=auto",
+      "export_direction=up",
+      "",
+    }, "\n")
+    fs = {
+      exists = function(path) return path == "test.ini" end,
+      open = function(path, mode)
+        if mode == "r" then
+          return { readAll = function() return ini end, close = function() end }
+        end
+      end,
+    }
+    local cfg = Config.load("test.ini")
+    local result = cfg:validate()
+    fs = oldFs
+    assertEq(result.ok, true)
+    assertEq(#result.errors, 0, "config valida nao deveria ter erros")
+  end },
+  { "config_validate_rejeita_invalidos", function()
+    local Config = require("lib.config")
+    local oldFs = fs
+    local ini = table.concat({
+      "[core]",
+      "log_level=NAO_VALIDO",
+      "poll_interval_seconds=-5",
+      "[delivery]",
+      "export_mode=modo_invalido",
+      "",
+    }, "\n")
+    fs = {
+      exists = function(path) return path == "test.ini" end,
+      open = function(path, mode)
+        if mode == "r" then
+          return { readAll = function() return ini end, close = function() end }
+        end
+      end,
+    }
+    local cfg = Config.load("test.ini")
+    local result = cfg:validate()
+    fs = oldFs
+    assertEq(result.ok, false)
+    assertEq(#result.errors >= 2, true, "deveria detectar log_level e export_mode invalidos")
+  end },
+  { "engine_todos_itens_blocked_by_tier", function()
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "lowest" },
+      progression = { enforce_building_gating = "true" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline = function() return true end,
+          getItem = function(f) return { name = f.name, amount = 1, isCraftable = true } end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              {
+                id = 600,
+                state = "requested",
+                target = "builder",
+                count = 1,
+                items = {
+                  { name = "minecraft:netherite_pickaxe", count = 1 },
+                  { name = "minecraft:diamond_pickaxe",   count = 1 },
+                },
+              },
+            }
+          end,
+          getBuildings = function()
+            return { { name = "builder", type = "builder", level = 1, built = true } }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+    peripheral = oldPeripheral
+
+    -- netherite e diamond sao > iron (max para level 1) → todos bloqueados por tier
+    assertEq(state.work["600"].status, "blocked_by_tier")
+    assertEq(state.work["600"].err, "blocked_by_tier")
+    assertEq(type(state.work["600"].next_retry), "number")
+  end },
+  { "engine_request_na_janela_retry_e_ignorado", function()
+    local Engine = require("modules.engine")
+    local Util = require("lib.util")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local exportCalls = 0
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      substitution = { vanilla_first = "true", allow_unmapped_mods = "true", tier_preference = "lowest" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline = function() return true end,
+          getItem = function(f) return { name = f.name, amount = 5, isCraftable = false } end,
+          exportItemToPeripheral = function(f, t)
+            exportCalls = exportCalls + 1
+            return f.count, nil
+          end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 700, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+
+    -- Simula request já com next_retry no futuro
+    engine.work["700"] = {
+      status = "waiting_retry",
+      err = "erro_anterior",
+      next_retry = Util.nowUtcMs() + 60000,
+    }
+
+    engine:tick()
+    peripheral = oldPeripheral
+
+    -- request ainda deve estar waiting_retry; nenhuma entrega deve ter ocorrido
+    assertEq(state.work["700"].status, "waiting_retry")
+    assertEq(state.work["700"].err, "erro_anterior", "err nao deve ter sido sobrescrito")
+    assertEq(exportCalls, 0, "nao deve exportar quando dentro da janela de retry")
+  end },
   { "engine_cursor_respects_requests_per_tick", function()
     local Engine = require("modules.engine")
     local Cache = require("lib.cache")

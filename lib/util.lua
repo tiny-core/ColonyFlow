@@ -4,6 +4,12 @@ function M.trim(s)
   return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+function M.normalizeName(s)
+  if not s then return "" end
+  s = tostring(s):lower():gsub("%s+", " ")
+  return (s:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
 function M.nowUtcMs()
   return os.epoch("utc")
 end

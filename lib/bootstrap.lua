@@ -35,6 +35,13 @@ function M.run()
     end
   end
 
+  local vr = cfg:validate()
+  if not vr.ok then
+    for _, err in ipairs(vr.errors) do
+      logger:warn("config.ini inválido: " .. err)
+    end
+  end
+
   logger:info("Inicializando sistema...")
 
   local obsEnabled = cfg:getBool("observability", "enabled", false)

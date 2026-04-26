@@ -1,0 +1,124 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-04-26T11:09:02Z",
+  "phase": null,
+  "phase_name": "refactoring-quality-improvements",
+  "phase_dir": null,
+  "plan": null,
+  "task": 4,
+  "total_tasks": 12,
+  "status": "paused",
+  "context": "free-form quality work (outside GSD phases)",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "Decompor engine.lua — extrair tick() monolítico em 11 métodos focados",
+      "status": "done",
+      "details": "tick() de 525 linhas → 70 linhas de orquestração + _processRequest, _handleNoCandidate, _handleMeOffline, _handleCraft, _handleExport, _logSubstitution, _refreshRequests, _fetchColonyStats, _fetchBuildings, _fetchCitizens, _markAllWaitingRetry"
+    },
+    {
+      "id": 2,
+      "name": "Validação de config.ini no load",
+      "status": "done",
+      "details": "lib/config.lua: adicionado Config:validate() delegando ao schema existente. lib/bootstrap.lua: chama cfg:validate() e loga warnings."
+    },
+    {
+      "id": 3,
+      "name": "Centralizar normalização de strings",
+      "status": "done",
+      "details": "lib/util.lua: adicionado M.normalizeName(s). engine.lua: removidos strLower() e normalizeName() locais. resolveBuildingForTarget: 2 loops → 1 loop com prioridade exata > parcial. Todos os pontos usam Util.normalizeName."
+    },
+    {
+      "id": 4,
+      "name": "Expandir cobertura de testes",
+      "status": "done",
+      "details": "5 testes novos adicionados: util_normalizeName_transforma_corretamente, config_validate_aceita_config_valida, config_validate_rejeita_invalidos, engine_todos_itens_blocked_by_tier, engine_request_na_janela_retry_e_ignorado. Total: 59 → 64 testes."
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 5,
+      "name": "Budget checking centralizado",
+      "status": "not_started",
+      "details": "Extrair lógica duplicada de budget:tryConsume() de me.lua:65, minecolonies.lua:33, inventory.lua:20 para Budget:withConsume() em modules/budget.lua"
+    },
+    {
+      "id": 6,
+      "name": "Padronizar tratamento de erro",
+      "status": "not_started",
+      "details": "4 padrões diferentes no codebase. Padronizar em (result, err) onde err = {code, msg, details}|nil. Afeta me.lua, engine.lua, tests."
+    },
+    {
+      "id": 7,
+      "name": "Watchdog periódico de periféricos",
+      "status": "not_started",
+      "details": "Peripherals.discover() chamado só no boot. Adicionar re-check periódico em loopEngine para detectar periféricos que caem após startup."
+    },
+    {
+      "id": 8,
+      "name": "Remover goto statements",
+      "status": "not_started",
+      "details": "Ainda existem goto em minecolonies.lua:170,293 e logger.lua:107. engine.lua já corrigido."
+    },
+    {
+      "id": 9,
+      "name": "Schema JSON para mappings.json",
+      "status": "not_started",
+      "details": "Adicionar lib/schema.lua com validação de mappings.json ao carregar."
+    },
+    {
+      "id": 10,
+      "name": "Persistência com versionamento/migration",
+      "status": "not_started",
+      "details": "data/state.json sem migration path. Adicionar versão e migração em modules/persistence.lua."
+    },
+    {
+      "id": 11,
+      "name": "Loops while true com proteção nos CLIs",
+      "status": "not_started",
+      "details": "config_cli.lua (7x) e mapping_cli.lua (2x) com while true sem verificar nil de io.read()."
+    },
+    {
+      "id": 12,
+      "name": "Timeout em safeCall()",
+      "status": "not_started",
+      "details": "lib/util.lua:safeCall não tem timeout. Periférico bloqueado congela o computador CC:Tweaked indefinidamente."
+    }
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {
+      "action": "Rodar suite de testes in-game: startup test",
+      "context": "Todas as mudanças desta sessão precisam ser validadas com a suite real em CC:Tweaked antes de prosseguir",
+      "blocking": true
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Manter engine.lua como arquivo único ao invés de dividir em múltiplos arquivos",
+      "rationale": "CC:Tweaked tem overhead de require() e as funções são fortemente acopladas. Métodos no mesmo arquivo mas bem nomeados são suficientes.",
+      "phase": "free-form"
+    },
+    {
+      "decision": "Usar ctx (context table) para passar estado entre _processRequest e seus handlers",
+      "rationale": "Evita repetir parâmetros longos e permite passar available (mutable) por referência sem side effects ocultos.",
+      "phase": "free-form"
+    },
+    {
+      "decision": "Não criar lib/errors.lua ainda",
+      "rationale": "Padronização de erro (item 6) é uma mudança invasiva que requer leitura de todos os callsites. Deixado para próxima sessão.",
+      "phase": "free-form"
+    }
+  ],
+  "uncommitted_files": [
+    "lib/bootstrap.lua",
+    "lib/config.lua",
+    "lib/util.lua",
+    "modules/engine.lua",
+    "tests/run.lua",
+    ".planning/STATE.md",
+    ".planning/phases/07-auto-setup-compatibilidade-mp/07-01-SUMMARY.md"
+  ],
+  "next_action": "Rodar 'startup test' in-game para validar os 64 testes. Se passarem, prosseguir com item 5: Budget:withConsume() centralizado em modules/budget.lua.",
+  "context_notes": "Trabalho de qualidade fora do fluxo GSD. Análise completa do codebase feita por subagente. engine.lua foi o maior alvo: refatorado de forma cirúrgica preservando 100% da lógica. Os goto em engine.lua foram eliminados via flag tierBlocked. Refatoração de engine.lua aumentou linhas (1237→1273) mas cada método agora tem responsabilidade única e é testável. Os 5 novos testes cobrem código novo desta sessão."
+}
