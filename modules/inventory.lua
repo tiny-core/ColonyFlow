@@ -25,7 +25,7 @@ local function safeList(inv, state)
     if not ok then return nil, err end
   end
   bumpIo(state, "list")
-  local ok, res = Util.safeCall(inv.list)
+  local ok, res = Util.safeCallTimeout(inv.list, 5)
   if not ok then return nil, tostring(res) end
   return res, nil
 end

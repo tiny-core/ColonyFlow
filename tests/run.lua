@@ -2667,6 +2667,32 @@ local tests = {
     assertEq(type(loaded.jobs), "table", "jobs deve ser tabela")
     assertEq(type(loaded.jobs["req-1"]), "table", "job req-1 deve estar presente")
   end },
+  { "safeCallTimeout_retorna_resultado_normal", function()
+    local Util = require("lib.util")
+    local ok, r = Util.safeCallTimeout(function() return "resultado" end, 5)
+    assertEq(ok, true)
+    assertEq(r, "resultado")
+  end },
+  { "safeCallTimeout_fallback_sem_parallel", function()
+    local Util = require("lib.util")
+    local oldParallel = _G.parallel
+    _G.parallel = nil
+    local ok, r = Util.safeCallTimeout(function() return "fallback" end, 5)
+    _G.parallel = oldParallel
+    assertEq(ok, true)
+    assertEq(r, "fallback")
+  end },
+  { "safeCallTimeout_retorna_timeout_quando_parallel_nao_executa_runner", function()
+    local Util = require("lib.util")
+    local oldParallel = _G.parallel
+    _G.parallel = {
+      waitForAny = function(runner, timer) timer() end
+    }
+    local ok, err = Util.safeCallTimeout(function() end, 5)
+    _G.parallel = oldParallel
+    assertEq(ok, false)
+    assertEq(err, "timeout")
+  end },
   { "persistence_versao_futura_retorna_nil", function()
     local Persistence = require("modules.persistence")
 

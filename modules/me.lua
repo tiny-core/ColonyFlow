@@ -9,6 +9,8 @@
 
 local Util = require("lib.util")
 
+local PERIPHERAL_TIMEOUT = 5
+
 local ME = {}
 ME.__index = ME
 
@@ -71,7 +73,7 @@ local function call(state, bridge, method, ...)
     if not ok then return nil, err end
   end
   bumpIo(state, method)
-  local ok, res1, res2 = Util.safeCall(bridge[method], ...)
+  local ok, res1, res2 = Util.safeCallTimeout(bridge[method], PERIPHERAL_TIMEOUT, ...)
   if not ok then return nil, tostring(res1) end
   return res1, res2
 end

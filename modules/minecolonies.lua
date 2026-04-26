@@ -8,6 +8,8 @@
 
 local Util = require("lib.util")
 
+local PERIPHERAL_TIMEOUT = 5
+
 local Mine = {}
 Mine.__index = Mine
 
@@ -39,7 +41,7 @@ local function call(state, integrator, method, ...)
     if not ok then return nil, err end
   end
   bumpIo(state, method)
-  local ok, res1, res2 = Util.safeCall(integrator[method], ...)
+  local ok, res1, res2 = Util.safeCallTimeout(integrator[method], PERIPHERAL_TIMEOUT, ...)
   if not ok then return nil, tostring(res1) end
   return res1, res2
 end

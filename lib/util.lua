@@ -20,6 +20,38 @@ function M.safeCall(fn, ...)
   return false, res1
 end
 
+local _unpack = table.unpack or unpack
+
+function M.safeCallTimeout(fn, timeoutSecs, ...)
+  timeoutSecs = tonumber(timeoutSecs) or 0
+  if timeoutSecs <= 0 or type(parallel) ~= "table" then
+    return M.safeCall(fn, ...)
+  end
+
+  local args = { ... }
+  local completed = false
+  local ok_val, r1, r2, r3, r4
+
+  parallel.waitForAny(
+    function()
+      local ok, v1, v2, v3, v4 = pcall(fn, _unpack(args))
+      ok_val, r1, r2, r3, r4 = ok, v1, v2, v3, v4
+      completed = true
+    end,
+    function()
+      os.sleep(timeoutSecs)
+    end
+  )
+
+  if not completed then
+    return false, "timeout"
+  end
+  if ok_val then
+    return true, r1, r2, r3, r4
+  end
+  return false, r1
+end
+
 function M.ensureDir(path)
   if fs.exists(path) then
     if fs.isDir(path) then return true end
