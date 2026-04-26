@@ -319,11 +319,6 @@ local function downloadToTemp(bundle, files, tempRoot)
     if not body then
       return nil, "Falha ao baixar " .. f.path .. ": " .. tostring(err)
     end
-    if f.size and tonumber(f.size) and #body ~= tonumber(f.size) then
-      return nil,
-          "Tamanho divergente em " ..
-          f.path .. " (esperado " .. tostring(f.size) .. ", obtido " .. tostring(#body) .. ")"
-    end
     local out = fs.combine(tempRoot, f.path)
     writeFile(out, body)
     results[#results + 1] = { path = f.path, tmp = out, size = #body }

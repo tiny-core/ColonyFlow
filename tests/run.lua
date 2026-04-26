@@ -2640,6 +2640,55 @@ local tests = {
     assertEq(r.ok, false)
     assertEq(string.find(r.errors[1], "tier_overrides") ~= nil, true)
   end },
+  { "persistence_migration_v_nil_preserva_jobs", function()
+    local Persistence = require("modules.persistence")
+    local Util = require("lib.util")
+
+    local oldFs = fs
+    local jobs = { ["req-1"] = { request_id = "req-1", status = "waiting_retry" } }
+    local payload = textutils.serializeJSON({ jobs = jobs, saved_at_ms = 1000 })
+    local existsSet = { ["data/state.json"] = true }
+
+    fs = {
+      exists = function(path) return existsSet[tostring(path)] == true end,
+      open = function(path, mode)
+        if mode == "r" then
+          return { readAll = function() return payload end, close = function() end }
+        end
+        return nil
+      end,
+    }
+
+    local loaded = Persistence.load("data/state.json")
+    fs = oldFs
+
+    assertEq(type(loaded), "table", "deve retornar tabela")
+    assertEq(loaded.v, 1, "v deve ser migrado para 1")
+    assertEq(type(loaded.jobs), "table", "jobs deve ser tabela")
+    assertEq(type(loaded.jobs["req-1"]), "table", "job req-1 deve estar presente")
+  end },
+  { "persistence_versao_futura_retorna_nil", function()
+    local Persistence = require("modules.persistence")
+
+    local oldFs = fs
+    local payload = textutils.serializeJSON({ v = 99, jobs = {}, saved_at_ms = 1000 })
+    local existsSet = { ["data/state.json"] = true }
+
+    fs = {
+      exists = function(path) return existsSet[tostring(path)] == true end,
+      open = function(path, mode)
+        if mode == "r" then
+          return { readAll = function() return payload end, close = function() end }
+        end
+        return nil
+      end,
+    }
+
+    local loaded = Persistence.load("data/state.json")
+    fs = oldFs
+
+    assertEq(loaded, nil, "versao futura deve retornar nil")
+  end },
 }
 
 for _, t in ipairs(tests) do

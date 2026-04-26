@@ -2,10 +2,22 @@ local Util = require("lib.util")
 
 local M = {}
 
+local CURRENT_VERSION = 1
+
 local function asNumber(v)
   local n = tonumber(v)
   if not n then return nil end
   return n
+end
+
+local function migrate(obj)
+  if obj.v == nil then
+    obj.v = CURRENT_VERSION
+    if type(obj.jobs) ~= "table" then obj.jobs = {} end
+    return obj
+  end
+  if obj.v > CURRENT_VERSION then return nil end
+  return obj
 end
 
 function M.load(path)
@@ -16,7 +28,9 @@ function M.load(path)
   local ok, obj = pcall(Util.jsonDecode, txt)
   if not ok then return nil end
   if type(obj) ~= "table" then return nil end
-  if obj.v ~= 1 then return nil end
+  obj = migrate(obj)
+  if obj == nil then return nil end
+  if obj.v ~= CURRENT_VERSION then return nil end
   if type(obj.jobs) ~= "table" then return nil end
   if obj.saved_at_ms ~= nil and asNumber(obj.saved_at_ms) == nil then
     return nil

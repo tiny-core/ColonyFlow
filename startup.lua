@@ -4,6 +4,7 @@
 -- - `startup map`    -> abre o editor de mapeamentos
 -- - `startup config` -> abre a CLI de configuração
 -- - `startup doctor` -> diagnóstico rápido do ambiente
+-- - `startup update` -> atualiza o mod pelo GitHub
 -- Sem argumento: carrega lib/bootstrap.lua e inicia o loop principal.
 
 local args = { ... }
@@ -44,6 +45,14 @@ local function runDoctor()
   print("Doctor nao encontrado.")
 end
 
+local function runUpdate()
+  if fs.exists("tools/install.lua") then
+    shell.run("tools/install.lua", "update")
+    return
+  end
+  print("Instalador nao encontrado.")
+end
+
 local mode = args[1]
 if mode == "test" then
   runTests()
@@ -62,6 +71,11 @@ end
 
 if mode == "doctor" then
   runDoctor()
+  return
+end
+
+if mode == "update" then
+  runUpdate()
   return
 end
 
