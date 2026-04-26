@@ -1919,7 +1919,7 @@ local tests = {
     assertEq(list[1].value, "NA")
     assertEq(list[1].level, "unknown")
     assertEq(list[3].label, "Buffer")
-    assertEq(list[4].label, "Target")
+    assertEq(list[4].label, "Targets")
   end
   },
   { "snapshot_build_has_stable_keys_and_defaults", function()
@@ -2035,7 +2035,7 @@ local tests = {
     assertEq(snap[3].label, "Buffer")
     assertEq(snap[3].value, "Offline")
     assertEq(snap[3].level, "bad")
-    assertEq(snap[4].label, "Target")
+    assertEq(snap[4].label, "Targets")
     assertEq(snap[4].value, "Offline")
     assertEq(snap[4].level, "bad")
   end
