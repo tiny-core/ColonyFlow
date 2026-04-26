@@ -65,7 +65,7 @@ Plans:
 
 ### Phase 2: Núcleo de Requisições + Filtros
 
-**Goal**: o sistema entende corretamente o que a colônia pede e decide “o que falta” e “o que pode ser equivalente”, sem ainda depender de craft/entrega.
+**Goal**: o sistema entende corretamente o que a colônia pede e decide "o que falta" e "o que pode ser equivalente", sem ainda depender de craft/entrega.
 **Depends on**: Phase 1
 **Requirements**: MC-01, MC-02, DEL-01, DEL-02, DEL-04, EQ-01, EQ-02, TIER-01, TIER-02, CACHE-02, CFG-03
 **Plans**: 1 plan
@@ -83,7 +83,7 @@ Inclui:
 
 1. Requisições pendentes são listadas e normalizadas em um formato estável.
 2. Para um pedido com `count` e destino, o sistema calcula o faltante real corretamente.
-3. Banco de equivalências aceita mapeamento como “jetpack ↔ iron chestplate” e gera candidatos.
+3. Banco de equivalências aceita mapeamento como "jetpack ↔ iron chestplate" e gera candidatos.
 4. Tier é inferido de forma consistente (com override via JSON/config).
 5. Pedidos com destino inválido entram em estado de retry com log e sem craft cego.
 
@@ -163,7 +163,7 @@ Inclui:
 
 1. Test harness executa localmente no CC e retorna status de sucesso/falha.
 2. Cobertura mínima: tiers + equivalências + gating + parser config.
-3. Dataset de mapeamentos inclui casos representativos e não permite “pular” tiers por substituição.
+3. Dataset de mapeamentos inclui casos representativos e não permite "pular" tiers por substituição.
 4. Loop de produção mantém performance aceitável com cache e refresh configurável.
 
 Plans:
@@ -256,7 +256,7 @@ Inclui:
 
 **Success Criteria** (what must be TRUE):
 
-1. Um computador “limpo” consegue instalar e rodar o sistema com `pastebin`/`wget`/`http.get` (conforme disponibilidade) apontando para o repositório.
+1. Um computador "limpo" consegue instalar e rodar o sistema com `pastebin`/`wget`/`http.get` (conforme disponibilidade) apontando para o repositório.
 2. Atualização não apaga `config.ini` nem `data/mappings.json` por padrão.
 3. Falhas de HTTP/permissões geram mensagens acionáveis.
 
@@ -287,6 +287,7 @@ Plans:
 | 17. Scheduler com Budget                               | 1/1            | Complete | 2026-04-21 |
 | 18. Refactor por Snapshots                             | 1/1 | Complete    | 2026-04-21 |
 | 19. Documentacao Didatica + Comentarios                | 1/1 | Complete   | 2026-04-21 |
+| 20. Roteamento Multi-Destino                           | 0/2            | Planning |            |
 
 ### Phase 10: Config CLI (editar config.ini e perifericos)
 
@@ -389,4 +390,15 @@ Plans:
 **Plans:** 1/1 plans complete
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 19 to break down)
+- [x] 19-01 Documentacao Didatica + Comentarios (PT)
+
+### Phase 20: Roteamento Multi-Destino
+
+**Goal:** Permitir que cada classe de item (armor_helmet, tool_pickaxe etc.) tenha um inventario de destino dedicado, com fallback automatico para o default_target_container quando a classe nao estiver mapeada ou o inventario configurado estiver offline.
+**Depends on:** Phase 19
+**Requirements**: phase-20
+**Plans:** 2 plans
+
+Plans:
+- [ ] 20-01-PLAN.md — Logica de roteamento: defaults [delivery_routing] em config.lua + resolveRoutedTarget + roteamento per-request + health display em engine.lua
+- [ ] 20-02-PLAN.md — Config CLI: menu delivery_routing em config_cli.lua + 4 testes de roteamento em tests/run.lua
