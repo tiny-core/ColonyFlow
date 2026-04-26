@@ -93,7 +93,7 @@ end
 
 local function prompt(label)
   term.write(label .. ": ")
-  return read()
+  return read() or ""
 end
 
 local function setCursor(x, y)
