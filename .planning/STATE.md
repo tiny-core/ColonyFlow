@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 ## Current Position
 
 Phase: 20 (roteamento-multi-destino) — EXECUTING
-Plan: 1 of 3
-Status: Plan 01 complete — executing plan 02
+Plan: 2 of 3
+Status: Plan 02 complete — executing plan 03
 Last activity: 2026-04-26
 
 Progress: [████████░░] 73%
@@ -67,6 +67,7 @@ Recent decisions affecting current work:
 
 - Phase 1: Roadmap padronizado para compatibilidade com ferramentas GSD
 - Phase 20 P01: resolveRoutedTarget por classe + ctx per-request no tick + health "Targets: X/Y online"
+- Phase 20 P02: runDeliveryRoutingMenu no Config CLI + 4 testes de roteamento inline (D-06, D-08)
 
 ### Blockers/Concerns
 
@@ -80,6 +81,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-26T21:25:00Z
-Stopped at: Completed 20-01-PLAN.md
+Last session: 2026-04-26T21:20:02Z
+Stopped at: Completed 20-02-PLAN.md
 Resume file: None

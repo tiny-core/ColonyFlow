@@ -397,8 +397,8 @@ Plans:
 **Goal:** Permitir que cada classe de item (armor_helmet, tool_pickaxe etc.) tenha um inventario de destino dedicado, com fallback automatico para o default_target_container quando a classe nao estiver mapeada ou o inventario configurado estiver offline.
 **Depends on:** Phase 19
 **Requirements**: phase-20
-**Plans:** 2 plans
+**Plans:** 2 plans (2/2 complete)
 
 Plans:
 - [x] 20-01-PLAN.md — Logica de roteamento: defaults [delivery_routing] em config.lua + resolveRoutedTarget + roteamento per-request + health display em engine.lua
-- [ ] 20-02-PLAN.md — Config CLI: menu delivery_routing em config_cli.lua + 4 testes de roteamento em tests/run.lua
+- [x] 20-02-PLAN.md — Config CLI: menu delivery_routing em config_cli.lua + 4 testes de roteamento em tests/run.lua
