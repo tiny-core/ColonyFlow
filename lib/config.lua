@@ -76,6 +76,19 @@ mc_calls_per_window=50
 me_calls_per_window=100
 inv_calls_per_window=50
 requests_refresh_interval_seconds=5
+
+[delivery_routing]
+armor_helmet=
+armor_chestplate=
+armor_leggings=
+armor_boots=
+tool_pickaxe=
+tool_shovel=
+tool_axe=
+tool_hoe=
+tool_sword=
+tool_bow=
+tool_shield=
 ]]
 
 local function parseIni(text)
