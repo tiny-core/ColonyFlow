@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
-  "version": "1.5.0",
-  "generated_utc": "2026-04-21T22:27:31Z",
+  "version": "1.5.1",
+  "generated_utc": "2026-04-26T11:15:45Z",
   "files": [
     {
       "path": "components/ui.lua",
@@ -19,7 +19,7 @@
     },
     {
       "path": "lib/bootstrap.lua",
-      "size": 3496
+      "size": 3649
     },
     {
       "path": "lib/cache.lua",
@@ -31,7 +31,7 @@
     },
     {
       "path": "lib/config.lua",
-      "size": 10302
+      "size": 10423
     },
     {
       "path": "lib/logger.lua",
@@ -39,7 +39,7 @@
     },
     {
       "path": "lib/util.lua",
-      "size": 1448
+      "size": 1601
     },
     {
       "path": "lib/version.lua",
@@ -59,7 +59,7 @@
     },
     {
       "path": "modules/engine.lua",
-      "size": 43236
+      "size": 44271
     },
     {
       "path": "modules/equivalence.lua",
@@ -111,7 +111,7 @@
     },
     {
       "path": "tests/run.lua",
-      "size": 82335
+      "size": 89648
     },
     {
       "path": "tools/install.lua",
