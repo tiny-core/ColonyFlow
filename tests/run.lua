@@ -2715,6 +2715,146 @@ local tests = {
 
     assertEq(loaded, nil, "versao futura deve retornar nil")
   end },
+  { "routing_classe_mapeada_e_online", function()
+    -- Arrange: helmet mapeado e online
+    local cfg = makeCfg({
+      delivery         = { default_target_container = "rack_0" },
+      delivery_routing = { armor_helmet = "rack_tools_0" },
+    })
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "rack_tools_0" or n == "rack_0" end,
+      wrap      = function(n) return { _name = n } end,
+    }
+    -- Logica inline de guessClass + resolveRoutedTarget
+    local function guessClassStub(name)
+      if not name then return nil end
+      local lo = name:lower()
+      if lo:find("helmet",1,true) then return "armor_helmet" end
+      return nil
+    end
+    local function resolveTargetStub(c)
+      local raw = c:get("delivery","default_target_container","")
+      if raw ~= "" and peripheral.isPresent(raw) then return raw, peripheral.wrap(raw) end
+      return nil, nil
+    end
+    local function resolveRoutedTargetStub(c, itemName)
+      local class = guessClassStub(itemName)
+      if class then
+        local rn = c:get("delivery_routing", class, "")
+        if rn ~= "" and peripheral.isPresent(rn) then return rn, peripheral.wrap(rn) end
+      end
+      return resolveTargetStub(c)
+    end
+    -- Act
+    local name, inv = resolveRoutedTargetStub(cfg, "iron_helmet")
+    peripheral = oldPeripheral
+    -- Assert
+    assertEq(name, "rack_tools_0", "routing_classe_mapeada_e_online: nome errado")
+    assertEq(inv._name, "rack_tools_0", "routing_classe_mapeada_e_online: inv errado")
+  end },
+  { "routing_classe_mapeada_e_offline", function()
+    -- Arrange: helmet mapeado mas offline; default online
+    local cfg = makeCfg({
+      delivery         = { default_target_container = "rack_0" },
+      delivery_routing = { armor_helmet = "rack_tools_0" },
+    })
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "rack_0" end,  -- rack_tools_0 esta OFFLINE
+      wrap      = function(n) return { _name = n } end,
+    }
+    local function guessClassStub(name)
+      if not name then return nil end
+      local lo = name:lower()
+      if lo:find("helmet",1,true) then return "armor_helmet" end
+      return nil
+    end
+    local function resolveTargetStub(c)
+      local raw = c:get("delivery","default_target_container","")
+      if raw ~= "" and peripheral.isPresent(raw) then return raw, peripheral.wrap(raw) end
+      return nil, nil
+    end
+    local function resolveRoutedTargetStub(c, itemName)
+      local class = guessClassStub(itemName)
+      if class then
+        local rn = c:get("delivery_routing", class, "")
+        if rn ~= "" and peripheral.isPresent(rn) then return rn, peripheral.wrap(rn) end
+      end
+      return resolveTargetStub(c)
+    end
+    local name, inv = resolveRoutedTargetStub(cfg, "iron_helmet")
+    peripheral = oldPeripheral
+    assertEq(name, "rack_0", "routing_classe_mapeada_e_offline: deveria cair no default")
+  end },
+  { "routing_classe_nao_mapeada", function()
+    -- Arrange: armor_helmet = "" (nao configurado); default online
+    local cfg = makeCfg({
+      delivery         = { default_target_container = "rack_0" },
+      delivery_routing = { armor_helmet = "" },
+    })
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "rack_0" end,
+      wrap      = function(n) return { _name = n } end,
+    }
+    local function guessClassStub(name)
+      if not name then return nil end
+      local lo = name:lower()
+      if lo:find("helmet",1,true) then return "armor_helmet" end
+      return nil
+    end
+    local function resolveTargetStub(c)
+      local raw = c:get("delivery","default_target_container","")
+      if raw ~= "" and peripheral.isPresent(raw) then return raw, peripheral.wrap(raw) end
+      return nil, nil
+    end
+    local function resolveRoutedTargetStub(c, itemName)
+      local class = guessClassStub(itemName)
+      if class then
+        local rn = c:get("delivery_routing", class, "")
+        if rn ~= "" and peripheral.isPresent(rn) then return rn, peripheral.wrap(rn) end
+      end
+      return resolveTargetStub(c)
+    end
+    local name, inv = resolveRoutedTargetStub(cfg, "iron_helmet")
+    peripheral = oldPeripheral
+    assertEq(name, "rack_0", "routing_classe_nao_mapeada: deveria usar default")
+  end },
+  { "routing_item_sem_classe", function()
+    -- Arrange: item sem classe reconhecida; default online
+    local cfg = makeCfg({
+      delivery = { default_target_container = "rack_0" },
+    })
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "rack_0" end,
+      wrap      = function(n) return { _name = n } end,
+    }
+    local function guessClassStub(name)
+      if not name then return nil end
+      local lo = name:lower()
+      if lo:find("helmet",1,true) then return "armor_helmet" end
+      if lo:find("pickaxe",1,true) then return "tool_pickaxe" end
+      return nil
+    end
+    local function resolveTargetStub(c)
+      local raw = c:get("delivery","default_target_container","")
+      if raw ~= "" and peripheral.isPresent(raw) then return raw, peripheral.wrap(raw) end
+      return nil, nil
+    end
+    local function resolveRoutedTargetStub(c, itemName)
+      local class = guessClassStub(itemName)
+      if class then
+        local rn = c:get("delivery_routing", class, "")
+        if rn ~= "" and peripheral.isPresent(rn) then return rn, peripheral.wrap(rn) end
+      end
+      return resolveTargetStub(c)
+    end
+    local name = resolveRoutedTargetStub(cfg, "minecraft:bread")
+    peripheral = oldPeripheral
+    assertEq(name, "rack_0", "routing_item_sem_classe: deveria usar default")
+  end },
 }
 
 for _, t in ipairs(tests) do
