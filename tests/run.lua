@@ -2581,6 +2581,65 @@ local tests = {
     assertEq(ok2, false)
     assertEq(err2, "budget_exceeded:me")
   end },
+  { "schema_mappings_valido_ok", function()
+    local Schema = require("lib.schema")
+    local db = {
+      version = 2,
+      rules = {
+        { selector = "mod:item", kind = "item", class = "tool_pickaxe", prefer_equivalent = true },
+        { selector = "#forge:tools/swords", kind = "tag", class = "tool_sword" },
+      },
+      tier_overrides = { ["minecraft:iron_sword"] = 2 },
+      gating = { by_building_type = { builder = { tool_pickaxe = 3 } } },
+    }
+    local r = Schema.validateMappings(db)
+    assertEq(r.ok, true)
+    assertEq(#r.errors, 0)
+  end },
+  { "schema_mappings_version_invalida", function()
+    local Schema = require("lib.schema")
+    local db = { version = 1, rules = {}, tier_overrides = {}, gating = { by_building_type = {} } }
+    local r = Schema.validateMappings(db)
+    assertEq(r.ok, false)
+    assertEq(#r.errors >= 1, true)
+    assertEq(string.find(r.errors[1], "version") ~= nil, true)
+  end },
+  { "schema_mappings_rule_selector_vazio", function()
+    local Schema = require("lib.schema")
+    local db = {
+      version = 2,
+      rules = { { selector = "", kind = "item" } },
+      tier_overrides = {},
+      gating = { by_building_type = {} },
+    }
+    local r = Schema.validateMappings(db)
+    assertEq(r.ok, false)
+    assertEq(string.find(r.errors[1], "selector") ~= nil, true)
+  end },
+  { "schema_mappings_rule_class_invalida", function()
+    local Schema = require("lib.schema")
+    local db = {
+      version = 2,
+      rules = { { selector = "mod:item", class = "invalid_class" } },
+      tier_overrides = {},
+      gating = { by_building_type = {} },
+    }
+    local r = Schema.validateMappings(db)
+    assertEq(r.ok, false)
+    assertEq(string.find(r.errors[1], "class") ~= nil, true)
+  end },
+  { "schema_mappings_tier_override_nao_numerico", function()
+    local Schema = require("lib.schema")
+    local db = {
+      version = 2,
+      rules = {},
+      tier_overrides = { ["minecraft:iron_sword"] = "alto" },
+      gating = { by_building_type = {} },
+    }
+    local r = Schema.validateMappings(db)
+    assertEq(r.ok, false)
+    assertEq(string.find(r.errors[1], "tier_overrides") ~= nil, true)
+  end },
 }
 
 for _, t in ipairs(tests) do

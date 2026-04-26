@@ -1,4 +1,5 @@
 local Util = require("lib.util")
+local Schema = require("lib.schema")
 
 local DB_PATH = "data/mappings.json"
 
@@ -112,6 +113,12 @@ local function loadDb(state)
     db = skeletonV2()
   end
   db = normalizeDbShape(db)
+  local validation = Schema.validateMappings(db)
+  if not validation.ok and state and state.logger then
+    for _, err in ipairs(validation.errors) do
+      state.logger:warn("mappings.json invalido: " .. err)
+    end
+  end
   indexV2Rules(db)
   return db
 end
