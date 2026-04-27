@@ -976,7 +976,7 @@ function Engine:_handleExport(work, candidate, r, exportQty, ctx)
 
   local beforeCount = Inventory.countFromSnapshot(beforeSnap, candidate.name)
   local afterCount = Inventory.countFromSnapshot(afterSnap, candidate.name)
-  if afterCount < beforeCount then
+  if afterCount <= beforeCount then
     work.status = "waiting_retry"
     work.err = "pos_entrega_inconsistente"
     work.next_retry = nowEpoch + 5000
