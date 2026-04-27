@@ -668,7 +668,9 @@ local function buildPeripheralHealth(state, me)
       end
     end
   end
-  local targetsValue = (targetsTotal > 0) and (targetsOnline .. "/" .. targetsTotal .. " online") or "NA"
+  local targetsValue = (targetsTotal == 0) and "NA" or
+                       (targetsOnline == 0) and "Offline" or
+                       (targetsOnline .. "/" .. targetsTotal .. " online")
   local targetsLevel = (targetsTotal == 0 or targetsOnline == 0) and "bad" or
                        (targetsOnline < targetsTotal and "warn" or "ok")
 

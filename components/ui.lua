@@ -109,7 +109,7 @@ local function defaultPeripheralHealth()
     { label = "ME Bridge", value = "NA", level = "unknown" },
     { label = "Colony",    value = "NA", level = "unknown" },
     { label = "Buffer",    value = "NA", level = "unknown" },
-    { label = "Target",    value = "NA", level = "unknown" },
+    { label = "Targets",   value = "NA", level = "unknown" },
   }
 end
 
