@@ -25,7 +25,7 @@ Objetivo: entregar um sistema autônomo em Lua (CC: Tweaked) que lê requisiçõ
 - [x] **Phase 17: Scheduler com Budget (limites por tick)** - Limitar trabalho por ciclo (requests/IO) para reduzir picos e travamentos
 - [x] **Phase 18: Refactor por Snapshots (reduzir acoplamento/IO)** - Padronizar snapshots de estado para UI/engine e reduzir complexidade (completed 2026-04-21)
 - [x] **Phase 19: Documentacao Didatica + Comentarios (PT)** - Guia de estudo e comentarios explicativos em portugues (identificadores em ingles) (completed 2026-04-21)
-- [ ] **Phase 20: Roteamento Multi-Destino** - Destinos configuráveis por classe de item (armor→rack A, tool→rack B) com fallback para destino padrão quando classe não mapeada
+- [x] **Phase 20: Roteamento Multi-Destino** - Destinos configuráveis por classe de item (armor→rack A, tool→rack B) com fallback para destino padrão quando classe não mapeada (completed 2026-04-27)
 - [ ] **Phase 21: Retry com Prioridade** - Requests mais antigas em waiting_retry ganham prioridade no próximo tick; fila ordenada por tempo de espera
 - [ ] **Phase 22: Alertas de Monitor** - Requests presas por N minutos (blocked_by_tier, nao_craftavel) exibidas em destaque colorido no monitor com contador de tempo
 - [ ] **Phase 23: Métricas Persistentes** - Snapshots periódicos de métricas em data/metrics.json; comando startup metrics para inspecionar pós-sessão
@@ -287,7 +287,7 @@ Plans:
 | 17. Scheduler com Budget                               | 1/1            | Complete | 2026-04-21 |
 | 18. Refactor por Snapshots                             | 1/1 | Complete    | 2026-04-21 |
 | 19. Documentacao Didatica + Comentarios                | 1/1 | Complete   | 2026-04-21 |
-| 20. Roteamento Multi-Destino                           | 0/2            | Planning |            |
+| 20. Roteamento Multi-Destino                           | 2/2            | Complete | 2026-04-27 |
 
 ### Phase 10: Config CLI (editar config.ini e perifericos)
 

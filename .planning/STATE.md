@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.4
 milestone_name: milestone
-status: verifying
-stopped_at: context exhaustion at 78% (2026-04-26)
-last_updated: "2026-04-26T11:00:01.954Z"
-last_activity: 2026-04-21
+status: active
+last_updated: "2026-04-27T00:00:00Z"
+last_activity: 2026-04-27
 progress:
   total_phases: 26
-  completed_phases: 19
-  total_plans: 19
-  completed_plans: 19
-  percent: 73
+  completed_phases: 20
+  total_plans: 20
+  completed_plans: 20
+  percent: 77
 ---
 
 # Project State
@@ -21,24 +20,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-17)
 
 **Core value:** Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColonies e entrega do item correto, craftando somente o necessário.
-**Current focus:** Phase 20 — roteamento-multi-destino
+**Current focus:** Phase 21 — retry-com-prioridade
 
 ## Current Position
 
-Phase: 20 (roteamento-multi-destino) — EXECUTING
-Plan: 2 of 3
-Status: Plan 02 complete — executing plan 03
-Last activity: 2026-04-26
+Phase: 21 (retry-com-prioridade) — READY TO DISCUSS
+Status: Phase 20 complete — advancing to Phase 21
+Last activity: 2026-04-27
 
-Progress: [████████░░] 73%
+Progress: [████████░░] 77%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 6
+- Total plans completed: 20
 - Average duration: 10 min
-- Total execution time: 0.4 hours
+- Total execution time: ~3.5 hours
 
 **By Phase:**
 
@@ -57,6 +55,7 @@ Progress: [████████░░] 73%
 | Phase 18 P01 | n/a | 4 tasks | 6 files |
 | 18 | 1 | - | - |
 | Phase 19 P01 | n/a | 4 tasks | 14 files |
+| Phase 20 | 2 | - | - |
 
 ## Accumulated Context
 
@@ -66,12 +65,11 @@ Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
 - Phase 1: Roadmap padronizado para compatibilidade com ferramentas GSD
-- Phase 20 P01: resolveRoutedTarget por classe + ctx per-request no tick + health "Targets: X/Y online"
-- Phase 20 P02: runDeliveryRoutingMenu no Config CLI + 4 testes de roteamento inline (D-06, D-08)
+- Phase 20: Roteamento multi-destino removido (nao faz sentido com multiplos guard towers pedindo mesmo item); default_target_container simplificado para valor unico; engine entrega sempre no warehouse e o currier distribui aos NPCs
 
 ### Blockers/Concerns
 
-None yet.
+None.
 
 ### Roadmap Evolution
 
@@ -81,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-26T21:20:02Z
-Stopped at: Completed 20-02-PLAN.md
+Last session: 2026-04-27T00:00:00Z
+Stopped at: Phase 20 complete, advancing to Phase 21
 Resume file: None
