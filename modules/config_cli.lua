@@ -789,7 +789,12 @@ local function runDeliveryRoutingMenu(cfg, updates)
         local v = prompt(fieldLabel("delivery_routing", key), trim(eff2[key] or ""))
         -- Permite string vazia (limpa o mapeamento — D-06)
         if v ~= nil then
-          updates.delivery_routing[key] = trim(v)
+          local trimmed = trim(v)
+          if trimmed ~= "" and not isPresentAndWrap(trimmed) then
+            -- Avisa mas nao bloqueia: periferico pode estar offline temporariamente (WR-04)
+            showLines("Aviso", { "Periferico nao encontrado: " .. trimmed, "Mapeamento salvo mesmo assim." })
+          end
+          updates.delivery_routing[key] = trimmed
         end
       end
     end
