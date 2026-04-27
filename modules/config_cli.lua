@@ -399,20 +399,16 @@ local function buildEffective(cfg, updates)
 end
 
 local function buildChangedOnly(cfg, updates)
-  local out = { peripherals = {}, core = {}, delivery = {}, update = {}, delivery_routing = {} }
+  local out = {}
   for section, kv in pairs(updates) do
     for k, newVal in pairs(kv) do
       local cur = cfg:get(section, k, "")
       if tostring(newVal) ~= tostring(cur) then
+        out[section] = out[section] or {}
         out[section][k] = newVal
       end
     end
   end
-  if next(out.peripherals) == nil then out.peripherals = nil end
-  if next(out.core) == nil then out.core = nil end
-  if next(out.delivery) == nil then out.delivery = nil end
-  if next(out.update) == nil then out.update = nil end
-  if next(out.delivery_routing) == nil then out.delivery_routing = nil end
   return out
 end
 
@@ -447,7 +443,7 @@ local function saveIni(cfg, updates)
   end
 
   local changedOnly = buildChangedOnly(cfg, updates)
-  if changedOnly.peripherals == nil and changedOnly.core == nil and changedOnly.delivery == nil and changedOnly.update == nil and changedOnly.delivery_routing == nil then
+  if next(changedOnly) == nil then
     showLines("Salvar", { "Nenhuma mudanca para salvar." })
     return false
   end
