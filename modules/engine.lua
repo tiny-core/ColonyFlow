@@ -650,11 +650,14 @@ local function buildPeripheralHealth(state, me)
   }
   local targetsTotal, targetsOnline = 0, 0
   if cfg and type(cfg.get) == "function" and type(peripheral) == "table" and type(peripheral.isPresent) == "function" then
-    -- contar default_target_container (D-07)
-    local defaultName = trim(cfg:get("delivery", "default_target_container", ""))
-    if defaultName ~= "" then
-      targetsTotal = targetsTotal + 1
-      if peripheral.isPresent(defaultName) then targetsOnline = targetsOnline + 1 end
+    -- contar default_target_container (D-07); suporta lista separada por virgulas (WR-05)
+    local defaultNames = cfg:getList("delivery", "default_target_container", {})
+    for _, dn in ipairs(defaultNames) do
+      dn = trim(dn)
+      if dn ~= "" then
+        targetsTotal = targetsTotal + 1
+        if peripheral.isPresent(dn) then targetsOnline = targetsOnline + 1 end
+      end
     end
     -- contar destinos roteados nao-vazios (D-07)
     for _, cls in ipairs(ROUTING_CLASSES) do
