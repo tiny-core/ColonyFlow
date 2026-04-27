@@ -171,10 +171,6 @@ local function resolveTarget(cfg)
       return name, peripheral.wrap(name)
     end
   end
-  local raw = cfg:get("delivery", "default_target_container", "")
-  if raw ~= "" and peripheral.isPresent(raw) then
-    return raw, peripheral.wrap(raw)
-  end
   return nil, nil
 end
 
