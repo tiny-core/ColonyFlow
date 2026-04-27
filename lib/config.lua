@@ -25,7 +25,7 @@ pending_states_allow=
 completed_states_deny=done,completed,fulfilled,success
 
 [delivery]
-default_target_container=minecolonies:rack_0,entangled:tile_0
+default_target_container=minecolonies:rack_0
 export_mode=auto
 export_direction=up
 export_buffer_container=minecolonies:rack_1
@@ -77,18 +77,6 @@ me_calls_per_window=100
 inv_calls_per_window=50
 requests_refresh_interval_seconds=5
 
-[delivery_routing]
-armor_helmet=
-armor_chestplate=
-armor_leggings=
-armor_boots=
-tool_pickaxe=
-tool_shovel=
-tool_axe=
-tool_hoe=
-tool_sword=
-tool_bow=
-tool_shield=
 ]]
 
 local function parseIni(text)

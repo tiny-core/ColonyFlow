@@ -125,7 +125,7 @@ local function guessClass(name)
   if n:find("axe", 1, true) then return "tool_axe" end
   if n:find("hoe", 1, true) then return "tool_hoe" end
   if n:find("sword", 1, true) then return "tool_sword" end
-  if n:find("%fbow") or n:match("_bow$") or n:match("^bow_") or n == "bow" then return "tool_bow" end
+  if n:find("bow", 1, true) then return "tool_bow" end
   if n:find("shield", 1, true) then return "tool_shield" end
   return nil
 end
@@ -165,27 +165,11 @@ local function isPendingState(cfg, stateValue)
 end
 
 local function resolveTarget(cfg)
-  local targets = cfg:getList("delivery", "default_target_container", {})
-  for _, name in ipairs(targets) do
-    if name ~= "" and peripheral.isPresent(name) then
-      return name, peripheral.wrap(name)
-    end
+  local name = cfg:get("delivery", "default_target_container", "")
+  if name ~= "" and peripheral.isPresent(name) then
+    return name, peripheral.wrap(name)
   end
   return nil, nil
-end
-
--- Resolve o inventario de destino roteado por classe de item (D-01, D-02, D-03).
--- Se a classe do item tiver periferico configurado e online, usa esse periferico.
--- Caso contrario, cai em resolveTarget(cfg) (default_target_container).
-local function resolveRoutedTarget(cfg, itemName)
-  local class = guessClass(itemName)
-  if class then
-    local routedName = cfg:get("delivery_routing", class, "")
-    if routedName ~= "" and peripheral.isPresent(routedName) then
-      return routedName, peripheral.wrap(routedName)
-    end
-  end
-  return resolveTarget(cfg)   -- fallback: D-01 (offline), D-02 (nao mapeado), D-03 (default offline)
 end
 
 local function resolveInvByName(name)
@@ -521,37 +505,6 @@ local function buildPeripheralHealth(state, me)
     return tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", "")
   end
 
-  local function listFromCfg(section, key)
-    if not cfg then return {} end
-    if type(cfg.getList) == "function" then
-      local out = cfg:getList(section, key, {})
-      if type(out) == "table" and #out > 0 then
-        local cleaned = {}
-        for _, v in ipairs(out) do
-          local t = trim(v)
-          if t ~= "" then
-            table.insert(cleaned, t)
-          end
-        end
-        if #cleaned > 0 then return cleaned end
-      end
-    end
-    if type(cfg.get) == "function" then
-      local raw = trim(cfg:get(section, key, ""))
-      if raw ~= "" then
-        local out = {}
-        for part in raw:gmatch("[^,]+") do
-          local t = trim(part)
-          if t ~= "" then
-            table.insert(out, t)
-          end
-        end
-        return out
-      end
-    end
-    return {}
-  end
-
   local function resolvePeripheralName(name)
     name = trim(name)
     if name == "" then return nil end
@@ -644,41 +597,19 @@ local function buildPeripheralHealth(state, me)
   end
   local bufferValue, bufferLevel = deviceStatus(resolveInvByName(resolvePeripheralName(bufferName)), bufferName)
 
-  local ROUTING_CLASSES = {
-    "armor_helmet","armor_chestplate","armor_leggings","armor_boots",
-    "tool_pickaxe","tool_shovel","tool_axe","tool_hoe","tool_sword","tool_bow","tool_shield"
-  }
-  local targetsTotal, targetsOnline = 0, 0
-  if cfg and type(cfg.get) == "function" and type(peripheral) == "table" and type(peripheral.isPresent) == "function" then
-    -- contar default_target_container (D-07); suporta lista separada por virgulas (WR-05)
-    local defaultNames = cfg:getList("delivery", "default_target_container", {})
-    for _, dn in ipairs(defaultNames) do
-      dn = trim(dn)
-      if dn ~= "" then
-        targetsTotal = targetsTotal + 1
-        if peripheral.isPresent(dn) then targetsOnline = targetsOnline + 1 end
-      end
-    end
-    -- contar destinos roteados nao-vazios (D-07)
-    for _, cls in ipairs(ROUTING_CLASSES) do
-      local rn = trim(cfg:get("delivery_routing", cls, ""))
-      if rn ~= "" then
-        targetsTotal = targetsTotal + 1
-        if peripheral.isPresent(rn) then targetsOnline = targetsOnline + 1 end
-      end
-    end
+  local defaultTargetName = cfg and type(cfg.get) == "function" and trim(cfg:get("delivery", "default_target_container", "")) or ""
+  local targetsValue, targetsLevel
+  if defaultTargetName == "" then
+    targetsValue, targetsLevel = "NA", "bad"
+  elseif type(peripheral) == "table" and type(peripheral.isPresent) == "function" and peripheral.isPresent(defaultTargetName) then
+    targetsValue, targetsLevel = "Online", "ok"
+  else
+    targetsValue, targetsLevel = "Offline", "bad"
   end
-  local targetsValue = (targetsTotal == 0) and "NA" or
-                       (targetsOnline == 0) and "Offline" or
-                       (targetsOnline .. "/" .. targetsTotal .. " online")
-  local targetsLevel = (targetsTotal == 0 or targetsOnline == 0) and "bad" or
-                       (targetsOnline < targetsTotal and "warn" or "ok")
 
   local colonyDev, colonyName = refreshDeviceFromConfig("colonyIntegrator", "colonyName", "colony_integrator")
   local colonyValue, colonyLevel = deviceStatus(colonyDev, colonyName)
 
-  -- suppress unused warning for listFromCfg (used by callers in future)
-  local _ = listFromCfg
 
   return {
     { label = "ME Bridge", value = meValue,      level = meLevel },
@@ -1211,13 +1142,9 @@ function Engine:tick()
     return
   end
 
-  -- availableByTarget: mapa por destino para evitar over-allocation entre destinos distintos (CR-01)
-  local availableByTarget = {}
-  availableByTarget[defaultTargetName] = {}
+  local available = {}
   if type(defaultSnap) == "table" then
-    for k, v in pairs(defaultSnap) do
-      availableByTarget[defaultTargetName][k] = tonumber(v or 0) or 0
-    end
+    for k, v in pairs(defaultSnap) do available[k] = tonumber(v or 0) or 0 end
   end
 
   -- ctx base — sera sobrescrito por campos per-request antes de _processRequest
@@ -1243,41 +1170,14 @@ function Engine:tick()
       idx = idx < n and idx + 1 or 1
       scanned = scanned + 1
 
-      -- Resolve destino especifico para este request (D-01, D-02, D-05)
-      local reqItemName = (r.accepted and r.accepted[1] and r.accepted[1].name)
-                       or (r.items and r.items[1] and r.items[1].name)
-                       or ""
-      local routedName, routedInv = resolveRoutedTarget(state.cfg, reqItemName)
-      local routedSnap, routedSnapErr
-      if routedName == defaultTargetName then
-        -- Mesmo destino que o default: reutiliza snapshot (D-04, D-05)
-        routedSnap    = defaultSnap
-        routedSnapErr = defaultSnapErr
-      else
-        -- Destino roteado diferente: snapshot on-demand com cache por nome (D-04, D-05)
-        routedSnap, routedSnapErr = getDestinationSnapshot(state, routedName or defaultTargetName,
-                                                            routedInv or defaultTargetInv, false)
-      end
-
-      -- Garante mapa de available para o destino resolvido (CR-01: mapa por destino)
-      local effectiveRoutedName = routedName or defaultTargetName
-      if not availableByTarget[effectiveRoutedName] then
-        availableByTarget[effectiveRoutedName] = {}
-        if type(routedSnap) == "table" then
-          for k, v in pairs(routedSnap) do
-            availableByTarget[effectiveRoutedName][k] = tonumber(v or 0) or 0
-          end
-        end
-      end
-
       local ctx = {
-        available  = availableByTarget[effectiveRoutedName],
+        available  = available,
         buildings  = baseCtx.buildings,
         citizens   = baseCtx.citizens,
-        snap       = routedSnap,
-        snapErr    = routedSnapErr,
-        targetName = routedName or defaultTargetName,
-        targetInv  = routedInv or defaultTargetInv,
+        snap       = defaultSnap,
+        snapErr    = defaultSnapErr,
+        targetName = defaultTargetName,
+        targetInv  = defaultTargetInv,
         nowEpoch   = baseCtx.nowEpoch,
       }
 
@@ -1327,7 +1227,5 @@ return {
   new = Engine.new,
   _test = {
     buildPeripheralHealth = buildPeripheralHealth,
-    resolveRoutedTarget   = resolveRoutedTarget,
-    guessClass            = guessClass,
   },
 }

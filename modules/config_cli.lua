@@ -47,19 +47,6 @@ local FIELD_LABELS = {
     retry_seconds = "Retry base (s)",
     error_backoff_max_seconds = "Backoff max (s)",
   },
-  delivery_routing = {
-    armor_helmet      = "Helmet",
-    armor_chestplate  = "Chestplate",
-    armor_leggings    = "Leggings",
-    armor_boots       = "Boots",
-    tool_pickaxe      = "Pickaxe",
-    tool_shovel       = "Shovel",
-    tool_axe          = "Axe",
-    tool_hoe          = "Hoe",
-    tool_sword        = "Sword",
-    tool_bow          = "Bow",
-    tool_shield       = "Shield",
-  },
 }
 
 local function fieldLabel(section, key)
@@ -381,19 +368,6 @@ local function buildEffective(cfg, updates)
       ttl_hours = v("update", "ttl_hours"),
       retry_seconds = v("update", "retry_seconds"),
       error_backoff_max_seconds = v("update", "error_backoff_max_seconds"),
-    },
-    delivery_routing = {
-      armor_helmet     = v("delivery_routing", "armor_helmet"),
-      armor_chestplate = v("delivery_routing", "armor_chestplate"),
-      armor_leggings   = v("delivery_routing", "armor_leggings"),
-      armor_boots      = v("delivery_routing", "armor_boots"),
-      tool_pickaxe     = v("delivery_routing", "tool_pickaxe"),
-      tool_shovel      = v("delivery_routing", "tool_shovel"),
-      tool_axe         = v("delivery_routing", "tool_axe"),
-      tool_hoe         = v("delivery_routing", "tool_hoe"),
-      tool_sword       = v("delivery_routing", "tool_sword"),
-      tool_bow         = v("delivery_routing", "tool_bow"),
-      tool_shield      = v("delivery_routing", "tool_shield"),
     },
   }
 end
@@ -752,55 +726,6 @@ local function runDeliveryMenu(cfg, updates)
   end
 end
 
-local ROUTING_CLASS_KEYS = {
-  "armor_helmet", "armor_chestplate", "armor_leggings", "armor_boots",
-  "tool_pickaxe", "tool_shovel", "tool_axe", "tool_hoe", "tool_sword", "tool_bow", "tool_shield",
-}
-
-local function runDeliveryRoutingMenu(cfg, updates)
-  while true do
-    local eff = buildEffective(cfg, updates).delivery_routing
-    local labels = {}
-    for _, key in ipairs(ROUTING_CLASS_KEYS) do
-      local label = fieldLabel("delivery_routing", key)
-      local cur   = trim(eff[key] or "")
-      local suffix = cur ~= "" and ("(" .. cur .. ")") or "()"
-      table.insert(labels, { text = label, suffix = suffix, suffixColor = separatorColor() })
-    end
-    table.insert(labels, { separator = true })
-    table.insert(labels, { text = "Salvar",  action = "save" })
-    table.insert(labels, { text = "Voltar",  action = "back" })
-
-    local idx, why = selectList("Roteamento de destino", "Enter confirma | <- volta", labels, 1)
-    if why ~= "enter" or not idx then return end
-    local chosen = labels[idx]
-    if type(chosen) == "table" and chosen.action == "back" then
-      return
-    end
-    if type(chosen) == "table" and chosen.action == "save" then
-      cfg = loadCfg()
-      saveIni(cfg, updates)
-      cfg = loadCfg()
-    else
-      -- idx 1..11 correspondem a ROUTING_CLASS_KEYS
-      local key = ROUTING_CLASS_KEYS[idx]
-      if key then
-        local eff2 = buildEffective(cfg, updates).delivery_routing
-        local v = prompt(fieldLabel("delivery_routing", key), trim(eff2[key] or ""))
-        -- Permite string vazia (limpa o mapeamento — D-06)
-        if v ~= nil then
-          local trimmed = trim(v)
-          if trimmed ~= "" and not isPresentAndWrap(trimmed) then
-            -- Avisa mas nao bloqueia: periferico pode estar offline temporariamente (WR-04)
-            showLines("Aviso", { "Periferico nao encontrado: " .. trimmed, "Mapeamento salvo mesmo assim." })
-          end
-          updates.delivery_routing[key] = trimmed
-        end
-      end
-    end
-  end
-end
-
 local function runUpdateMenu(cfg, updates)
   while true do
     local eff = buildEffective(cfg, updates).update
@@ -853,7 +778,6 @@ local function main()
     core = {},
     delivery = {},
     update = {},
-    delivery_routing = {},
   }
 
   local cfg = loadCfg()
@@ -863,7 +787,6 @@ local function main()
       "Perifericos",
       "Core+Logs",
       "Delivery",
-      "Roteamento de destino",
       "Update-check",
       "Sair",
     }
@@ -880,9 +803,6 @@ local function main()
     elseif choice == "Delivery" then
       cfg = loadCfg()
       runDeliveryMenu(cfg, updates)
-    elseif choice == "Roteamento de destino" then
-      cfg = loadCfg()
-      runDeliveryRoutingMenu(cfg, updates)
     elseif choice == "Update-check" then
       cfg = loadCfg()
       runUpdateMenu(cfg, updates)
