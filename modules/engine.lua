@@ -125,7 +125,7 @@ local function guessClass(name)
   if n:find("axe", 1, true) then return "tool_axe" end
   if n:find("hoe", 1, true) then return "tool_hoe" end
   if n:find("sword", 1, true) then return "tool_sword" end
-  if n:find("bow", 1, true) then return "tool_bow" end
+  if n:find("%fbow") or n:match("_bow$") or n:match("^bow_") or n == "bow" then return "tool_bow" end
   if n:find("shield", 1, true) then return "tool_shield" end
   return nil
 end
