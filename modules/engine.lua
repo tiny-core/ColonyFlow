@@ -1210,15 +1210,17 @@ function Engine:tick()
     return
   end
 
-  -- available e compartilhado entre requests do mesmo tick para evitar over-allocation
-  local available = {}
+  -- availableByTarget: mapa por destino para evitar over-allocation entre destinos distintos (CR-01)
+  local availableByTarget = {}
+  availableByTarget[defaultTargetName] = {}
   if type(defaultSnap) == "table" then
-    for k, v in pairs(defaultSnap) do available[k] = tonumber(v or 0) or 0 end
+    for k, v in pairs(defaultSnap) do
+      availableByTarget[defaultTargetName][k] = tonumber(v or 0) or 0
+    end
   end
 
   -- ctx base — sera sobrescrito por campos per-request antes de _processRequest
   local baseCtx = {
-    available  = available,
     buildings  = buildings,
     citizens   = citizens,
     nowEpoch   = os.epoch("utc"),
@@ -1256,8 +1258,19 @@ function Engine:tick()
                                                             routedInv or defaultTargetInv, false)
       end
 
+      -- Garante mapa de available para o destino resolvido (CR-01: mapa por destino)
+      local effectiveRoutedName = routedName or defaultTargetName
+      if not availableByTarget[effectiveRoutedName] then
+        availableByTarget[effectiveRoutedName] = {}
+        if type(routedSnap) == "table" then
+          for k, v in pairs(routedSnap) do
+            availableByTarget[effectiveRoutedName][k] = tonumber(v or 0) or 0
+          end
+        end
+      end
+
       local ctx = {
-        available  = baseCtx.available,
+        available  = availableByTarget[effectiveRoutedName],
         buildings  = baseCtx.buildings,
         citizens   = baseCtx.citizens,
         snap       = routedSnap,
