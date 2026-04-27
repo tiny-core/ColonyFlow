@@ -1326,5 +1326,7 @@ return {
   new = Engine.new,
   _test = {
     buildPeripheralHealth = buildPeripheralHealth,
+    resolveRoutedTarget   = resolveRoutedTarget,
+    guessClass            = guessClass,
   },
 }
