@@ -1164,26 +1164,30 @@ function Engine:tick()
   local retryEligible = {}
   local prePassProcessed = {}  -- IDs processados pelo pre-pass neste tick (CR-02)
   local nowEpoch = baseCtx.nowEpoch
+  local posCounter = 0
   for _, r in ipairs(requests or {}) do
     if r and r.id then
+      posCounter = posCounter + 1
       local w = self.work[r.id]
       if w and w.status == "waiting_retry"
          and w.next_retry and w.next_retry <= nowEpoch then
-        table.insert(retryEligible, r)
+        table.insert(retryEligible, { r = r, pos = posCounter })  -- WR-01: guardar posição para sort estável
       end
     end
   end
 
   table.sort(retryEligible, function(a, b)
-    local wa = self.work[a.id]
-    local wb = self.work[b.id]
+    local wa = self.work[a.r.id]
+    local wb = self.work[b.r.id]
     local ta = (wa and type(wa.craft) == "table" and tonumber(wa.craft.started_at)) or math.huge
     local tb = (wb and type(wb.craft) == "table" and tonumber(wb.craft.started_at)) or math.huge
-    return ta < tb
+    if ta ~= tb then return ta < tb end
+    return a.pos < b.pos  -- WR-01: desempate estável por posição original
   end)
 
   local processed = 0
-  for _, r in ipairs(retryEligible) do
+  for _, entry in ipairs(retryEligible) do
+    local r = entry.r
     if processed >= rqLimit then break end
     local ctx = {
       available  = available,
