@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.4
 milestone_name: milestone
-status: active
-last_updated: "2026-04-27T00:00:00Z"
-last_activity: 2026-04-27
+status: in_progress
+last_updated: "2026-04-28T00:00:00.000Z"
+last_activity: 2026-04-28
 progress:
   total_phases: 26
-  completed_phases: 20
-  total_plans: 20
-  completed_plans: 20
-  percent: 77
+  completed_phases: 21
+  total_plans: 22
+  completed_plans: 22
+  percent: 81
 ---
 
 # Project State
@@ -20,15 +20,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-17)
 
 **Core value:** Fechar de forma confiável e autônoma o ciclo completo entre pedido do MineColonies e entrega do item correto, craftando somente o necessário.
-**Current focus:** Phase 21 — retry-com-prioridade
+**Current focus:** Phase 22 — alertas-de-monitor
 
 ## Current Position
 
-Phase: 21 (retry-com-prioridade) — READY TO DISCUSS
-Status: Phase 20 complete — advancing to Phase 21
-Last activity: 2026-04-27
+Phase: 22 (alertas-de-monitor) — READY TO DISCUSS
+Status: Phase 21 complete — advancing to Phase 22
+Last activity: 2026-04-28
 
-Progress: [████████░░] 77%
+Progress: [████████░░] 81%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [████████░░] 77%
 | 18 | 1 | - | - |
 | Phase 19 P01 | n/a | 4 tasks | 14 files |
 | Phase 20 | 2 | - | - |
+| Phase 21 P01 | ~25 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,7 @@ Recent decisions affecting current work:
 
 - Phase 1: Roadmap padronizado para compatibilidade com ferramentas GSD
 - Phase 20: Roteamento multi-destino removido (nao faz sentido com multiplos guard towers pedindo mesmo item); default_target_container simplificado para valor unico; engine entrega sempre no warehouse e o currier distribui aos NPCs
+- Phase 21: Pre-pass em Engine:tick() processa waiting_retry elegíveis por started_at ASC antes do round-robin; retry_count em memória (não persiste); badge [R:N] na coluna ETAPA do monitor
 
 ### Blockers/Concerns
 
@@ -79,6 +81,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-27T00:00:00Z
-Stopped at: Phase 20 complete, advancing to Phase 21
+Last session: 2026-04-28T00:00:00.000Z
+Stopped at: Phase 21 complete — ready to discuss/plan Phase 22
 Resume file: None

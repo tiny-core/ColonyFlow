@@ -26,7 +26,7 @@ Objetivo: entregar um sistema autônomo em Lua (CC: Tweaked) que lê requisiçõ
 - [x] **Phase 18: Refactor por Snapshots (reduzir acoplamento/IO)** - Padronizar snapshots de estado para UI/engine e reduzir complexidade (completed 2026-04-21)
 - [x] **Phase 19: Documentacao Didatica + Comentarios (PT)** - Guia de estudo e comentarios explicativos em portugues (identificadores em ingles) (completed 2026-04-21)
 - [x] **Phase 20: Roteamento Multi-Destino** - Destinos configuráveis por classe de item (armor→rack A, tool→rack B) com fallback para destino padrão quando classe não mapeada (completed 2026-04-27)
-- [ ] **Phase 21: Retry com Prioridade** - Requests mais antigas em waiting_retry ganham prioridade no próximo tick; fila ordenada por tempo de espera
+- [x] **Phase 21: Retry com Prioridade** - Requests mais antigas em waiting_retry ganham prioridade no próximo tick; fila ordenada por tempo de espera (completed 2026-04-28)
 - [ ] **Phase 22: Alertas de Monitor** - Requests presas por N minutos (blocked_by_tier, nao_craftavel) exibidas em destaque colorido no monitor com contador de tempo
 - [ ] **Phase 23: Métricas Persistentes** - Snapshots periódicos de métricas em data/metrics.json; comando startup metrics para inspecionar pós-sessão
 - [ ] **Phase 24: Testes de Integração** - Cenários de falha real: ME oscilante durante craft, periférico que timeout, colony sem requests
@@ -288,6 +288,7 @@ Plans:
 | 18. Refactor por Snapshots                             | 1/1 | Complete    | 2026-04-21 |
 | 19. Documentacao Didatica + Comentarios                | 1/1 | Complete   | 2026-04-21 |
 | 20. Roteamento Multi-Destino                           | 2/2            | Complete | 2026-04-27 |
+| 21. Retry com Prioridade                               | 1/1            | Complete | 2026-04-28 |
 
 ### Phase 10: Config CLI (editar config.ini e perifericos)
 
@@ -402,3 +403,13 @@ Plans:
 Plans:
 - [x] 20-01-PLAN.md — Logica de roteamento: defaults [delivery_routing] em config.lua + resolveRoutedTarget + roteamento per-request + health display em engine.lua
 - [x] 20-02-PLAN.md — Config CLI: menu delivery_routing em config_cli.lua + 4 testes de roteamento em tests/run.lua
+
+### Phase 21: Retry com Prioridade
+
+**Goal:** Requests mais antigas em waiting_retry ganham prioridade no próximo tick; fila ordenada por tempo de espera evita starvation.
+**Depends on:** Phase 20
+**Requirements**: phase-21
+**Plans:** 1/1 plans complete
+
+Plans:
+- [x] 21-01-PLAN.md — Pre-pass em Engine:tick() com coleta, sort por started_at ASC e budget compartilhado; badge [R:N] na coluna ETAPA do monitor
