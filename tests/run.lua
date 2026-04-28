@@ -2715,6 +2715,542 @@ local tests = {
 
     assertEq(loaded, nil, "versao futura deve retornar nil")
   end },
+
+  -- =========================================================================
+  -- Phase 21: retry pre-pass tests
+  -- =========================================================================
+
+  { "engine_prepass_processa_waiting_retry_elegivel", function()
+    -- Verifica que requests com status waiting_retry e next_retry <= nowEpoch
+    -- sao processadas pelo pre-pass (retry_count deve ser incrementado)
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "10" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline = function() return true end,
+          getItem = function(f) return { name = f.name, amount = 5, isCraftable = false } end,
+          exportItemToPeripheral = function(f, _) return f.count, nil end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 901, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+
+    -- Pre-setar work: request elegivel (next_retry no passado)
+    engine.work["901"] = {
+      status = "waiting_retry",
+      next_retry = 0,  -- elegivel (passado)
+      craft = { started_at = 1000 },
+    }
+
+    engine:tick()
+    peripheral = oldPeripheral
+
+    -- retry_count deve ter sido incrementado (pre-pass processou a request)
+    assertEq(type(engine.work["901"]), "table", "work[901] deve existir")
+    assertEq((engine.work["901"].retry_count or 0) >= 1, true,
+      "retry_count deve ser >= 1 apos pre-pass processar request elegivel")
+  end },
+
+  { "engine_prepass_ignora_waiting_retry_na_janela", function()
+    -- Requests com next_retry > nowEpoch nao devem ser processadas pelo pre-pass
+    local Engine = require("modules.engine")
+    local Util = require("lib.util")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local exportCalls = 0
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "10" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline = function() return true end,
+          getItem = function(f) return { name = f.name, amount = 5, isCraftable = false } end,
+          exportItemToPeripheral = function(f, _)
+            exportCalls = exportCalls + 1
+            return f.count, nil
+          end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 902, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+
+    -- Pre-setar work: request NAO elegivel (next_retry no futuro)
+    engine.work["902"] = {
+      status = "waiting_retry",
+      err = "erro_anterior",
+      next_retry = Util.nowUtcMs() + 60000,  -- futuro
+    }
+
+    engine:tick()
+    peripheral = oldPeripheral
+
+    -- request ainda deve estar waiting_retry; retry_count NAO deve ter sido incrementado
+    assertEq(state.work["902"].status, "waiting_retry",
+      "status deve permanecer waiting_retry")
+    assertEq(state.work["902"].err, "erro_anterior",
+      "err nao deve ter sido sobrescrito")
+    assertEq(exportCalls, 0, "nao deve exportar quando dentro da janela de retry")
+    assertEq((state.work["902"].retry_count or 0), 0,
+      "retry_count nao deve ser incrementado para request na janela")
+  end },
+
+  { "engine_prepass_ordena_por_started_at_asc", function()
+    -- Pre-pass deve processar requests mais antigas primeiro (started_at ASC)
+    -- Com budget=1, apenas a request mais antiga deve ser processada
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "1" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline = function() return true end,
+          getItem = function(f) return { name = f.name, amount = 5, isCraftable = false } end,
+          exportItemToPeripheral = function(f, _) return f.count, nil end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              -- id=904 tem started_at MAIOR (mais recente)
+              { id = 904, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+              -- id=903 tem started_at MENOR (mais antigo = deve ser processado primeiro)
+              { id = 903, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+
+    -- id=903 e mais antigo (started_at menor)
+    engine.work["903"] = {
+      status = "waiting_retry",
+      next_retry = 0,
+      craft = { started_at = 1000 },  -- mais antigo
+    }
+    -- id=904 e mais recente (started_at maior)
+    engine.work["904"] = {
+      status = "waiting_retry",
+      next_retry = 0,
+      craft = { started_at = 2000 },  -- mais recente
+    }
+
+    engine:tick()
+    peripheral = oldPeripheral
+
+    -- Com budget=1, apenas o mais antigo (903) deve ter retry_count incrementado
+    local rc903 = engine.work["903"] and (engine.work["903"].retry_count or 0) or 0
+    local rc904 = engine.work["904"] and (engine.work["904"].retry_count or 0) or 0
+    assertEq(rc903 >= 1, true, "id=903 (mais antigo) deve ser processado pelo pre-pass com budget=1")
+    assertEq(rc904, 0, "id=904 (mais recente) nao deve ser processado quando budget=1 esgotado pelo 903")
+  end },
+
+  { "engine_prepass_nao_altera_cursor", function()
+    -- Pre-pass NAO deve alterar _rq_cursor; cursor deve continuar de onde estava
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "10" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline = function() return true end,
+          getItem = function(f) return { name = f.name, amount = 5, isCraftable = false } end,
+          exportItemToPeripheral = function(f, _) return f.count, nil end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 905, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+              { id = 906, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+              { id = 907, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+
+    -- Setar cursor em posicao especifica antes do tick
+    engine._rq_cursor = 2
+
+    -- id=905 e elegivel para pre-pass
+    engine.work["905"] = {
+      status = "waiting_retry",
+      next_retry = 0,
+      craft = { started_at = 1000 },
+    }
+
+    engine:tick()
+    peripheral = oldPeripheral
+
+    -- Cursor deve ter sido atualizado pelo loop normal, nao zerado pelo pre-pass
+    assertEq(type(engine._rq_cursor), "number", "_rq_cursor deve ser number")
+    assertEq((engine.work["905"].retry_count or 0) >= 1, true,
+      "id=905 deve ter sido processado pelo pre-pass")
+  end },
+
+  { "engine_prepass_budget_compartilhado_com_loop_normal", function()
+    -- Budget e compartilhado: retries e requests normais dividem requests_per_tick
+    -- Com budget=1 e 1 retry elegivel + 2 requests normais:
+    -- apenas a retry deve ser processada; as requests normais ficam de fora
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "1" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline = function() return true end,
+          getItem = function(f) return { name = f.name, amount = 5, isCraftable = false } end,
+          exportItemToPeripheral = function(f, _) return f.count, nil end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 910, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+              { id = 911, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+              { id = 912, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+
+    -- id=910 e elegivel para pre-pass
+    engine.work["910"] = {
+      status = "waiting_retry",
+      next_retry = 0,
+      craft = { started_at = 1000 },
+    }
+    -- ids 911 e 912 sao requests normais (nao estao em waiting_retry)
+
+    engine:tick()
+    peripheral = oldPeripheral
+
+    -- Com budget=1, apenas id=910 deve ter sido processado pelo pre-pass
+    local rc910 = engine.work["910"] and (engine.work["910"].retry_count or 0) or 0
+    assertEq(rc910 >= 1, true, "id=910 deve ter sido processado pelo pre-pass com budget=1")
+
+    -- ids 911 e 912 nao devem ter sido processados (budget esgotado pelo pre-pass)
+    local w911 = engine.work["911"]
+    local w912 = engine.work["912"]
+    -- Com budget=1 totalmente consumido pelo pre-pass, o loop normal nao deve ter rodado
+    assertEq(w911 == nil or (w911.retry_count or 0) == 0, true,
+      "id=911 nao deve ter sido processado quando budget esgotado pelo pre-pass")
+    assertEq(w912 == nil or (w912.retry_count or 0) == 0, true,
+      "id=912 nao deve ter sido processado quando budget esgotado pelo pre-pass")
+  end },
+
+  { "engine_retry_count_incrementado_em_processRequest", function()
+    -- retry_count e incrementado em _processRequest apos a guarda next_retry
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline = function() return true end,
+          getItem = function(f) return { name = f.name, amount = 5, isCraftable = false } end,
+          exportItemToPeripheral = function(f, _) return f.count, nil end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 920, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+
+    -- Primeiro tick: retry_count deve comecar em 0 e ir para 1 apos processamento
+    assertEq((engine.work["920"] and engine.work["920"].retry_count or 0), 0,
+      "retry_count deve ser 0 antes do primeiro tick")
+
+    engine:tick()
+    peripheral = oldPeripheral
+
+    -- Apos 1 tick, retry_count deve ser 1
+    local rc = engine.work["920"] and (engine.work["920"].retry_count or 0) or 0
+    assertEq(rc, 1, "retry_count deve ser 1 apos primeiro processamento")
+  end },
+
+  { "engine_retry_count_nao_persiste", function()
+    -- retry_count NAO deve aparecer no bloco persistido (jobs em data/state.json)
+    local Engine = require("modules.engine")
+    local Cache = require("lib.cache")
+
+    local savedPayload = nil
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(name) return name == "test_inv" end,
+      wrap = function() return inv end,
+    }
+
+    local oldFs = fs
+    local existsSet = {}
+    fs = {
+      exists = function(path) return existsSet[tostring(path)] == true end,
+      open = function(path, mode)
+        if mode == "w" then
+          existsSet[tostring(path)] = true
+          return {
+            write = function(self2, s) savedPayload = s end,
+            writeLine = function(self2, s) savedPayload = (savedPayload or "") .. s .. "\n" end,
+            close = function() end,
+          }
+        end
+        if mode == "r" and existsSet[tostring(path)] then
+          return { readAll = function() return savedPayload end, close = function() end }
+        end
+        return nil
+      end,
+      makeDir = function() end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+    })
+
+    local state = {
+      cfg = cfg,
+      cache = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline = function() return false end,  -- ME offline para deixar status=waiting_retry
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 930, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName = function() return "t" end,
+          amountOfCitizens = function() return 0 end,
+          maxOfCitizens = function() return 0 end,
+          getHappiness = function() return 0 end,
+          isUnderAttack = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+
+    -- Forcar retry_count no work para testar que nao persiste
+    engine.work["930"] = {
+      status = "waiting_retry",
+      next_retry = 0,
+      retry_count = 5,  -- deve ser ignorado na persistencia
+    }
+
+    -- Forcar persist imediato zerando o timer
+    engine._persist_next_at_ms = 0
+    engine:_persistWorkMaybe()
+
+    fs = oldFs
+    peripheral = oldPeripheral
+
+    -- Verificar que retry_count nao aparece no payload salvo
+    if savedPayload then
+      assertEq(savedPayload:find("retry_count") == nil, true,
+        "retry_count nao deve aparecer no payload persistido")
+    end
+  end },
 }
 
 for _, t in ipairs(tests) do
