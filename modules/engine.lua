@@ -974,14 +974,11 @@ function Engine:_processRequest(r, ctx)
   end
 
   -- Incrementar retry_count a cada tentativa efetiva (D-06)
-  local work_rc = self.work[r.id] or {}
-  work_rc.retry_count = (tonumber(work_rc.retry_count or 0) or 0) + 1
-  self.work[r.id] = work_rc
+  local work = self.work[r.id] or {}
+  work.retry_count = (tonumber(work.retry_count or 0) or 0) + 1
 
   local building, buildingResolved = resolveBuildingForRequest(ctx.buildings, ctx.citizens, r.target)
   local candidate, why = pickCandidate(state, self.eq, self.tier, self.me, r, building, buildingResolved)
-
-  local work = self.work[r.id] or {}
   work.request_state = r.state
   work.target = r.target
   work.requested = (r.accepted and r.accepted[1] and r.accepted[1].name) or
