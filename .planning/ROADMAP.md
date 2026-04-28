@@ -289,6 +289,7 @@ Plans:
 | 19. Documentacao Didatica + Comentarios                | 1/1 | Complete   | 2026-04-21 |
 | 20. Roteamento Multi-Destino                           | 2/2            | Complete | 2026-04-27 |
 | 21. Retry com Prioridade                               | 1/1            | Complete | 2026-04-28 |
+| 22. Alertas de Monitor                                 | 0/2            | In Progress | —       |
 
 ### Phase 10: Config CLI (editar config.ini e perifericos)
 
@@ -413,3 +414,14 @@ Plans:
 
 Plans:
 - [x] 21-01-PLAN.md — Pre-pass em Engine:tick() com coleta, sort por started_at ASC e budget compartilhado; badge [R:N] na coluna ETAPA do monitor
+
+### Phase 22: Alertas de Monitor
+
+**Goal:** Requests presas por N minutos (blocked_by_tier, nao_craftavel, waiting_retry) exibidas em destaque colorido no monitor com sufixo de tempo; resumo no Monitor 2.
+**Depends on:** Phase 21
+**Requirements**: phase-22
+**Plans:** 2 plans
+
+Plans:
+- [ ] 22-01-PLAN.md — Camada de dados: stuck_since_ms lifecycle em engine.lua + cópia em snapshot.lua + alert_stuck_minutes=5 em config.lua
+- [ ] 22-02-PLAN.md — Camada de display: cor/sufixo "Xm" em renderRequests + linha "Presas: N >Xm" em renderStatus + 6 testes em tests/run.lua
