@@ -461,6 +461,11 @@ function UI:renderRequests(state, mon)
     end
 
     local etapa = jobSymbol(jobState)
+    -- WR-02: incluir badge [R:N] na medição para que jobMax reflita largura real
+    local retryCountM = job and tonumber(job.retry_count or 0) or 0
+    if retryCountM >= 1 then
+      etapa = etapa .. "[R:" .. tostring(retryCountM) .. "]"
+    end
     if #chosenDisplay > choMax then choMax = #chosenDisplay end
     if #etapa > jobMax then jobMax = #etapa end
   end
