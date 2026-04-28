@@ -973,6 +973,11 @@ function Engine:_processRequest(r, ctx)
     return false, nil
   end
 
+  -- Incrementar retry_count a cada tentativa efetiva (D-06)
+  local work_rc = self.work[r.id] or {}
+  work_rc.retry_count = (tonumber(work_rc.retry_count or 0) or 0) + 1
+  self.work[r.id] = work_rc
+
   local building, buildingResolved = resolveBuildingForRequest(ctx.buildings, ctx.citizens, r.target)
   local candidate, why = pickCandidate(state, self.eq, self.tier, self.me, r, building, buildingResolved)
 
@@ -1158,12 +1163,58 @@ function Engine:tick()
   rqLimit = math.floor(tonumber(rqLimit or 0) or 0)
   if rqLimit <= 0 then rqLimit = math.huge end
 
+  -- Pre-pass: processar retries elegíveis em ordem de prioridade (D-03)
+  local retryEligible = {}
+  local nowEpoch = baseCtx.nowEpoch
+  for _, r in ipairs(requests or {}) do
+    if r and r.id then
+      local w = self.work[r.id]
+      if w and w.status == "waiting_retry"
+         and w.next_retry and w.next_retry <= nowEpoch then
+        table.insert(retryEligible, r)
+      end
+    end
+  end
+
+  table.sort(retryEligible, function(a, b)
+    local wa = self.work[a.id]
+    local wb = self.work[b.id]
+    local ta = (wa and type(wa.craft) == "table" and tonumber(wa.craft.started_at)) or math.huge
+    local tb = (wb and type(wb.craft) == "table" and tonumber(wb.craft.started_at)) or math.huge
+    return ta < tb
+  end)
+
+  local processed = 0
+  for _, r in ipairs(retryEligible) do
+    if processed >= rqLimit then break end
+    local ctx = {
+      available  = available,
+      buildings  = baseCtx.buildings,
+      citizens   = baseCtx.citizens,
+      snap       = defaultSnap,
+      snapErr    = defaultSnapErr,
+      targetName = defaultTargetName,
+      targetInv  = defaultTargetInv,
+      nowEpoch   = nowEpoch,
+    }
+    local did, budgetErr = self:_processRequest(r, ctx)
+    if did == nil and budgetErr ~= nil then
+      -- budget excedido: preservar cursor e sair (D-04 — nao alterar _rq_cursor aqui)
+      self._rq_cursor = tonumber(self._rq_cursor or 1) or 1
+      publishSnapshot(state)
+      self:_persistWorkMaybe()
+      return
+    end
+    if did == true then processed = processed + 1 end
+  end
+  -- loop normal continua com `processed` já incrementado (D-05)
+
   local n = type(requests) == "table" and #requests or 0
   if n > 0 then
     local idx = tonumber(self._rq_cursor or 1) or 1
     if idx < 1 or idx > n then idx = 1 end
 
-    local scanned, processed = 0, 0
+    local scanned = 0
     while processed < rqLimit and scanned < n do
       local r = requests[idx]
       local currentIdx = idx

@@ -532,12 +532,17 @@ function UI:renderRequests(state, mon)
     if bg == colors.gray and fg == colors.gray then
       fg = colors.white
     end
+    local etapaStr = jobSymbol(jobState)
+    local retryCount = job and tonumber(job.retry_count or 0) or 0
+    if retryCount >= 1 then
+      etapaStr = etapaStr .. "[R:" .. tostring(retryCount) .. "]"
+    end
     local line = string.format(
       "%-" .. reqW .. "s | %-" .. choMax .. "s | %" .. faltW .. "s | %-" .. jobMax .. "s",
       shorten(displayItem, reqW),
       centerText(shorten(chosenDisplay, choMax), choMax),
       shorten(missingLabel, faltW),
-      centerText(shorten(jobSymbol(jobState), jobMax), jobMax)
+      centerText(shorten(etapaStr, jobMax), jobMax)
     )
     self:drawText("requests", mon, 1, y, line, fg, bg)
     y = y + 1
