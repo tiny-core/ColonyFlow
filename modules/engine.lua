@@ -1162,6 +1162,7 @@ function Engine:tick()
 
   -- Pre-pass: processar retries elegíveis em ordem de prioridade (D-03)
   local retryEligible = {}
+  local prePassProcessed = {}  -- IDs processados pelo pre-pass neste tick (CR-02)
   local nowEpoch = baseCtx.nowEpoch
   for _, r in ipairs(requests or {}) do
     if r and r.id then
@@ -1202,7 +1203,10 @@ function Engine:tick()
       self:_persistWorkMaybe()
       return
     end
-    if did == true then processed = processed + 1 end
+    if did == true then
+      processed = processed + 1
+      prePassProcessed[tostring(r.id)] = true  -- marcar para pular no loop normal (CR-02)
+    end
   end
   -- loop normal continua com `processed` já incrementado (D-05)
 
@@ -1218,25 +1222,28 @@ function Engine:tick()
       idx = idx < n and idx + 1 or 1
       scanned = scanned + 1
 
-      local ctx = {
-        available  = available,
-        buildings  = baseCtx.buildings,
-        citizens   = baseCtx.citizens,
-        snap       = defaultSnap,
-        snapErr    = defaultSnapErr,
-        targetName = defaultTargetName,
-        targetInv  = defaultTargetInv,
-        nowEpoch   = baseCtx.nowEpoch,
-      }
+      -- Pular requests já processados pelo pre-pass neste tick (CR-02)
+      if not (r and r.id and prePassProcessed[tostring(r.id)]) then
+        local ctx = {
+          available  = available,
+          buildings  = baseCtx.buildings,
+          citizens   = baseCtx.citizens,
+          snap       = defaultSnap,
+          snapErr    = defaultSnapErr,
+          targetName = defaultTargetName,
+          targetInv  = defaultTargetInv,
+          nowEpoch   = baseCtx.nowEpoch,
+        }
 
-      local did, budgetErr = self:_processRequest(r, ctx)
-      if did == nil and budgetErr ~= nil then
-        self._rq_cursor = currentIdx
-        publishSnapshot(state)
-        self:_persistWorkMaybe()
-        return
+        local did, budgetErr = self:_processRequest(r, ctx)
+        if did == nil and budgetErr ~= nil then
+          self._rq_cursor = currentIdx
+          publishSnapshot(state)
+          self:_persistWorkMaybe()
+          return
+        end
+        if did == true then processed = processed + 1 end
       end
-      if did == true then processed = processed + 1 end
     end
     self._rq_cursor = idx
   else
