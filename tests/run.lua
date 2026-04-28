@@ -3015,6 +3015,9 @@ local tests = {
     assertEq(type(engine._rq_cursor), "number", "_rq_cursor deve ser number")
     assertEq((engine.work["905"].retry_count or 0) >= 1, true,
       "id=905 deve ter sido processado pelo pre-pass")
+    -- WR-03: verificar que id=906 (posicao 2, onde cursor iniciou) foi processado pelo loop normal
+    -- provando que o loop comecou da posicao 2 e nao foi zerado pelo pre-pass
+    assertEq(type(engine.work["906"]), "table", "id=906 at cursor position 2 should be processed by normal round-robin loop")
   end },
 
   { "engine_prepass_budget_compartilhado_com_loop_normal", function()
@@ -3090,13 +3093,9 @@ local tests = {
     assertEq(rc910 >= 1, true, "id=910 deve ter sido processado pelo pre-pass com budget=1")
 
     -- ids 911 e 912 nao devem ter sido processados (budget esgotado pelo pre-pass)
-    local w911 = engine.work["911"]
-    local w912 = engine.work["912"]
-    -- Com budget=1 totalmente consumido pelo pre-pass, o loop normal nao deve ter rodado
-    assertEq(w911 == nil or (w911.retry_count or 0) == 0, true,
-      "id=911 nao deve ter sido processado quando budget esgotado pelo pre-pass")
-    assertEq(w912 == nil or (w912.retry_count or 0) == 0, true,
-      "id=912 nao deve ter sido processado quando budget esgotado pelo pre-pass")
+    -- WR-04: assert estrito — work deve ser nil, nao apenas sem retry_count
+    assertEq(engine.work["911"], nil, "id=911 should not be in work when budget exhausted by pre-pass")
+    assertEq(engine.work["912"], nil, "id=912 should not be in work when budget exhausted by pre-pass")
   end },
 
   { "engine_retry_count_incrementado_em_processRequest", function()
