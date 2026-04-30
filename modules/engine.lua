@@ -83,6 +83,7 @@ function Engine:_persistWorkMaybe()
           started_at_ms = startedAt,
           retry_at_ms = tonumber(work.next_retry),
           last_err = work.err,
+          -- retry_count, stuck_since_ms intentionally omitted
         }
       end
     end
@@ -691,6 +692,7 @@ function Engine:_markAllWaitingRetry(requests, errReason)
       local work = self.work[r.id] or {}
       local needed = tonumber(r.requiredCount or r.count or 0) or 0
       work.status = "waiting_retry"
+      if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
       work.request_state = r.state
       work.target = r.target
       work.err = errReason
@@ -730,10 +732,12 @@ function Engine:_handleNoCandidate(work, r, why, ctx)
 
   if why == "blocked_by_tier" then
     work.status = "blocked_by_tier"
+    if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
     work.err = "blocked_by_tier"
     work.next_retry = os.epoch("utc") + 15000
   elseif why == "nao_craftavel" then
     work.status = "waiting_retry"
+    if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
     work.err = "nao_craftavel"
     work.next_retry = os.epoch("utc") + 15000
     state.logger:warn("Item não craftável agora; aguardando...", { request = r.id, item = reqItem })
@@ -749,6 +753,7 @@ end
 function Engine:_handleMeOffline(work, r, meErr, ctx)
   local state = self.state
   work.status = "waiting_retry"
+  if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
   local errStr = tostring(meErr or "")
   if errStr == "degraded" then
     work.err = "me_degraded"
@@ -784,6 +789,7 @@ function Engine:_handleCraft(work, candidate, r, craftQty, ctx)
   if crafting == nil and isBudgetExceeded(craftErr) then return tostring(craftErr) end
 
   if crafting == true or locked then
+    work.stuck_since_ms = nil
     work.status = "crafting"
     work.craft = work.craft or {}
     work.craft.key = lockKey
@@ -796,6 +802,7 @@ function Engine:_handleCraft(work, candidate, r, craftQty, ctx)
 
   if craftable == false then
     work.status = "waiting_retry"
+    if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
     work.err = "nao_craftavel:" .. tostring(craftableErr or "")
     work.next_retry = nowEpoch + 15000
     state.logger:warn("Item não craftável agora; aguardando...",
@@ -813,6 +820,7 @@ function Engine:_handleCraft(work, candidate, r, craftQty, ctx)
   if started == true then
     state.cache:set("craft_lock", lockKey, true, lockTtlSeconds)
     state.stats.crafted = state.stats.crafted + 1
+    work.stuck_since_ms = nil
     work.status = "crafting"
     work.craft = work.craft or {}
     work.craft.key = lockKey
@@ -820,6 +828,7 @@ function Engine:_handleCraft(work, candidate, r, craftQty, ctx)
     work.craft.message = startErr
   else
     work.status = "waiting_retry"
+    if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
     work.err = "craft_falhou:" .. tostring(startErr or "")
     work.next_retry = nowEpoch + 15000
     state.logger:warn("Falha ao iniciar craft",
@@ -853,6 +862,7 @@ function Engine:_handleExport(work, candidate, r, exportQty, ctx)
   if beforeSnap == nil and isBudgetExceeded(beforeErr) then return tostring(beforeErr) end
   if not beforeSnap then
     work.status = "waiting_retry"
+    if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
     work.err = beforeErr
     work.next_retry = nowEpoch + 5000
     state.logger:warn("Falha ao ler destino antes da entrega", { request = r.id, err = beforeErr })
@@ -889,6 +899,7 @@ function Engine:_handleExport(work, candidate, r, exportQty, ctx)
 
   if exported <= 0 then
     work.status = "waiting_retry"
+    if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
     work.err = "destino_cheio_ou_export_falhou:" .. tostring(exportErr or "")
     work.next_retry = nowEpoch + 5000
     state.logger:warn("Entrega não ocorreu; aguardando...",
@@ -900,6 +911,7 @@ function Engine:_handleExport(work, candidate, r, exportQty, ctx)
   if afterSnap == nil and isBudgetExceeded(afterErr) then return tostring(afterErr) end
   if not afterSnap then
     work.status = "waiting_retry"
+    if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
     work.err = "pos_entrega_snapshot_falhou:" .. tostring(afterErr or "")
     work.next_retry = nowEpoch + 5000
     state.logger:warn("Falha ao ler destino após entrega", { request = r.id, err = afterErr })
@@ -910,6 +922,7 @@ function Engine:_handleExport(work, candidate, r, exportQty, ctx)
   local afterCount = Inventory.countFromSnapshot(afterSnap, candidate.name)
   if afterCount <= beforeCount then
     work.status = "waiting_retry"
+    if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
     work.err = "pos_entrega_inconsistente"
     work.next_retry = nowEpoch + 5000
     state.logger:warn("Validação pós-entrega inconsistente; aguardando...",
@@ -922,8 +935,10 @@ function Engine:_handleExport(work, candidate, r, exportQty, ctx)
   work.present = afterCount
   work.missing = math.max(0, work.needed - afterCount)
   if work.missing <= 0 then
+    work.stuck_since_ms = nil
     work.status = "done"
   elseif work.status ~= "crafting" and work.status ~= "waiting_retry" then
+    work.stuck_since_ms = nil
     work.status = "pending"
   end
   return nil
@@ -997,6 +1012,7 @@ function Engine:_processRequest(r, ctx)
 
   if not ctx.snap then
     work.status = "waiting_retry"
+    if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
     work.err = ctx.snapErr
     work.next_retry = ctx.nowEpoch + 5000
     self.work[r.id] = work
@@ -1013,6 +1029,7 @@ function Engine:_processRequest(r, ctx)
   work.missing = missing
 
   if missing <= 0 then
+    work.stuck_since_ms = nil
     work.status = "done"
     self.work[r.id] = work
     return true, nil
@@ -1039,6 +1056,7 @@ function Engine:_processRequest(r, ctx)
     if freeSpace == nil and isBudgetExceeded(freeErr) then return nil, tostring(freeErr) end
     if not freeSpace then
       work.status = "waiting_retry"
+      if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
       work.err = "erro_capacidade_destino:" .. tostring(freeErr or "")
       work.next_retry = ctx.nowEpoch + 5000
       state.logger:warn("Falha ao ler capacidade do destino", { request = r.id, err = freeErr })
@@ -1047,6 +1065,7 @@ function Engine:_processRequest(r, ctx)
     end
     if freeSpace <= 0 then
       work.status = "waiting_retry"
+      if work.stuck_since_ms == nil then work.stuck_since_ms = os.epoch("utc") end
       work.err = "destino_cheio_capacidade"
       work.next_retry = ctx.nowEpoch + 5000
       state.logger:info("Destino cheio, aguardando espaço", { request = r.id, item = candidate.name })
@@ -1066,7 +1085,7 @@ function Engine:_processRequest(r, ctx)
     if budgetErr then return nil, budgetErr end
   end
 
-  if not work.status then work.status = "pending" end
+  if not work.status then work.stuck_since_ms = nil; work.status = "pending" end
   self:_logSubstitution(work, r, candidate, why)
   self.work[r.id] = work
   return true, nil

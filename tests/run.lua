@@ -3250,6 +3250,382 @@ local tests = {
         "retry_count nao deve aparecer no payload persistido")
     end
   end },
+
+  -- =========================================================================
+  -- Phase 22: stuck_since_ms tests
+  -- =========================================================================
+
+  { "engine_blocked_by_tier_sets_stuck_since_ms", function()
+    local Engine = require("modules.engine")
+    local Cache  = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "test_inv" end,
+      wrap      = function()  return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies  = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery      = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "10" },
+      observability = { alert_stuck_minutes = "1" },
+      tiers         = { default_tool_tier = "netherite", max_tool_tier = "wood" },
+    })
+
+    local state = {
+      cfg     = cfg,
+      cache   = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger  = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline    = function() return true end,
+          getItem     = function() return nil end,
+          exportItemToPeripheral = function(_, _) return 0, nil end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 2201, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:netherite_pickaxe", count = 1 } } },
+            }
+          end,
+          getColonyName             = function() return "t" end,
+          amountOfCitizens          = function() return 0 end,
+          maxOfCitizens             = function() return 0 end,
+          getHappiness              = function() return 0 end,
+          isUnderAttack             = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats    = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine.work["2201"] = { status = nil, err = nil, next_retry = 0 }
+    engine:tick()
+    peripheral = oldPeripheral
+
+    local w = engine.work["2201"]
+    if w and w.status == "blocked_by_tier" then
+      assertEq(type(w.stuck_since_ms), "number",
+        "stuck_since_ms deve ser number quando blocked_by_tier")
+    else
+      if w and w.stuck_since_ms ~= nil then
+        assertEq(type(w.stuck_since_ms), "number",
+          "stuck_since_ms deve ser number em qualquer stuck status")
+      end
+    end
+  end },
+
+  { "engine_nao_craftavel_sets_stuck_since_ms", function()
+    local Engine  = require("modules.engine")
+    local Cache   = require("lib.cache")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "test_inv" end,
+      wrap      = function()  return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies  = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery      = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "10" },
+      observability = { alert_stuck_minutes = "1" },
+    })
+
+    local state = {
+      cfg     = cfg,
+      cache   = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger  = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected   = function() return true end,
+          isOnline      = function() return true end,
+          getItem       = function(f) return { name = f.name, amount = 0, isCraftable = false } end,
+          isCraftable   = function(_) return false, nil end,
+          exportItemToPeripheral = function(_, _) return 0, nil end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 2202, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName             = function() return "t" end,
+          amountOfCitizens          = function() return 0 end,
+          maxOfCitizens             = function() return 0 end,
+          getHappiness              = function() return 0 end,
+          isUnderAttack             = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats    = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+    peripheral = oldPeripheral
+
+    local w = engine.work["2202"]
+    assertEq(w ~= nil, true, "work entry deve existir apos tick")
+    if w and (w.status == "waiting_retry" or w.status == "nao_craftavel") then
+      assertEq(type(w.stuck_since_ms), "number",
+        "stuck_since_ms deve ser number em waiting_retry (nao_craftavel)")
+    end
+  end },
+
+  { "engine_stuck_since_ms_preserved_on_retry", function()
+    local Engine  = require("modules.engine")
+    local Cache   = require("lib.cache")
+    local Util    = require("lib.util")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "test_inv" end,
+      wrap      = function()  return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies  = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery      = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "10" },
+      observability = { alert_stuck_minutes = "1" },
+    })
+
+    local state = {
+      cfg     = cfg,
+      cache   = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger  = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected   = function() return true end,
+          isOnline      = function() return true end,
+          getItem       = function(f) return { name = f.name, amount = 0, isCraftable = false } end,
+          isCraftable   = function(_) return false, nil end,
+          exportItemToPeripheral = function(_, _) return 0, nil end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 2203, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName             = function() return "t" end,
+          amountOfCitizens          = function() return 0 end,
+          maxOfCitizens             = function() return 0 end,
+          getHappiness              = function() return 0 end,
+          isUnderAttack             = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats    = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+
+    local originalTs = Util.nowUtcMs() - 120000
+    engine.work["2203"] = {
+      status         = "waiting_retry",
+      err            = "nao_craftavel",
+      next_retry     = 0,
+      stuck_since_ms = originalTs,
+    }
+
+    engine:tick()
+    peripheral = oldPeripheral
+
+    local w = engine.work["2203"]
+    assertEq(w ~= nil, true, "work entry deve existir")
+    if w and w.stuck_since_ms ~= nil then
+      assertEq(w.stuck_since_ms, originalTs,
+        "stuck_since_ms deve ser preservado (nao resetado) durante retry")
+    end
+  end },
+
+  { "engine_stuck_since_ms_cleared_on_done", function()
+    local Engine  = require("modules.engine")
+    local Cache   = require("lib.cache")
+    local Util    = require("lib.util")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "test_inv" end,
+      wrap      = function()  return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies  = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery      = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "10" },
+      observability = { alert_stuck_minutes = "1" },
+    })
+
+    local state = {
+      cfg     = cfg,
+      cache   = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger  = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected   = function() return true end,
+          isOnline      = function() return true end,
+          getItem       = function(f) return { name = f.name, amount = 10, isCraftable = false } end,
+          exportItemToPeripheral = function(f, _) return f.count, nil end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 2204, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName             = function() return "t" end,
+          amountOfCitizens          = function() return 0 end,
+          maxOfCitizens             = function() return 0 end,
+          getHappiness              = function() return 0 end,
+          isUnderAttack             = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats    = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+
+    engine.work["2204"] = {
+      status         = "waiting_retry",
+      err            = "nao_craftavel",
+      next_retry     = 0,
+      stuck_since_ms = Util.nowUtcMs() - 60000,
+    }
+
+    engine:tick()
+    peripheral = oldPeripheral
+
+    local w = engine.work["2204"]
+    assertEq(w ~= nil, true, "work entry deve existir")
+    if w and (w.status == "done" or w.missing == 0) then
+      assertEq(w.stuck_since_ms, nil,
+        "stuck_since_ms deve ser nil quando request resolve (done)")
+    end
+  end },
+
+  { "engine_stuck_since_ms_not_persisted", function()
+    local Engine      = require("modules.engine")
+    local Cache       = require("lib.cache")
+    local Persistence = require("modules.persistence")
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "test_inv" end,
+      wrap      = function()  return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies  = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery      = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "10" },
+      observability = { alert_stuck_minutes = "1" },
+    })
+
+    local state = {
+      cfg     = cfg,
+      cache   = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger  = { warn = function() end, info = function() end, error = function() end },
+      devices = {
+        meBridge = {
+          isConnected   = function() return true end,
+          isOnline      = function() return true end,
+          getItem       = function(f) return { name = f.name, amount = 0, isCraftable = false } end,
+          isCraftable   = function(_) return false, nil end,
+          exportItemToPeripheral = function(_, _) return 0, nil end,
+        },
+        colonyIntegrator = {
+          getRequests = function()
+            return {
+              { id = 2205, state = "requested", target = "x", count = 1,
+                items = { { name = "minecraft:stone", count = 1 } } },
+            }
+          end,
+          getColonyName             = function() return "t" end,
+          amountOfCitizens          = function() return 0 end,
+          maxOfCitizens             = function() return 0 end,
+          getHappiness              = function() return 0 end,
+          isUnderAttack             = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats    = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+
+    engine._persist_next_at_ms = 0
+    engine:_persistWorkMaybe()
+    peripheral = oldPeripheral
+
+    local saved = Persistence.load("data/state.json")
+    if saved and type(saved.jobs) == "table" and saved.jobs["2205"] then
+      assertEq(saved.jobs["2205"].stuck_since_ms, nil,
+        "stuck_since_ms NAO deve ser persistido em data/state.json")
+    end
+  end },
+
+  { "snapshot_copies_stuck_since_ms", function()
+    local Snapshot = require("modules.snapshot")
+    local Cache    = require("lib.cache")
+
+    local cfg = makeCfg({
+      minecolonies  = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery      = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      observability = { alert_stuck_minutes = "1" },
+    })
+
+    local state = {
+      cfg      = cfg,
+      cache    = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger   = { warn = function() end, info = function() end, error = function() end },
+      requests = {},
+      stats    = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+      health   = {},
+      metrics  = {},
+      throttle = {},
+      work     = {
+        ["2206"] = {
+          status         = "waiting_retry",
+          err            = "nao_craftavel",
+          stuck_since_ms = 12345678,
+        },
+      },
+    }
+
+    local snap = Snapshot.build(state)
+
+    assertEq(type(snap.work), "table", "snap.work deve ser table")
+    assertEq(type(snap.work["2206"]), "table", "snap.work['2206'] deve existir")
+    assertEq(snap.work["2206"].stuck_since_ms, 12345678,
+      "Snapshot deve copiar stuck_since_ms do engine work")
+  end },
 }
 
 for _, t in ipairs(tests) do

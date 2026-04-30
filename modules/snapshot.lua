@@ -78,6 +78,8 @@ local function copyWorkJob(job)
     next_retry = job.next_retry,
     delivered = job.delivered,
     craft = craft,
+    retry_count = job.retry_count,
+    stuck_since_ms = job.stuck_since_ms,
   }
 end
 

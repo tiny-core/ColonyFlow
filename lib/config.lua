@@ -64,6 +64,7 @@ enabled=false
 ui_enabled=false
 debug_log_enabled=false
 debug_log_interval_seconds=30
+alert_stuck_minutes=5
 
 [scheduler_budget]
 enabled=true

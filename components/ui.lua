@@ -466,6 +466,16 @@ function UI:renderRequests(state, mon)
     if retryCountM >= 1 then
       etapa = etapa .. "[R:" .. tostring(retryCountM) .. "]"
     end
+    -- PHASE 22: include "Xm" suffix in jobMax measurement (D-07)
+    local stuckSinceM = job and job.stuck_since_ms or nil
+    local alertMinsM  = state.cfg:getNumber("observability", "alert_stuck_minutes", 5)
+    if stuckSinceM then
+      local elapsedMsM  = (state.at_ms or os.epoch("utc")) - stuckSinceM
+      local elapsedMinM = math.floor(elapsedMsM / 60000)
+      if elapsedMinM >= alertMinsM then
+        etapa = etapa .. tostring(elapsedMinM) .. "m"
+      end
+    end
     if #chosenDisplay > choMax then choMax = #chosenDisplay end
     if #etapa > jobMax then jobMax = #etapa end
   end
@@ -541,6 +551,22 @@ function UI:renderRequests(state, mon)
     local retryCount = job and tonumber(job.retry_count or 0) or 0
     if retryCount >= 1 then
       etapaStr = etapaStr .. "[R:" .. tostring(retryCount) .. "]"
+    end
+    -- PHASE 22: stuck alert color and "Xm" suffix (D-04, D-05, D-06, D-07)
+    local stuckSince = job and job.stuck_since_ms or nil
+    local alertMins  = (state.cfg and state.cfg:getNumber("observability", "alert_stuck_minutes", 5)) or 5
+    if stuckSince then
+      local elapsedMs  = (state.at_ms or os.epoch("utc")) - stuckSince
+      local elapsedMin = math.floor(elapsedMs / 60000)
+      if elapsedMin >= alertMins then
+        etapaStr = etapaStr .. tostring(elapsedMin) .. "m"
+        local st = tostring(jobState or ""):lower()
+        if st == "blocked_by_tier" then
+          fg = colors.red
+        else
+          fg = colors.yellow
+        end
+      end
     end
     local line = string.format(
       "%-" .. reqW .. "s | %-" .. choMax .. "s | %" .. faltW .. "s | %-" .. jobMax .. "s",
@@ -783,6 +809,29 @@ function UI:renderStatus(state, mon)
         self:drawText("status", mon, startX, y, shorten(val, math.max(0, w - #leftPrefix)), colors.white, colors.black, true)
       end
       y = y + 1
+    end
+
+    -- PHASE 22: stuck summary line (D-08, D-09, D-10)
+    if y <= h - 2 then
+      local stuckCount = 0
+      local oldestStuck = nil
+      local alertMinsSt = (state.cfg and state.cfg:getNumber("observability","alert_stuck_minutes",5)) or 5
+      local nowMsSt = state.at_ms or os.epoch("utc")
+      for _, r in ipairs(state.requests or {}) do
+        local job = state.work and state.work[tostring(r.id)] or nil
+        if job and job.stuck_since_ms then
+          stuckCount = stuckCount + 1
+          if not oldestStuck or job.stuck_since_ms < oldestStuck then
+            oldestStuck = job.stuck_since_ms
+          end
+        end
+      end
+      if stuckCount > 0 then
+        local oldestMin = oldestStuck and math.floor((nowMsSt - oldestStuck) / 60000) or alertMinsSt
+        local stuckLine = "Presas: " .. tostring(stuckCount) .. " >" .. tostring(oldestMin) .. "m"
+        self:drawText("status", mon, 1, y, padRight(shorten(stuckLine, w), w), colors.yellow, colors.black)
+        y = y + 1
+      end
     end
 
     if y <= h - 2 then
