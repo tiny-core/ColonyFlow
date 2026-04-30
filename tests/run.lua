@@ -3626,6 +3626,207 @@ local tests = {
     assertEq(snap.work["2206"].stuck_since_ms, 12345678,
       "Snapshot deve copiar stuck_since_ms do engine work")
   end },
+
+  -- =========================================================================
+  -- Phase 23: metricas persistentes tests
+  -- =========================================================================
+
+  { "engine_flushes_metrics_at_interval", function()
+    -- Verifica que data/metrics.json é criado após N ticks com observability ativo
+    local Engine = require("modules.engine")
+    local Cache  = require("lib.cache")
+
+    -- Remove arquivo anterior se existir
+    if fs.exists("data/metrics.json") then fs.delete("data/metrics.json") end
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "test_inv" end,
+      wrap      = function()  return inv end,
+    }
+
+    -- interval=1 para disparar no primeiro tick
+    local cfg = makeCfg({
+      minecolonies     = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery         = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "10" },
+      observability    = { enabled = "true", metrics_flush_interval_ticks = "1" },
+    })
+
+    local state = {
+      cfg        = cfg,
+      cache      = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger     = { warn = function() end, info = function() end, error = function() end },
+      started_at = os.epoch("utc"),
+      metrics    = {
+        enabled  = true,
+        timing   = {},
+        io       = { me = { total = 0, methods = {} }, mc = { total = 0, methods = {} }, inv = { total = 0, methods = {} } },
+        cache    = { hit_total = 0, miss_total = 0, hit_by_namespace = {}, miss_by_namespace = {} },
+      },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline    = function() return true end,
+          getItem     = function() return nil end,
+          exportItemToPeripheral = function(_, _) return 0, nil end,
+        },
+        colonyIntegrator = {
+          getRequests               = function() return {} end,
+          getColonyName             = function() return "t" end,
+          amountOfCitizens          = function() return 0 end,
+          maxOfCitizens             = function() return 0 end,
+          getHappiness              = function() return 0 end,
+          isUnderAttack             = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats    = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()  -- processed=1; 1%1==0 → flush
+    peripheral = oldPeripheral
+
+    assertEq(fs.exists("data/metrics.json"), true,
+      "data/metrics.json deve existir apos tick com observability.enabled=true")
+  end },
+
+  { "engine_skips_metrics_flush_when_disabled", function()
+    -- Verifica que data/metrics.json NÃO é criado quando observability está desabilitado
+    local Engine = require("modules.engine")
+    local Cache  = require("lib.cache")
+
+    if fs.exists("data/metrics.json") then fs.delete("data/metrics.json") end
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "test_inv" end,
+      wrap      = function()  return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies     = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery         = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "10" },
+      -- observability.enabled = false (default) → state.metrics = nil
+    })
+
+    local state = {
+      cfg        = cfg,
+      cache      = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger     = { warn = function() end, info = function() end, error = function() end },
+      started_at = os.epoch("utc"),
+      metrics    = nil,  -- disabled
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline    = function() return true end,
+          getItem     = function() return nil end,
+          exportItemToPeripheral = function(_, _) return 0, nil end,
+        },
+        colonyIntegrator = {
+          getRequests               = function() return {} end,
+          getColonyName             = function() return "t" end,
+          amountOfCitizens          = function() return 0 end,
+          maxOfCitizens             = function() return 0 end,
+          getHappiness              = function() return 0 end,
+          isUnderAttack             = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats    = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+    peripheral = oldPeripheral
+
+    assertEq(fs.exists("data/metrics.json"), false,
+      "data/metrics.json NAO deve ser criado quando observability esta desabilitado")
+  end },
+
+  { "engine_metrics_payload_has_required_fields", function()
+    -- Verifica que data/metrics.json contém v, flushed_at_ms, started_at_ms, metrics
+    local Engine = require("modules.engine")
+    local Cache  = require("lib.cache")
+    local Util   = require("lib.util")
+
+    if fs.exists("data/metrics.json") then fs.delete("data/metrics.json") end
+
+    local inv = { list = function() return {} end }
+    local oldPeripheral = peripheral
+    peripheral = {
+      isPresent = function(n) return n == "test_inv" end,
+      wrap      = function()  return inv end,
+    }
+
+    local cfg = makeCfg({
+      minecolonies     = { pending_states_allow = "requested", completed_states_deny = "done" },
+      delivery         = { default_target_container = "test_inv", destination_cache_ttl_seconds = "0" },
+      scheduler_budget = { enabled = "true", requests_per_tick = "10" },
+      observability    = { enabled = "true", metrics_flush_interval_ticks = "1" },
+    })
+
+    local bootTime = os.epoch("utc")
+    local state = {
+      cfg        = cfg,
+      cache      = Cache.new({ max_entries = 2000, default_ttl_seconds = 5 }),
+      logger     = { warn = function() end, info = function() end, error = function() end },
+      started_at = bootTime,
+      metrics    = {
+        enabled  = true,
+        timing   = {},
+        io       = { me = { total = 5, methods = {} }, mc = { total = 3, methods = {} }, inv = { total = 1, methods = {} } },
+        cache    = { hit_total = 10, miss_total = 2, hit_by_namespace = {}, miss_by_namespace = {} },
+      },
+      devices = {
+        meBridge = {
+          isConnected = function() return true end,
+          isOnline    = function() return true end,
+          getItem     = function() return nil end,
+          exportItemToPeripheral = function(_, _) return 0, nil end,
+        },
+        colonyIntegrator = {
+          getRequests               = function() return {} end,
+          getColonyName             = function() return "t" end,
+          amountOfCitizens          = function() return 0 end,
+          maxOfCitizens             = function() return 0 end,
+          getHappiness              = function() return 0 end,
+          isUnderAttack             = function() return false end,
+          amountOfConstructionSites = function() return 0 end,
+        },
+      },
+      requests = {},
+      stats    = { processed = 0, crafted = 0, delivered = 0, substitutions = 0, errors = 0 },
+    }
+
+    local engine = Engine.new(state)
+    state.work = engine.work
+    engine:tick()
+    peripheral = oldPeripheral
+
+    assertEq(fs.exists("data/metrics.json"), true, "data/metrics.json deve existir")
+
+    local txt = Util.readFile("data/metrics.json")
+    assertEq(type(txt), "string", "metrics.json deve ser legivel")
+    local ok, data = pcall(Util.jsonDecode, txt)
+    assertEq(ok, true, "metrics.json deve ser JSON valido")
+    assertEq(type(data), "table", "metrics.json deve deserializar para table")
+    assertEq(data.v, 1, "payload.v deve ser 1")
+    assertEq(type(data.flushed_at_ms), "number", "payload.flushed_at_ms deve ser number")
+    assertEq(type(data.started_at_ms), "number", "payload.started_at_ms deve ser number")
+    assertEq(data.started_at_ms, bootTime, "payload.started_at_ms deve ser state.started_at")
+    assertEq(type(data.metrics), "table", "payload.metrics deve ser table")
+    assertEq(type(data.metrics.io), "table", "payload.metrics.io deve ser table")
+    assertEq(type(data.metrics.cache), "table", "payload.metrics.cache deve ser table")
+  end },
 }
 
 for _, t in ipairs(tests) do
