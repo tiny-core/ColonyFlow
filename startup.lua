@@ -5,6 +5,7 @@
 -- - `startup config` -> abre a CLI de configuração
 -- - `startup doctor` -> diagnóstico rápido do ambiente
 -- - `startup update` -> atualiza o mod pelo GitHub
+-- - `startup metrics` -> exibe relatorio de metricas persistidas
 -- Sem argumento: carrega lib/bootstrap.lua e inicia o loop principal.
 
 local args = { ... }
@@ -53,6 +54,14 @@ local function runUpdate()
   print("Instalador nao encontrado.")
 end
 
+local function runMetrics()
+  if fs.exists("modules/metrics_cli.lua") then
+    shell.run("modules/metrics_cli.lua")
+    return
+  end
+  print("CLI de metricas nao encontrado.")
+end
+
 local mode = args[1]
 if mode == "test" then
   runTests()
@@ -76,6 +85,11 @@ end
 
 if mode == "update" then
   runUpdate()
+  return
+end
+
+if mode == "metrics" then
+  runMetrics()
   return
 end
 
