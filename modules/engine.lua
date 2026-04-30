@@ -19,6 +19,7 @@ Engine.__index = Engine
 local PERSIST_PATH = "data/state.json"
 local PERSIST_INTERVAL_MS = 2000
 local PERSIST_MAX_AGE_MS = 6 * 60 * 60 * 1000
+local METRICS_PATH = "data/metrics.json"
 
 local function isBudgetExceeded(err)
   return type(err) == "string" and err:match("^budget_exceeded:") ~= nil
@@ -90,6 +91,25 @@ function Engine:_persistWorkMaybe()
   end
 
   Persistence.save(PERSIST_PATH, jobs)
+end
+
+function Engine:_metricsFlushMaybe()
+  local state = self.state
+  if not state.metrics or not state.metrics.enabled then return end
+  local interval = (state.cfg and state.cfg:getNumber("observability", "metrics_flush_interval_ticks", 60)) or 60
+  if interval <= 0 then return end
+  if (state.stats.processed % interval) ~= 0 then return end
+  Util.ensureDir("data")
+  local payload = {
+    v             = 1,
+    flushed_at_ms = Util.nowUtcMs(),
+    started_at_ms = state.started_at,
+    metrics       = state.metrics,
+  }
+  local ok, json = pcall(textutils.serializeJSON, payload)
+  if ok and type(json) == "string" then
+    Util.writeFileAtomic(METRICS_PATH, json)
+  end
 end
 
 function Engine.new(state)
@@ -1105,6 +1125,7 @@ function Engine:tick()
     state.logger:warn("colonyIntegrator indisponível; aguardando...")
     publishSnapshot(state)
     self:_persistWorkMaybe()
+    self:_metricsFlushMaybe()
     return
   end
 
@@ -1121,6 +1142,7 @@ function Engine:tick()
   if requests == nil then
     publishSnapshot(state)
     self:_persistWorkMaybe()
+    self:_metricsFlushMaybe()
     return
   end
 
@@ -1128,6 +1150,7 @@ function Engine:tick()
   if colonyStats == nil then
     publishSnapshot(state)
     self:_persistWorkMaybe()
+    self:_metricsFlushMaybe()
     return
   end
   state.colonyStats = colonyStats
@@ -1138,6 +1161,7 @@ function Engine:tick()
     self:_markAllWaitingRetry(requests, "destino_indisponivel")
     publishSnapshot(state)
     self:_persistWorkMaybe()
+    self:_metricsFlushMaybe()
     return
   end
 
@@ -1146,6 +1170,7 @@ function Engine:tick()
   if defaultSnap == nil and isBudgetExceeded(defaultSnapErr) then
     publishSnapshot(state)
     self:_persistWorkMaybe()
+    self:_metricsFlushMaybe()
     return
   end
 
@@ -1153,6 +1178,7 @@ function Engine:tick()
   if buildings == nil then
     publishSnapshot(state)
     self:_persistWorkMaybe()
+    self:_metricsFlushMaybe()
     return
   end
 
@@ -1160,6 +1186,7 @@ function Engine:tick()
   if citizens == nil then
     publishSnapshot(state)
     self:_persistWorkMaybe()
+    self:_metricsFlushMaybe()
     return
   end
 
@@ -1224,6 +1251,7 @@ function Engine:tick()
       self._rq_cursor = tonumber(self._rq_cursor or 1) or 1
       publishSnapshot(state)
       self:_persistWorkMaybe()
+      self:_metricsFlushMaybe()
       return
     end
     if did == true then
@@ -1263,6 +1291,7 @@ function Engine:tick()
           self._rq_cursor = currentIdx
           publishSnapshot(state)
           self:_persistWorkMaybe()
+          self:_metricsFlushMaybe()
           return
         end
         if did == true then processed = processed + 1 end
@@ -1275,6 +1304,7 @@ function Engine:tick()
 
   publishSnapshot(state)
   self:_persistWorkMaybe()
+  self:_metricsFlushMaybe()
 end
 
 function Engine:updateHealthSnapshot(forceRefresh)
