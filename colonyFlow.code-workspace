@@ -1,0 +1,68 @@
+{
+  "folders": [
+    {
+      "name": "ColonyFlow",
+      "path": ".",
+    },
+    {
+      "name": "Documentation",
+      "path": "docs",
+    },
+    {
+      "name": "Handlers",
+      "path": "handlers",
+    },
+    {
+      "name": "Modules",
+      "path": "modules",
+    },
+    {
+      "name": "Library",
+      "path": "cclib",
+    },
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "files.exclude": {
+      "**/.git": true,
+      "**/.svn": true,
+      "**/.hg": true,
+      "**/.DS_Store": true,
+      "**/Thumbs.db": true,
+      "{handlers,cclib,docs,modules}": true,
+    },
+    "[markdown]": {
+      "editor.formatOnSave": true,
+      "editor.formatOnPaste": true
+    },
+    "cSpell.language": "pt_BR,en-US",
+    "cSpell.words": [
+      "blit",
+      "booleano",
+      "cclib",
+      "Colour",
+      "colours",
+      "encadeável",
+      "GLSL",
+      "idiv",
+      "ipairs",
+      "lerp",
+      "metamethods",
+      "METAMETHODS",
+      "metatable",
+      "metatables",
+      "MUTA",
+      "mutam",
+      "newindex",
+      "pcall",
+      "Perlin",
+      "redstone",
+      "sparkline",
+      "stdlib",
+      "subname",
+      "tostring",
+      "trunc",
+      "unwatch"
+    ],
+  },
+}
