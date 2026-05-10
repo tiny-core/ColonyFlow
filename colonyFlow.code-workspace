@@ -47,6 +47,7 @@
       "idiv",
       "ipairs",
       "lerp",
+      "luarc",
       "metamethods",
       "METAMETHODS",
       "metatable",

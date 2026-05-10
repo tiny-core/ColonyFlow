@@ -1,0 +1,109 @@
+---@meta [cclib]
+-- cclib / types / cclib.d.lua
+-- Índice global de todos os tipos CCLib.
+-- Importa este ficheiro nos teus módulos para ter autocomplete completo.
+--
+-- Uso no topo de qualquer ficheiro do projeto:
+--   ---@type CCLib.Const
+--   local Const = require("core.const")
+--
+-- O LSP resolve automaticamente os tipos a partir de types/*.d.lua
+-- graças ao .luarc.json. Este ficheiro serve de índice de referência.
+
+-- ── Namespace global CCLib ────────────────────────────────────────────────────
+
+---@class CCLib
+---Namespace raiz. Todos os sub-tipos estão documentados nos ficheiros .d.lua.
+---Usa `require("core.xxx")` ou `require("system.xxx")` para os módulos reais.
+local CCLib = {}
+
+-- ──────────────────────────────────────────────────────────────────────────────
+-- REFERÊNCIA RÁPIDA DE TIPOS
+-- ──────────────────────────────────────────────────────────────────────────────
+--
+-- CORE
+--   CCLib.Const               → core/const.lua
+--   CCLib.Const.Monitor
+--   CCLib.Const.Color
+--   CCLib.Const.Key
+--   CCLib.Const.Peripheral
+--   CCLib.Const.Log
+--   CCLib.Const.Path
+--   CCLib.Const.Event
+--   CCLib.Const.Time
+--   CCLib.Const.Limit
+--
+--   CCLib.ClassModule          → core/class.lua
+--   CCLib.Class                Resultado de Class.new()
+--   CCLib.ClassInstance        Instância (tem :isA, :__tostring)
+--
+--   CCLib.Guard                → core/guard.lua
+--   CCLib.GuardFn              Tipo alias: fun(v, name?): any
+--
+--   CCLib.ResultModule         → core/result.lua
+--   CCLib.Result<T, E>         Tipo base (Ok ou Err)
+--   CCLib.Ok<T>                Resultado de sucesso
+--   CCLib.Err<E>               Resultado de falha
+--
+--   CCLib.Str                  → core/str.lua
+--   CCLib.Str.Char             Tabela de caracteres CP437
+--
+--   CCLib.Tbl                  → core/tbl.lua
+--
+--   CCLib.Math                 → core/math.lua
+--
+--   CCLib.Fmt                  → core/fmt.lua
+--
+-- SYSTEM
+--   CCLib.Log                  → system/log.lua
+--   CCLib.Log.InitOpts
+--
+--   CCLib.Event                → system/event.lua
+--   CCLib.Event.ListenerId     alias: integer
+--   CCLib.Event.Handler        alias: fun(...)
+--   CCLib.Event.InspectResult
+--
+--   CCLib.Timer                → system/timer.lua
+--   CCLib.Timer.CreateOpts
+--   CCLib.Timer.InspectEntry
+--
+--   CCLib.Peripheral           → system/peripheral.lua
+--   CCLib.Peripheral.Entry
+--   CCLib.Peripheral.InspectEntry
+--   CCLib.Peripheral.FoundPayload
+--   CCLib.Peripheral.LostPayload
+--
+--   CCLib.Snapshot             → system/snapshot.lua
+--   CCLib.Snapshot.DiffResult
+--   CCLib.Snapshot.DeepDiffEntry
+--   CCLib.Snapshot.History<T>
+--
+--   CCLib.Session              → system/session.lua
+--   CCLib.Session.RunOpts
+--   CCLib.Session.InspectResult
+--   CCLib.Session.OnStart
+--   CCLib.Session.OnStop
+--   CCLib.Session.OnUpdate
+--   CCLib.Session.OnError
+
+-- ── Exemplo de uso com anotações ─────────────────────────────────────────────
+--
+-- -- No topo de um módulo qualquer:
+--
+-- ---@type CCLib.Log
+-- local Log = require("system.log")
+--
+-- ---@type CCLib.Result<string, string>
+-- local r = Result.try(fs.open, "/data.lua", "r")
+--
+-- ---@param store CCLib.Tbl
+-- local function processar(store) end
+--
+-- -- Definir uma tela com tipo explícito:
+-- ---@class MinhaTela
+-- ---@field title string
+-- local MinhaTela = {}
+-- function MinhaTela.onMount(params) end
+-- function MinhaTela.render(screen) end
+
+return CCLib
