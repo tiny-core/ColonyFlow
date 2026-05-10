@@ -13,6 +13,10 @@
 -- ── Namespace global CCLib ────────────────────────────────────────────────────
 
 ---@class CCLib
+---@field VERSION string -- Versão da lib, ex: "1.0.0"
+---@field LIB_NAME string -- Nome da lib: "CCLib"
+---@field SCHEMA_VER integer -- Versão do schema de dados para migrate.lua
+---@field DEV boolean -- Ativa logs verbose e ferramentas de debug
 ---Namespace raiz. Todos os sub-tipos estão documentados nos ficheiros .d.lua.
 ---Usa `require("core.xxx")` ou `require("system.xxx")` para os módulos reais.
 local CCLib = {}
@@ -26,6 +30,8 @@ local CCLib = {}
 --   CCLib.Const.Monitor
 --   CCLib.Const.Color
 --   CCLib.Const.Key
+--   CCLib.Const.Side           Enum: .TOP .BOTTOM .LEFT .RIGHT .FRONT .BACK .ALL
+--   CCLib.Side                 Alias union: "top"|"bottom"|"left"|"right"|"front"|"back"
 --   CCLib.Const.Peripheral
 --   CCLib.Const.Log
 --   CCLib.Const.Path
