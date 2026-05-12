@@ -123,7 +123,6 @@
 -- ── Módulo principal ─────────────────────────────────────────────────────────
 
 ---@class CCLib.Const
----@field VERSION    string                 -- Versão da lib, ex: "1.0.0"
 ---@field LIB_NAME   string                 -- Nome da lib: "CCLib"
 ---@field SCHEMA_VER integer                -- Versão do schema de dados para migrate.lua
 ---@field DEV        boolean                -- Ativa logs verbose e ferramentas de debug

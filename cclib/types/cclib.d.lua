@@ -13,10 +13,6 @@
 -- ── Namespace global CCLib ────────────────────────────────────────────────────
 
 ---@class CCLib
----@field VERSION string -- Versão da lib, ex: "1.0.0"
----@field LIB_NAME string -- Nome da lib: "CCLib"
----@field SCHEMA_VER integer -- Versão do schema de dados para migrate.lua
----@field DEV boolean -- Ativa logs verbose e ferramentas de debug
 ---Namespace raiz. Todos os sub-tipos estão documentados nos ficheiros .d.lua.
 ---Usa `require("core.xxx")` ou `require("system.xxx")` para os módulos reais.
 local CCLib = {}
