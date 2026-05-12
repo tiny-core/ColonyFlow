@@ -8,6 +8,6 @@
     "bit32": "enable",
     "utf8": "enable",
     "io": "disable",
-    "os": "disable"
+    "os": "enable"
   }
 }
