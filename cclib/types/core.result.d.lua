@@ -5,129 +5,52 @@
 -- Definições de tipo para core/result.lua
 -- Usa genéricos LuaLS para preservar o tipo do valor em Ok<T> e Err<E>.
 
--- ── Ok<T> ────────────────────────────────────────────────────────────────────
+-- ── Callbacks ─────────────────────────────────────────────────────────────────
 
----@class CCLib.Ok<T>: CCLib.Result<T, any>
----@field _value T
-
--- ── Err<E> ───────────────────────────────────────────────────────────────────
-
----@class CCLib.Err<E>: CCLib.Result<any, E>
----@field _error E
-
--- ── Result<T, E> ─────────────────────────────────────────────────────────────
-
----@class CCLib.Result<T, E>
-local Result = {}
-
----@return boolean true -- se Ok, false se Err
-function Result:isOk() end
-
----@return boolean true -- se Err, false se Ok
-function Result:isErr() end
-
----Retorna o valor se Ok. Lança error() se Err.
----@generic T
----@return T
-function Result:unwrap() end
-
----Retorna o erro se Err. Lança error() se Ok.
----@generic E
----@return E
-function Result:unwrapErr() end
-
----Retorna o valor se Ok, ou `default` se Err.
----@generic T
----@param default T
----@return T
-function Result:unwrapOr(default) end
-
----Retorna o valor se Ok, ou lança error() com `msg` se Err.
----@generic T
----@param msg string -- Mensagem de erro personalizada
----@return T
-function Result:expect(msg) end
-
----Transforma o valor interno se Ok. Propaga Err sem modificar.
----@generic T, U, E
----@param fn fun(value: T): U
----@return CCLib.Result<U, E>
-function Result:map(fn) end
-
----Transforma o erro interno se Err. Propaga Ok sem modificar.
----@generic T, E, F
----@param fn fun(err: E): F
----@return CCLib.Result<T, F>
-function Result:mapErr(fn) end
-
----Encadeia operações que retornam Result. Propaga Err sem chamar `fn`.
----@generic T, U, E
----@param fn fun(value: T): CCLib.Result<U, E>
----@return CCLib.Result<U, E>
-function Result:andThen(fn) end
-
----Fallback se Err. Propaga Ok sem chamar `fn`.
----@generic T, E
----@param fn fun(err: E): CCLib.Result<T, E>
----@return CCLib.Result<T, E>
-function Result:orElse(fn) end
-
----Executa um side-effect sem modificar o resultado.
----@generic T
----@param fn fun(value: T)
----@return CCLib.Result<T, any>
-function Result:tap(fn) end
+---@class CCLib.Result.Callbacks<T>
+---@field onSuccess? fun(data: T)      Chamado com o retorno de fn em caso de sucesso
+---@field onError?   fun(err: string)  Chamado com a mensagem de erro em caso de falha
 
 -- ── Módulo ────────────────────────────────────────────────────────────────────
 
----@class CCLib.ResultModule
-local ResultModule = {}
+---@class CCLib.Result
+local Result = {}
 
----Cria um resultado de sucesso.
----@generic T
----@param value T
----@return CCLib.Ok<T>
-function ResultModule.ok(value) end
-
----Cria um resultado de falha.
----@generic E
----@param err E
----@return CCLib.Err<E>
-function ResultModule.err(err) end
-
----Envolve uma chamada de função num Result automaticamente.
+---Executa `fn` com pcall e chama o callback apropriado.
+---`fn` não recebe argumentos — usa closure para capturar valores externos.
+---`onSuccess` recebe o valor de retorno de `fn`.
+---`onError` recebe a mensagem de erro como string.
+---Ambos os callbacks são opcionais.
 ---
 ---```lua
----local r = Result.try(io.open, "/ficheiro", "r")
----if r:isOk() then
---- local handle = r:unwrap()
----end
----```
----@generic T
----@param fn fun(...): T -- Função a chamar
----@param ... any -- Argumentos para a função
----@return CCLib.Ok<T> | CCLib.Err<string>
-function ResultModule.try(fn, ...) end
-
----Converte o padrão Lua `valor, mensagem_erro` para Result.
+----- Exemplo com Persist.load
+---Result.try(function()
+---  local data, err = Persist.load("/data.lua")
+---  if not data then error(err) end  -- propaga para onError
+---  return data
+---end, {
+---  onSuccess = function(data)
+---    store:patch(data)
+---    Toast.success("Dados carregados")
+---  end,
+---  onError = function(err)
+---    Log.error("main", "Falha: %s", err)
+---  end,
+---})
 ---
----```lua
----local r = Result.from(io.open("/path", "r"))
+----- Sem onError (ignora falhas silenciosamente)
+---Result.try(function()
+---  return Persist.load("/config.lua")
+---end, {
+---  onSuccess = function(cfg) applyConfig(cfg) end,
+---})
+---
+----- Sem callbacks (só executa e protege com pcall)
+---Result.try(function()
+---  dangerousOperation()
+---end)
 ---```
 ---@generic T
----@param value T | nil
----@param err? string
----@return CCLib.Ok<T> | CCLib.Err<string>
-function ResultModule.from(value, err) end
-
----Combina múltiplos Results numa lista.
----Retorna o primeiro Err encontrado, ou Ok com array de todos os valores.
----@generic T
----@param list CCLib.Result<T, any>[]
----@return CCLib.Ok<T[]> | CCLib.Err<any>
-function ResultModule.all(list) end
-
----Verifica se um valor qualquer é um Result (Ok ou Err).
----@param v any
----@return boolean
-function ResultModule.isResult(v) end
+---@param fn fun(): T
+---@param callbacks? CCLib.Result.Callbacks<T>
+function Result.try(fn, callbacks) end
