@@ -156,7 +156,3 @@ end
 ---@return table -- Retorna `props` se tudo válido
 function Guard.props(props, schema)
 end
-
----@type CCLib.Guard
-local G = {}
-return G

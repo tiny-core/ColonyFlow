@@ -131,7 +131,3 @@ function ResultModule.all(list) end
 ---@param v any
 ---@return boolean
 function ResultModule.isResult(v) end
-
----@type CCLib.ResultModule
-local R = {}
-return R

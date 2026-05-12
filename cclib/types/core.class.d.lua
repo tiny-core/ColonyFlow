@@ -58,7 +58,3 @@ function ClassModule.mixin(cls, mixin) end
 ---@param klass CCLib.Class
 ---@return boolean
 function ClassModule.isInstance(value, klass) end
-
----@type CCLib.ClassModule
-local Class = {}
-return Class
