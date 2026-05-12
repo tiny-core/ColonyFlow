@@ -39,7 +39,9 @@
       "---@type CCLib.$3",
       "local $4 = $5\n",
       "--#endregion\n",
-      "return $4"
+      "--#region Métodos públicos ---------------------------------------------------------------------------------------------\n",
+      "--#endregion\n",
+      "return $4\n"
     ],
     "description": "Insert a class template",
   },

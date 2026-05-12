@@ -6,8 +6,7 @@
 
 ---@version 1.0.0
 
-local Const        = require("cclib.core.const")
-local Fmt          = require("cclib.core.fmt")
+local LConst       = require("cclib.core.const")
 local Str          = require("cclib.core.str")
 
 --#region Definições ----------------------------------------------------------------------------------------------------
@@ -19,20 +18,12 @@ local M            = {}
 
 --#region Propriedades privadas ----------------------------------------------------------------------------------------
 
-local _level       = Const.DEV and Const.LOG.DEBUG or Const.LOG.INFO
+local _level       = LConst.DEV and LConst.LOG.DEBUG or LConst.LOG.INFO
 local _fileHandle  = nil
 local _debugMon    = nil -- monitor lateral para logs em tempo real
 local _lineCount   = 0
 local _initialized = false
 local _buffer      = {} -- buffer de linhas antes da inicialização
-
-local LEVEL_COLORS = {
-  [1] = "\xB0", -- DEBUG  : cor info (sem cor real — CC terminal)
-  [2] = " ",    -- INFO
-  [3] = "!",    -- WARN
-  [4] = "X",    -- ERROR
-  [5] = "#",    -- FATAL
-}
 
 --#endregion
 
@@ -41,12 +32,12 @@ local LEVEL_COLORS = {
 function M._write(level, module, message)
   if level < _level then return end
 
-  local levelName = Const.LOG_NAMES[level] or "?"
+  local levelName = LConst.LOG_NAMES[level] or "?"
   local time      = os.date and os.date("%H:%M:%S") or "??:??:??"
   local line      = string.format("[%s] [%-5s] [%s] %s", time, levelName, module, message)
 
   -- Terminal (só em DEV ou se WARN+)
-  if Const.DEV or level >= Const.LOG.WARN then
+  if LConst.DEV or level >= LConst.LOG.WARN then
     print(line)
   end
 
@@ -57,7 +48,7 @@ function M._write(level, module, message)
     _lineCount = _lineCount + 1
 
     -- Rotação de ficheiro quando atinge o limite
-    if _lineCount >= Const.LIMIT.LOG_FILE_LINES then
+    if _lineCount >= LConst.LIMIT.LOG_FILE_LINES then
       _fileHandle:write("--- log rotacionado ---\n")
       _fileHandle:close()
       _fileHandle = nil
@@ -73,11 +64,11 @@ function M._write(level, module, message)
       _debugMon.scroll(1)
       _debugMon.setCursorPos(1, h)
       -- Cor por nível
-      if level >= Const.LOG.FATAL then
+      if level >= LConst.LOG.FATAL then
         _debugMon.setTextColor(colors and colors.red or 16384)
-      elseif level >= Const.LOG.ERROR then
+      elseif level >= LConst.LOG.ERROR then
         _debugMon.setTextColor(colors and colors.orange or 2)
-      elseif level >= Const.LOG.WARN then
+      elseif level >= LConst.LOG.WARN then
         _debugMon.setTextColor(colors and colors.yellow or 16)
       else
         _debugMon.setTextColor(colors and colors.lightGray or 256)
@@ -124,7 +115,7 @@ function M.init(opts)
 
   -- Ficheiro de log
   if opts.file ~= false then
-    local path = Const.PATH.LOGS
+    local path = LConst.PATH.LOGS
     if not fs.exists(path) then
       fs.makeDir(path)
     end
@@ -134,13 +125,13 @@ function M.init(opts)
       _fileHandle = handle
     else
       -- não podemos logar o erro ainda — vai para o buffer
-      _buffer[#_buffer + 1] = { Const.LOG.WARN, "log", "Não foi possível abrir ficheiro de log: " .. tostring(err) }
+      _buffer[#_buffer + 1] = { LConst.LOG.WARN, "log", "Não foi possível abrir ficheiro de log: " .. tostring(err) }
     end
   end
 
   -- Monitor de debug
   if opts.monitor then
-    local mon = peripheral.find and peripheral.find("monitor") or
+    local mon = peripheral.find and peripheral.find(LConst.PERIPHERAL.MONITOR) or
         (peripheral.isPresent(opts.monitor) and peripheral.wrap(opts.monitor))
     if mon then
       _debugMon = mon
@@ -159,11 +150,11 @@ function M.init(opts)
   _buffer = {}
 end
 
-M.debug = _makeLogger(Const.LOG.DEBUG)
-M.info  = _makeLogger(Const.LOG.INFO)
-M.warn  = _makeLogger(Const.LOG.WARN)
-M.error = _makeLogger(Const.LOG.ERROR)
-M.fatal = _makeLogger(Const.LOG.FATAL)
+M.debug = _makeLogger(LConst.LOG.DEBUG)
+M.info  = _makeLogger(LConst.LOG.INFO)
+M.warn  = _makeLogger(LConst.LOG.WARN)
+M.error = _makeLogger(LConst.LOG.ERROR)
+M.fatal = _makeLogger(LConst.LOG.FATAL)
 
 function M.setLevel(level)
   local levels = { DEBUG = 1, INFO = 2, WARN = 3, ERROR = 4, FATAL = 5 }
@@ -171,7 +162,7 @@ function M.setLevel(level)
 end
 
 function M.getLevel()
-  return Const.LOG_NAMES[_level] or "?"
+  return LConst.LOG_NAMES[_level] or "?"
 end
 
 function M.close()
@@ -187,7 +178,7 @@ function M.separator(label)
   local line = string.rep("-", 40)
   label = label and (" " .. label .. " ") or ""
   local sep = line .. label .. line
-  M._write(Const.LOG.INFO, "---", sep:sub(1, 60))
+  M._write(LConst.LOG.INFO, "---", sep:sub(1, 60))
 end
 
 --#endregion
