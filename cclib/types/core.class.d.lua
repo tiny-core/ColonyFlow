@@ -1,4 +1,6 @@
 ---@meta
+---@version 1.0.0
+
 -- cclib / types / core.class.d.lua
 -- Definições de tipo para core/class.lua
 
@@ -11,9 +13,9 @@
 -- ── Classe (resultado de Class.new) ──────────────────────────────────────────
 
 ---@class CCLib.Class : CCLib.ClassInstance
----@field __name  string -- Nome da classe (para tostring e debug)
+---@field __name string -- Nome da classe (para tostring e debug)
 ---@field __index CCLib.Class
----@field super   CCLib.Class | nil -- Classe pai, ou nil se não há herança
+---@field super CCLib.Class | nil -- Classe pai, ou nil se não há herança
 ---@field new fun(self: CCLib.Class, ...): CCLib.ClassInstance -- Cria uma nova instância. Chama `:init(...)` automaticamente se definido.
 ---@field isA fun(self: CCLib.Class, klass: CCLib.Class): boolean -- Verifica herança.
 
@@ -26,13 +28,13 @@ local ClassModule = {}
 ---
 ---```lua
 ---local Animal = Class.new()
----local Dog    = Class.new(Animal)
+---local Dog = Class.new(Animal)
 ---
 ---function Dog:init(name) self.name = name end
----function Dog:bark()     return "Woof!" end
+---function Dog:bark() return "Woof!" end
 ---
 ---local d = Dog:new("Rex")
----print(d:isA(Animal))  --> true
+---print(d:isA(Animal)) --> true
 ---```
 ---@param base? CCLib.Class -- Classe pai para herança
 ---@return CCLib.Class
@@ -45,7 +47,7 @@ function ClassModule.new(base) end
 ---local Serializable = { serialize = function(self) return textutils.serialize(self) end }
 ---Class.mixin(MyClass, Serializable)
 ---```
----@param cls   CCLib.Class -- Classe de destino
+---@param cls CCLib.Class -- Classe de destino
 ---@param mixin table -- Tabela com métodos a copiar
 ---@return CCLib.Class -- A mesma `cls` (para encadeamento)
 function ClassModule.mixin(cls, mixin) end
