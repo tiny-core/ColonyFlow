@@ -1,6 +1,6 @@
 --- =====================================================================================================================
 -- Arquivo: cclib/system/event.lua
--- Descrição:
+-- Descrição: Bus de eventos pub/sub. Cobre eventos nativos do CC:Tweaked E eventos internos da CCLib (prefixo "cclib:").
 -- Autor: CCLib - Tiny Core
 -- =====================================================================================================================
 

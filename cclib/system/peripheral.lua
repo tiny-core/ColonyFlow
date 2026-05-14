@@ -1,6 +1,7 @@
 -- =====================================================================================================================
 -- Arquivo: cclib/system/peripheral.lua
--- Descrição:
+-- Descrição: Detecção e gestão de periféricos CC:Tweaked.
+--            Suporta sides físicos ("top", "left"…) E periféricos por wired modem ("monitor_0"…).
 -- Autor: CCLib - Tiny Core
 -- =====================================================================================================================
 

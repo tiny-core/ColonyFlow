@@ -93,6 +93,11 @@ local M = {
       failed         = "Migração %d→%d falhou: %s",
       downgrade      = "Downgrade não suportado (dados v%d > alvo v%d)",
     },
+
+    snapshot = {
+      max_deep_copy = "Profundidade máxima (%d) atingida no deepCopy",
+      circular_deep_copy = "Referência circular detetada no deepCopy — truncada"
+    }
   },
 
   -- ── Componentes de UI ──────────────────────────────────────────────────────

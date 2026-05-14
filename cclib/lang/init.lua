@@ -1,6 +1,13 @@
 -- =====================================================================================================================
 -- Arquivo: cclib/lang/init.lua
--- Descrição:
+-- Descrição: Motor de internacionalização (i18n).
+-- Funcionalidades:
+--   · Acesso por notação de ponto: Lang.get("ui.button.ok")
+--   · Interpolação printf:         Lang.get("ui.label.page", 1, 5) → "Página 1 de 5"
+--   · Fallback automático para EN  se a chave não existe no idioma ativo
+--   · Merge de traduções custom    sem substituir toda a tabela
+--   · Registo de novos idiomas     em runtime
+--   · Reset ao idioma padrão
 -- Autor: CCLib - Tiny Core
 -- =====================================================================================================================
 
