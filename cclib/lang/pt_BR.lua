@@ -58,11 +58,15 @@ local M = {
     },
 
     peripheral = {
-      found        = "%s conectado em %s",
-      lost         = "%s desconectado de %s",
-      not_found    = "Periférico não encontrado: %s",
-      scan_done    = "%d periférico(s) encontrado(s)",
-      monitor_size = "Monitor pequeno demais (%dx%d), mínimo é %dx%d",
+      scan                 = "A escanear periféricos...",
+      conect               = "%s conectado em %s",
+      found                = "%d periférico(s) encontrado(s)",
+      lost                 = "%s desconectado de %s",
+      not_found            = "Periférico não encontrado: %s",
+      scan_done            = "%d periférico(s) encontrado(s)",
+      monitor_size         = "Monitor pequeno demais (%dx%d), mínimo é %dx%d",
+      getNames_available   = "peripheral.getNames() disponível — %d nome(s)",
+      getNames_unavailable = "peripheral.getNames() indisponível — a usar sides apenas"
     },
 
     store      = {
