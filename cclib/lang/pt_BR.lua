@@ -3,16 +3,41 @@
 -- Todas as chaves definidas aqui DEVEM existir em todos os outros arquivos de idioma.
 -- Novas chaves adicionadas à biblioteca devem ser adicionadas primeiro aqui e, em seguida, aos outros arquivos.
 
-return {
+---@version 1.0.0
+
+local M = {
   cclib = {
     name       = "CCLib",
     version    = "Versão %s",
 
+    event      = {
+      registered   = "[Event]: Listener #%d registado para '%s'",
+      removed      = "[Event]: Listener #%d removido de '%s'",
+      reset_bus    = "[Event]: Bus resetado (%d listeners removidos)",
+      pause_bus    = "[Event]: Bus pausado",
+      resume_bus   = "[Event]: Bus retomado (%d eventos em fila)",
+      invalid_args = "[Event] [%s]: Argumentos inválidos",
+      emited       = "[Event]: Emit '%s' (%d listeners)",
+      error        = "[Event]: Handler de '%s' lançou erro: %s"
+    },
+
     guard      = {
-      must_be         = "'%s' deve ser %s, recebeu %s",
-      must_not_be_nil = "'%s' não pode ser nil",
-      must_be_between = "'%s' deve estar entre %s e %s, recebeu %s",
-      must_be_one_of  = "'%s' deve ser um de [%s], recebeu '%s'",
+      must_not_be_nil          = "[Guard] '%s' não pode ser nil",
+      must_not_be_empty        = "[Guard] '%s' não pode ser string vazia",
+      must_not_be_max_char     = "[Guard] '%s' não pode ter mais de %d chars, tem %d",
+      must_be                  = "[Guard] '%s' deve ser %s, recebeu %s",
+      must_be_between          = "[Guard] '%s' deve estar entre %s e %s, recebeu %s",
+      must_be_one_of           = "[Guard] '%s' deve ser um de [%s], recebeu '%s'",
+      must_be_greater_zero     = "[Guard] '%s' deve ser > 0, recebeu %s",
+      must_be_greater_or_equal = "[Guard] '%s' deve ser >= %s, recebeu %s",
+      must_be_less_or_equal    = "[Guard] '%s' deve ser <= %s, recebeu %s",
+      must_be_string           = "[Guard] '%s' deve ser string, recebeu %s",
+      must_be_number           = "[Guard] '%s' deve ser number, recebeu %s",
+      must_be_integer          = "[Guard] '%s' deve ser integer, recebeu %s",
+      must_be_boolean          = "[Guard] '%s' deve ser boolean, recebeu %s",
+      must_be_function         = "[Guard] '%s' deve ser function, recebeu %s",
+      must_be_nil              = "[Guard] '%s' deve ser nil, recebeu %s",
+      must_be_table            = "[Guard] '%s' deve ser table, recebeu %s"
     },
 
     log        = {
@@ -23,6 +48,7 @@ return {
       level_fatal = "FATAL",
       rotated     = "Log rotacionado",
       closed      = "Log encerrado",
+      file_error  = "Não foi possível abrir ficheiro de log: %s"
     },
 
     session    = {
@@ -183,6 +209,12 @@ return {
       tick = "tick %d",
       day  = "Dia %d",
     },
+
+    limit    = "Limite de %d timers atingido, não foi possível criar '%s'",
+    created  = "Timer '%s' criado (id=%d, interval=%.2fs, loop=%s)",
+    fired    = "Timer '%s' disparou (id=%d)",
+    error    = "Callback do timer '%s' lançou erro: %s",
+    canceled = "Timer '%s' cancelado (cancelAll)"
   },
 
   -- ── Status / feedback ──────────────────────────────────────────────────────
@@ -198,4 +230,7 @@ return {
     error   = "Erro",
     unknown = "Desconhecido",
   },
+
 }
+
+return M

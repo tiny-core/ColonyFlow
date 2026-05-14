@@ -7,7 +7,8 @@
 ---@version 1.0.0
 
 local LConst       = require("cclib.core.const")
-local Str          = require("cclib.core.str")
+local LStr         = require("cclib.core.str")
+local LLang        = require("cclib.lang.init")
 
 --#region Definições ----------------------------------------------------------------------------------------------------
 
@@ -49,7 +50,7 @@ function M._write(level, module, message)
 
     -- Rotação de ficheiro quando atinge o limite
     if _lineCount >= LConst.LIMIT.LOG_FILE_LINES then
-      _fileHandle:write("--- log rotacionado ---\n")
+      _fileHandle:write("--- " .. LLang.t("cclib.log.rotated") .. " ---\n")
       _fileHandle:close()
       _fileHandle = nil
       _lineCount  = 0
@@ -73,7 +74,7 @@ function M._write(level, module, message)
       else
         _debugMon.setTextColor(colors and colors.lightGray or 256)
       end
-      _debugMon.write(Str.truncate(line, w))
+      _debugMon.write(LStr.truncate(line, w))
       _debugMon.setTextColor(colors and colors.white or 1)
     end)
     if not ok then _debugMon = nil end -- monitor desconectado
@@ -125,7 +126,7 @@ function M.init(opts)
       _fileHandle = handle
     else
       -- não podemos logar o erro ainda — vai para o buffer
-      _buffer[#_buffer + 1] = { LConst.LOG.WARN, "log", "Não foi possível abrir ficheiro de log: " .. tostring(err) }
+      _buffer[#_buffer + 1] = { LConst.LOG.WARN, "log", LLang.t("cclib.log.file_error", tostring(err)) }
     end
   end
 
@@ -167,7 +168,7 @@ end
 
 function M.close()
   if _fileHandle then
-    M.info("log", "Log encerrado")
+    M.info("log", LLang.t("cclib.log.closed"))
     _fileHandle:flush()
     _fileHandle:close()
     _fileHandle = nil
@@ -178,7 +179,7 @@ function M.separator(label)
   local line = string.rep("-", 40)
   label = label and (" " .. label .. " ") or ""
   local sep = line .. label .. line
-  M._write(LConst.LOG.INFO, "---", sep:sub(1, 60))
+  M._write(LConst.LOG.INFO, LStr.CHAR.LINE_H, sep:sub(1, 60))
 end
 
 --#endregion

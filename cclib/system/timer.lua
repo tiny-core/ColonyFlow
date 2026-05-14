@@ -9,6 +9,8 @@
 
 local TConst        = require("cclib.core.const")
 local TLog          = require("cclib.system.log")
+local TGuard        = require("cclib.core.guard")
+local TLang         = require("cclib.lang.init")
 
 --#region Definições ----------------------------------------------------------------------------------------------------
 
@@ -36,15 +38,20 @@ local _delayCounter = 0
 --#region Métodos públicos ---------------------------------------------------------------------------------------------
 
 function M.create(name, interval, callback, opts)
-  if type(name) ~= "string" then
-    TLog.warn("timer", "create: name deve ser string"); return nil
-  end
-  if type(interval) ~= "number" then
-    TLog.warn("timer", "create: interval deve ser number"); return nil
-  end
-  if type(callback) ~= "function" then
-    TLog.warn("timer", "create: callback deve ser function"); return nil
-  end
+  -- if type(name) ~= "string" then
+  --   TLog.warn("timer", "create: name deve ser string"); return nil
+  -- end
+  -- if type(interval) ~= "number" then
+  --   TLog.warn("timer", "create: interval deve ser number"); return nil
+  -- end
+  -- if type(callback) ~= "function" then
+  --   TLog.warn("timer", "create: callback deve ser function"); return nil
+  -- end
+
+  name = TGuard.isString(name, "name")
+  interval = TGuard.isNumber(interval, "interval")
+  callback = TGuard.isFunction(callback, "callback")
+
   if interval < 0.05 then interval = 0.05 end
 
   opts = opts or {}
@@ -55,7 +62,8 @@ function M.create(name, interval, callback, opts)
   end
 
   if _totalCount >= TConst.LIMIT.TIMER_MAX then
-    TLog.warn("timer", "Limite de %d timers atingido, não foi possível criar '%s'", TConst.LIMIT.TIMER_MAX, name)
+    -- TLog.warn("timer", "Limite de %d timers atingido, não foi possível criar '%s'", TConst.LIMIT.TIMER_MAX, name)
+    TLog.warn("timer", TLang.t("cclib.time.limit", TConst.LIMIT.TIMER_MAX, name))
     return nil
   end
 
@@ -71,8 +79,8 @@ function M.create(name, interval, callback, opts)
   _byName[name] = ccId
   _totalCount   = _totalCount + 1
 
-  TLog.debug("timer", "Timer '%s' criado (id=%d, interval=%.2fs, loop=%s)",
-    name, ccId, interval, tostring(opts.loop == true))
+  -- TLog.debug("timer", "Timer '%s' criado (id=%d, interval=%.2fs, loop=%s)", name, ccId, interval, tostring(opts.loop == true))
+  TLog.warn("timer", TLang.t("cclib.time.created", name, ccId, interval, tostring(opts.loop == true)))
   return ccId
 end
 
@@ -80,12 +88,14 @@ function M.fire(ccId)
   local entry = _timers[ccId]
   if not entry then return false end
 
-  TLog.debug("timer", "Timer '%s' disparou (id=%d)", entry.name, ccId)
+  -- TLog.debug("timer", "Timer '%s' disparou (id=%d)", entry.name, ccId)
+  TLog.debug("timer", TLang.t("cclib.time.fired", entry.name, ccId))
 
   -- Executa callback protegido
   local ok, err = pcall(entry.callback, table.unpack(entry.args))
   if not ok then
-    TLog.error("timer", "Callback do timer '%s' lançou erro: %s", entry.name, tostring(err))
+    -- TLog.error("timer", "Callback do timer '%s' lançou erro: %s", entry.name, tostring(err))
+    TLog.error("timer", TLang.t("cclib.time.error", entry.name, tostring(err)))
   end
 
   -- Remove da tabela (o ID CC é descartável após o disparo)
@@ -124,7 +134,8 @@ end
 function M.cancelAll()
   for ccId, entry in pairs(_timers) do
     if os.cancelTimer then pcall(os.cancelTimer, ccId) end
-    TLog.debug("timer", "Timer '%s' cancelado (cancelAll)", entry.name)
+    -- TLog.debug("timer", "Timer '%s' cancelado (cancelAll)", entry.name)
+    TLog.debug("timer", TLang.t("cclib.time.canceled", entry.name))
   end
   _timers     = {}
   _byName     = {}

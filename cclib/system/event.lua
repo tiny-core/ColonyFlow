@@ -6,7 +6,9 @@
 
 ---@version 1.0.0
 
-local Log        = require("cclib.system.log")
+local ELog       = require("cclib.system.log")
+local ELang      = require("cclib.lang.init")
+local EGuard     = require("cclib.core.guard")
 
 --#region Definições ----------------------------------------------------------------------------------------------------
 
@@ -27,14 +29,18 @@ local _queue     = {} -- fila de eventos emitidos enquanto pausado
 --#region Métodos públicos ---------------------------------------------------------------------------------------------
 
 function M.on(eventName, fn)
-  if type(eventName) ~= "string" then
-    Log.warn("event", "M.on: eventName deve ser string, recebeu %s", type(eventName))
-    return nil
-  end
-  if type(fn) ~= "function" then
-    Log.warn("event", "M.on: fn deve ser function")
-    return nil
-  end
+  -- if type(eventName) ~= "string" then
+  --   ELog.warn("event", "Event.on: eventName deve ser string, recebeu %s", type(eventName))
+  --   return nil
+  -- end
+  --
+  -- if type(fn) ~= "function" then
+  --   ELog.warn("event", "Event.on: fn deve ser function")
+  --   return nil
+  -- end
+
+  eventName = EGuard.isString(eventName, "eventName")
+  fn = EGuard.isFunction(fn, "fn")
 
   if not _listeners[eventName] then
     _listeners[eventName] = {}
@@ -48,13 +54,15 @@ function M.on(eventName, fn)
     once = false,
   }
 
-  Log.debug("event", "Listener #%d registado para '%s'", id, eventName)
+  -- ELog.debug("event", "Listener #%d registado para '%s'", id, eventName)
+  ELog.debug("event", ELang.t("cclib.event.registered", id, eventName))
   return id
 end
 
 function M.once(eventName, fn)
   if type(eventName) ~= "string" or type(fn) ~= "function" then
-    Log.warn("event", "M.once: argumentos inválidos")
+    -- ELog.warn("event", "Event.once: argumentos inválidos")
+    ELog.warn("event", ELang.t("cclib.event.invalid_args", eventName))
     return nil
   end
 
@@ -79,7 +87,8 @@ function M.off(id)
     for i, entry in ipairs(list) do
       if entry.id == id then
         table.remove(list, i)
-        Log.debug("event", "Listener #%d removido de '%s'", id, eventName)
+        -- ELog.debug("event", "Listener #%d removido de '%s'", id, eventName)
+        ELog.debug("event", ELang.t("cclib.event.removed", id, eventName))
         return true
       end
     end
@@ -91,7 +100,8 @@ function M.offAll(eventName)
   if _listeners[eventName] then
     local count = #_listeners[eventName]
     _listeners[eventName] = {}
-    Log.debug("event", "%d listeners removidos de '%s'", count, eventName)
+    -- ELog.debug("event", "%d listeners removidos de '%s'", count, eventName)
+    ELog.debug("event", ELang.t("cclib.event.removed", count, eventName))
     return count
   end
   return 0
@@ -101,7 +111,8 @@ function M.reset()
   local total = 0
   for _, list in pairs(_listeners) do total = total + #list end
   _listeners = {}
-  Log.debug("event", "Bus resetado (%d listeners removidos)", total)
+  -- ELog.debug("event", "Bus resetado (%d listeners removidos)", total)
+  ELog.debug("event", ELang.t("cclib.event.reset_bus", total))
 end
 
 function M.emit(eventName, data)
@@ -113,7 +124,8 @@ function M.emit(eventName, data)
   local list = _listeners[eventName]
   if not list or #list == 0 then return end
 
-  Log.debug("event", "emit '%s' (%d listeners)", eventName, #list)
+  -- ELog.debug("event", "emit '%s' (%d listeners)", eventName, #list)
+  ELog.debug("event", ELang.t("cclib.event.emited", eventName, #list))
 
   local snapshot = {}
   for i, e in ipairs(list) do snapshot[i] = e end
@@ -122,7 +134,8 @@ function M.emit(eventName, data)
   for _, entry in ipairs(snapshot) do
     local ok, err = pcall(entry.fn, data)
     if not ok then
-      Log.error("event", "Handler de '%s' lançou erro: %s", eventName, tostring(err))
+      -- ELog.error("event", "Handler de '%s' lançou erro: %s", eventName, tostring(err))
+      ELog.error("event", ELang.t("cclib.event.error", eventName, tostring(err)))
     end
     if entry.once then
       toRemove[#toRemove + 1] = entry.id
@@ -151,7 +164,8 @@ function M.dispatch(eventName, ...)
   for _, entry in ipairs(snapshot) do
     local ok, err = pcall(entry.fn, ...)
     if not ok then
-      Log.error("event", "Handler de '%s' lançou erro: %s", eventName, tostring(err))
+      -- ELog.error("event", "Handler de '%s' lançou erro: %s", eventName, tostring(err))
+      ELog.error("event", ELang.t("cclib.event.error", eventName, tostring(err)))
     end
     if entry.once then toRemove[#toRemove + 1] = entry.id end
   end
@@ -160,14 +174,16 @@ end
 
 function M.pause()
   _paused = true
-  Log.debug("event", "Bus pausado")
+  -- ELog.debug("event", "Bus pausado")
+  ELog.debug("event", ELang.t("cclib.event.pause_bus"))
 end
 
 function M.resume()
   _paused = false
   local queued = _queue
   _queue = {}
-  Log.debug("event", "Bus retomado (%d eventos em fila)", #queued)
+  -- ELog.debug("event", "Bus retomado (%d eventos em fila)", #queued)
+  ELog.debug("event", ELang.t("cclib.event.resume_bus", #queued))
 
   for _, entry in ipairs(queued) do
     local name = entry[1]
