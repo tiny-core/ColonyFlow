@@ -1,19 +1,19 @@
 ---@meta
 ---@version 1.0.0
 
--- cclib / types / core.result.d.lua
--- Definições de tipo para core/result.lua
+-- cclib / types / core.resolver.d.lua
+-- Definições de tipo para core/resolver.lua
 -- Usa genéricos LuaLS para preservar o tipo do valor em Ok<T> e Err<E>.
 
 -- ── Callbacks ─────────────────────────────────────────────────────────────────
 
----@class CCLib.Result.Callbacks<T>
+---@class CCLib.Resolver.Callbacks<T>
 ---@field onSuccess? fun(data: T)      Chamado com o retorno de fn em caso de sucesso
 ---@field onError?   fun(err: string)  Chamado com a mensagem de erro em caso de falha
 
 -- ── Módulo ────────────────────────────────────────────────────────────────────
 
----@class CCLib.Result
+---@class CCLib.Resolver
 local Result = {}
 
 ---Executa `fn` com pcall e chama o callback apropriado.
@@ -52,5 +52,5 @@ local Result = {}
 ---```
 ---@generic T
 ---@param fn fun(): T
----@param callbacks? CCLib.Result.Callbacks<T>
+---@param callbacks? CCLib.Resolver.Callbacks<T>
 function Result.try(fn, callbacks) end

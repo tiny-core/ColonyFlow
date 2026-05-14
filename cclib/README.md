@@ -19,7 +19,7 @@ cclib/
 │   ├── const.lua             ← Constantes globais (versão, cores, keys, sides)
 │   ├── class.lua             ← Sistema OOP base (herança, instâncias)
 │   ├── guard.lua             ← Type guards e validação de argumentos
-│   ├── result.lua            ← Monad Ok/Err para tratamento de erros
+│   ├── resolver.lua            ← Monad Ok/Err para tratamento de erros
 │   ├── str.lua               ← String utils + encode CP437 + chars especiais
 │   ├── tbl.lua               ← Table utils (map, filter, reduce, deepCopy…)
 │   ├── math.lua              ← Math utils (clamp, lerp, percent, round…)
@@ -117,7 +117,7 @@ Isso permite que o utilizador coloque a lib em qualquer pasta.
 ### Erros
 - Módulos `core/` podem usar `error()` diretamente.
 - Módulos `system/` e acima devem retornar `Result.err()` em vez de `error()`.
-- Nunca usar `assert()` em código de produção — prefere `guard` ou `result`.
+- Nunca usar `assert()` em código de produção — prefere `guard` ou `resolver`.
 
 ### Comentários de módulo
 Cada ficheiro começa com:

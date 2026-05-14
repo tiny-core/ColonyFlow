@@ -1,5 +1,5 @@
 -- =====================================================================================================================
--- Arquivo: cclib/core/M.lua
+-- Arquivo: cclib/core/Resolver.lua
 -- Descrição: Execução protegida com callbacks de sucesso e erro.
 --            API única: Result.try(fn, { onSuccess, onError })
 --            fn não recebe argumentos — usa closure para capturar valores externos.
@@ -10,7 +10,7 @@
 
 --#region Definições ----------------------------------------------------------------------------------------------------
 
----@type CCLib.Result
+---@type CCLib.Resolver
 local M = {}
 
 --#endregion
